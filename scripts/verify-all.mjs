@@ -29,6 +29,7 @@ const SCRIPTS = [
   'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api', 'verify-txn', 'verify-slips', 'verify-ledger', 'verify-money', 'verify-notify', 'verify-approvals', 'verify-bell', 'verify-employees', 'verify-workers', 'verify-attendance', 'verify-payroll', 'verify-payroll-ui', 'verify-audit', 'verify-pwa',
   // ท้ายสุดเสมอ — ตรวจว่า "ติ๊ก" ในตารางตรวจรับมีของจริงรองรับ
   // ตัวนี้ไม่ได้ทดสอบแอป มันทดสอบ**เอกสารที่บอกว่าแอปถูกทดสอบแล้ว**
+  'verify-ship',
   'verify-matrix',
 ]
 

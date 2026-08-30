@@ -14,7 +14,6 @@ type Site = {
   client_name: string | null
   client_phone: string | null
   address: string | null
-  contract_amount: number
   start_date: string | null
   end_date: string | null
   status: SiteStatus
@@ -74,9 +73,12 @@ function Field({ id, label, span, children }: { id: string; label: string; span?
 }
 
 export function SiteDetailActions({
-  site, crew, milestones, people,
+  site, contractAmount, crew, milestones, people,
 }: {
   site: Site
+  /** มาจากตาราง `site_finance` คนละตารางกับ `sites` — เจ้าของเท่านั้นที่อ่านได้
+   *  คอมโพเนนต์นี้เรนเดอร์ให้เจ้าของเท่านั้นอยู่แล้ว จึงรับเป็น number ตรง ๆ */
+  contractAmount: number
   crew: Crew[]
   milestones: Milestone[]
   people: Person[]
@@ -92,7 +94,7 @@ export function SiteDetailActions({
     clientName: site.client_name ?? '',
     clientPhone: site.client_phone ?? '',
     address: site.address ?? '',
-    contractAmount: site.contract_amount ? String(site.contract_amount) : '',
+    contractAmount: contractAmount ? String(contractAmount) : '',
     startDate: site.start_date ?? '',
     endDate: site.end_date ?? '',
     status: site.status,

@@ -17,7 +17,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
 
   const { data: site, error } = await sb
     .from('sites')
-    .select('id, name, client_name, client_phone, address, contract_amount, start_date, end_date, status')
+    .select('id, name, client_name, client_phone, address, start_date, end_date, status')
     .eq('id', id)
     .maybeSingle()
 
@@ -34,7 +34,9 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   // หน้าเปล่าอ่านเหมือนระบบพัง และยังบอกใบ้ด้วยว่า "ไซต์นี้มีอยู่จริงนะ"
   if (!site) notFound()
 
-  const [{ data: crew }, { data: milestones }, people] = await Promise.all([
+  const isOwner = me.role === 'owner'
+
+  const [{ data: crew }, { data: milestones }, people, contractAmount] = await Promise.all([
     sb
       .from('site_supervisors')
       .select('id, effective_from, effective_to, profiles(id, full_name)')
@@ -62,9 +64,21 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             return data ?? []
           })
       : Promise.resolve([]),
+    // ค่างานอยู่ตารางที่หัวหน้าไซต์อ่านไม่ได้ · `null` แปลว่า "ไม่มีสิทธิ์เห็น"
+    // ซึ่งไม่เหมือน 0 ที่แปลว่า "ยังไม่ได้ตั้ง" — สองอย่างนี้ห้ามปนกัน
+    isOwner
+      ? sb
+          .from('site_finance')
+          .select('contract_amount')
+          .eq('site_id', id)
+          .maybeSingle()
+          .then(({ data, error: fErr }) => {
+            if (fErr) console.error('[sites] อ่านค่างานไม่ได้', fErr.message)
+            return data ? Number(data.contract_amount) : 0
+          })
+      : Promise.resolve<number | null>(null),
   ])
 
-  const isOwner = me.role === 'owner'
   const today = todayInBangkok()
   const progress = timeProgress(site.start_date, site.end_date, today)
   const plannedTotal = (milestones ?? []).reduce((sum, m) => sum + Number(m.planned_amount), 0)
@@ -94,6 +108,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         {isOwner && (
           <SiteDetailActions
             site={site}
+            contractAmount={contractAmount ?? 0}
             crew={crew ?? []}
             milestones={milestones ?? []}
             people={people}
@@ -150,12 +165,14 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
       <section className="panel mb-4">
         <div className="panel-head">ข้อมูลสัญญา</div>
         <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
-          <div>
-            <dt className="text-xs font-medium text-muted-token">ค่างานตามสัญญา</dt>
-            <dd className="mt-0.5 text-xl font-bold tnum text-ink">
-              {site.contract_amount > 0 ? fmtBaht(site.contract_amount) : 'ยังไม่ได้ตั้งค่างาน'}
-            </dd>
-          </div>
+          {contractAmount !== null && (
+            <div>
+              <dt className="text-xs font-medium text-muted-token">ค่างานตามสัญญา</dt>
+              <dd className="mt-0.5 text-xl font-bold tnum text-ink">
+                {contractAmount > 0 ? fmtBaht(contractAmount) : 'ยังไม่ได้ตั้งค่างาน'}
+              </dd>
+            </div>
+          )}
           <div>
             <dt className="text-xs font-medium text-muted-token">ช่วงเวลางาน</dt>
             <dd className="mt-0.5 flex items-center gap-1.5 text-base text-ink">

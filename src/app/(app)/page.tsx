@@ -21,15 +21,30 @@ export default async function OverviewPage() {
   // 🔴 ตัวเลขสรุปคำนวณในฐานข้อมูลด้วย RPC ที่เป็น `security invoker`
   // RLS จึงยังทำงาน — หัวหน้าไซต์ได้ตัวเลขของไซต์ตัวเองโดยไม่ต้องมี if ตรงนี้
   // และไม่มีการดึงแถวมานับใน JS ซึ่งจะเพี้ยนเงียบ ๆ ที่ 1,000 แถว
-  const [{ data: summary, error: sErr }, { data: sites, error: lErr }] = await Promise.all([
+  const isOwner = me.role === 'owner'
+
+  const [{ data: summary, error: sErr }, { data: sites, error: lErr }, financeRows] =
+    await Promise.all([
     sb.rpc('site_overview', { p_on: today }),
     sb
       .from('sites')
-      .select('id, name, client_name, contract_amount, start_date, end_date, status')
+      .select('id, name, client_name, start_date, end_date, status')
       .eq('status', 'active')
       // ไซต์ที่ใกล้ครบกำหนดที่สุดอยู่บนสุด · ไซต์ที่ยังไม่ตั้งวันจบไปท้ายสุด
       .order('end_date', { ascending: true, nullsFirst: false })
       .range(0, TOP_SITES - 1),
+    // ค่างานอยู่ตาราง `site_finance` ที่หัวหน้าไซต์อ่านไม่ได้เลย
+    isOwner
+      ? sb
+          .from('site_finance')
+          .select('site_id, contract_amount')
+          .order('site_id', { ascending: true })
+          .range(0, TOP_SITES - 1)
+          .then(({ data, error: fErr }) => {
+            if (fErr) console.error('[overview] อ่านค่างานไม่ได้', fErr.message)
+            return data ?? []
+          })
+      : Promise.resolve([]),
   ])
 
   if (sErr || lErr) {
@@ -45,7 +60,7 @@ export default async function OverviewPage() {
   const s = summary?.[0] ?? {
     total_count: 0, active_count: 0, active_contract: 0, due_soon_count: 0, overdue_count: 0,
   }
-  const isOwner = me.role === 'owner'
+  const contractOf = new Map(financeRows.map((f) => [f.site_id, Number(f.contract_amount)]))
   const rows = sites ?? []
 
   return (
@@ -77,12 +92,17 @@ export default async function OverviewPage() {
         {/* ค่างานตามสัญญาเป็นตัวเลขเดียวที่มีจริงในเฟสนี้ — ยอดเก็บเงินและต้นทุน
             ต้องรอ P2/P4 · การ์ดที่โชว์ ฿0 ตอนนี้จะอ่านเหมือน "ยังไม่เก็บเงินได้เลย"
             ทั้งที่ความจริงคือ "ระบบยังไม่รู้จักรายรับ" ซึ่งคนละเรื่องกัน */}
-        <Metric
-          label="ค่างานที่รับไว้"
-          value={fmtBaht(s.active_contract)}
-          icon={Wallet}
-          hint="ตามสัญญาของไซต์ที่กำลังทำ"
-        />
+        {/* 🔴 RPC คืน `null` ไม่ใช่ 0 เมื่อคนเรียกไม่มีสิทธิ์เห็นตัวเลข
+            การ์ดจึงหายไปทั้งใบสำหรับหัวหน้าไซต์ · ถ้าคืน 0 มาแทน หน้าจอจะวาด ฿0
+            อย่างมั่นใจ แล้วคนอ่านจะเชื่อว่านั่นคือคำตอบ */}
+        {s.active_contract !== null && (
+          <Metric
+            label="ค่างานที่รับไว้"
+            value={fmtBaht(Number(s.active_contract))}
+            icon={Wallet}
+            hint="ตามสัญญาของไซต์ที่กำลังทำ"
+          />
+        )}
         <Metric
           label="ใกล้ครบกำหนด"
           value={s.due_soon_count}
@@ -179,7 +199,9 @@ export default async function OverviewPage() {
                   <div className="mt-3 border-t border-line-soft pt-2 text-sm tnum text-muted-token">
                     ค่างาน{' '}
                     <span className="font-semibold text-ink">
-                      {site.contract_amount > 0 ? fmtBaht(site.contract_amount) : 'ยังไม่ได้ตั้ง'}
+                      {(contractOf.get(site.id) ?? 0) > 0
+                        ? fmtBaht(contractOf.get(site.id))
+                        : 'ยังไม่ได้ตั้ง'}
                     </span>
                   </div>
                 )}

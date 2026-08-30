@@ -80,11 +80,11 @@ let othersId = null
 try {
   // ── fixture: ไซต์ที่ sup1 ดูแล และไซต์ที่ sup2 ดูแล ─────────────────────
   ;[{ id: mineId }] = (await sql(
-    `insert into public.sites(name, contract_amount, start_date, end_date)
-     values ('ทดสอบ ไซต์ของฉัน', 1000000, current_date - 10, current_date + 10) returning id`,
+    `insert into public.sites(name, start_date, end_date)
+     values ('ทดสอบ ไซต์ของฉัน', current_date - 10, current_date + 10) returning id`,
   )).rows
   ;[{ id: othersId }] = (await sql(
-    `insert into public.sites(name, contract_amount) values ('ทดสอบ ไซต์คนอื่น', 500000) returning id`,
+    `insert into public.sites(name) values ('ทดสอบ ไซต์คนอื่น') returning id`,
   )).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id) values ('${mineId}','${sup1.id}')`)
   await sql(`insert into public.site_supervisors(site_id, profile_id) values ('${othersId}','${sup2.id}')`)
@@ -116,7 +116,7 @@ try {
       `anon ${Array.isArray(anon.body) ? anon.body.length : anon.status} · owner ${own.body?.length}`)
   }
 
-  // P1-DB-05 · หัวหน้าไซต์แก้ค่างานไม่ได้ (RLS ปฏิเสธเงียบ ๆ = โดน 0 แถว)
+  // P1-DB-05 · หัวหน้าไซต์แก้ชื่อไซต์ไม่ได้ (RLS ปฏิเสธเงียบ ๆ = โดน 0 แถว)
   {
     const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/sites?id=eq.${mineId}`, {
       method: 'PATCH',
@@ -126,13 +126,73 @@ try {
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },
-      body: JSON.stringify({ contract_amount: 99 }),
+      body: JSON.stringify({ name: 'ชื่อที่ไม่ควรถูกเขียน' }),
     })
     const changed = await r.json().catch(() => [])
-    const { rows } = await sql(`select contract_amount from public.sites where id='${mineId}'`)
-    check('P1-DB-05 หัวหน้าไซต์แก้ค่างานไม่ได้ — โดน 0 แถว และค่าเดิมไม่เปลี่ยน',
-      (Array.isArray(changed) ? changed.length : 0) === 0 && Number(rows[0].contract_amount) === 1000000,
-      `แถวที่ถูกแก้ ${Array.isArray(changed) ? changed.length : '?'} · ค่างาน ${rows[0].contract_amount}`)
+    const { rows } = await sql(`select name from public.sites where id='${mineId}'`)
+    check('P1-DB-05 หัวหน้าไซต์แก้ข้อมูลไซต์ไม่ได้ — โดน 0 แถว และค่าเดิมไม่เปลี่ยน',
+      (Array.isArray(changed) ? changed.length : 0) === 0 && rows[0].name === 'ทดสอบ ไซต์ของฉัน',
+      `แถวที่ถูกแก้ ${Array.isArray(changed) ? changed.length : '?'} · ชื่อ ${rows[0].name}`)
+  }
+
+  // ── ค่างานตามสัญญาเป็นความลับจากหัวหน้าไซต์ (เจ้าของตัดสิน 30 ส.ค. 2569) ──
+
+  // P1-DB-14 · หัวหน้าไซต์อ่านตาราง site_finance ไม่ได้เลย
+  // 🔴 ครึ่งบวกอยู่ในการตรวจเดียวกัน: เจ้าของต้องอ่านได้ > 0 แถว
+  // ไม่งั้น "หัวหน้าไซต์เห็น 0 แถว" อาจแปลว่าไม่มีข้อมูลตั้งแต่แรก
+  {
+    await sql(`update public.site_finance set contract_amount = 1000000 where site_id='${mineId}'`)
+    const sup = await db(supTok, '/site_finance?select=site_id,contract_amount')
+    const own = await db(ownerTok, '/site_finance?select=site_id,contract_amount')
+    check('P1-DB-14 หัวหน้าไซต์อ่าน site_finance ได้ 0 แถว · เจ้าของอ่านได้',
+      (Array.isArray(sup.body) ? sup.body.length : -1) === 0 && own.body?.length >= 1,
+      `หัวหน้าไซต์ ${Array.isArray(sup.body) ? sup.body.length : sup.status} · เจ้าของ ${own.body?.length}`)
+  }
+
+  // P1-DB-15 · ไม่มีคอลัมน์ contract_amount บนตาราง sites อีกแล้ว
+  // ปิดทางอ้อม: ถ้ายังมีคอลัมน์อยู่ หัวหน้าไซต์อ่านผ่านแถว sites ที่เขาเห็นได้ทันที
+  {
+    const { rows } = await sql(
+      `select count(*)::int as n from information_schema.columns
+       where table_schema='public' and table_name='sites' and column_name='contract_amount'`)
+    const { rows: fin } = await sql(
+      `select count(*)::int as n from information_schema.columns
+       where table_schema='public' and table_name='site_finance' and column_name='contract_amount'`)
+    check('P1-DB-15 คอลัมน์ contract_amount ไม่อยู่บน sites แล้ว และย้ายไปอยู่บน site_finance',
+      rows[0].n === 0 && fin[0].n === 1, `sites ${rows[0].n} · site_finance ${fin[0].n}`)
+  }
+
+  // P1-DB-16 · site_overview คืน null ให้หัวหน้าไซต์ ไม่ใช่ 0
+  // 🔴 "ศูนย์" กับ "ไม่มีสิทธิ์เห็น" เป็นคนละเรื่อง — หน้าจอซ่อนการ์ดที่ได้ null ได้
+  // แต่มันจะวาด ฿0 อย่างมั่นใจ แล้วคนอ่านจะเชื่อว่านั่นคือคำตอบ
+  {
+    const rpc = async (token) => {
+      const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/site_overview`, {
+        method: 'POST',
+        headers: {
+          apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ p_on: new Date().toISOString().slice(0, 10) }),
+      })
+      return (await r.json())?.[0]
+    }
+    const sup = await rpc(supTok)
+    const own = await rpc(ownerTok)
+    check('P1-DB-16 site_overview คืน active_contract = null ให้หัวหน้าไซต์ · ตัวเลขให้เจ้าของ',
+      sup?.active_contract === null && Number(own?.active_contract) >= 1000000,
+      `หัวหน้าไซต์ ${JSON.stringify(sup?.active_contract)} · เจ้าของ ${own?.active_contract}`)
+  }
+
+  // P1-DB-17 · ทุกไซต์ต้องมีแถว site_finance (trigger สร้างให้)
+  {
+    const { rows } = await sql(
+      `select count(*)::int as n from public.sites s
+       left join public.site_finance f on f.site_id = s.id where f.site_id is null`)
+    const { rows: total } = await sql('select count(*)::int as n from public.sites')
+    check('P1-DB-17 ทุกไซต์มีแถว site_finance — trigger สร้างให้ตอน insert',
+      rows[0].n === 0 && total[0].n >= 2, `ไม่มีแถวการเงิน ${rows[0].n} จาก ${total[0].n} ไซต์`)
   }
 
   // P1-DB-07 · ช่วงเวลาทับกันถูกปฏิเสธ

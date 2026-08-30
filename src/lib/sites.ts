@@ -134,19 +134,26 @@ export function timeProgress(
   }
 }
 
+/**
+ * คอลัมน์ของตาราง `sites` เท่านั้น
+ *
+ * 🔴 `contract_amount` **ไม่อยู่ในนี้** — มันย้ายไปตาราง `site_finance`
+ * ที่เจ้าของเท่านั้นอ่านได้ เพราะสิทธิ์ระดับคอลัมน์ของ Postgres ให้กับ role
+ * ของฐานข้อมูล แต่เจ้าของกับหัวหน้าไซต์เป็น role `authenticated` เหมือนกัน
+ * แยกไม่ได้ · ค่าที่คนละบทบาทเห็นไม่เท่ากันต้องอยู่คนละแถว = คนละตาราง
+ */
 export type SiteFields = {
   name: string
   client_name: string | null
   client_phone: string | null
   address: string | null
-  contract_amount: number
   start_date: string | null
   end_date: string | null
   status: SiteStatus
 }
 
 export type SiteParse =
-  | { ok: true; fields: SiteFields }
+  | { ok: true; fields: SiteFields; contractAmount: number }
   | { ok: false; error: string }
 
 const text = (v: unknown, max = MAX_NAME): string | null => {
@@ -192,10 +199,12 @@ export function parseSiteFields(b: unknown): SiteParse {
       client_name: text(o.clientName ?? o.client_name),
       client_phone: text(o.clientPhone ?? o.client_phone, 32),
       address: text(o.address ?? null, 400),
-      contract_amount: amount.value,
       start_date: start.value,
       end_date: end.value,
       status: isSiteStatus(rawStatus) ? rawStatus : 'active',
     },
+    // เขียนลงคนละตาราง จึงคืนแยกออกมา — ปนกลับเข้า fields เมื่อไหร่
+    // `.insert()` จะพังทันทีเพราะ type ของตาราง `sites` ไม่มีคอลัมน์นี้แล้ว
+    contractAmount: amount.value,
   }
 }

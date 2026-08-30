@@ -190,8 +190,9 @@ try {
 
     // ค่าที่ส่งเป็นข้อความมีจุลภาคต้องถูกอ่านเป็นตัวเลข ไม่ใช่ 0 เงียบ ๆ
     const { rows: saved } = await sql(
-      `select contract_amount::float8 as amount, client_name, start_date::text as sd
-       from public.sites where id='${r.body.site?.id}'`,
+      `select f.contract_amount::float8 as amount, s.client_name, s.start_date::text as sd
+       from public.sites s join public.site_finance f on f.site_id = s.id
+       where s.id='${r.body.site?.id}'`,
     )
     check('P1-API-09b ค่างาน "1,500,000" ถูกบันทึกเป็น 1500000 และวันเริ่มเป็น ค.ศ.',
       saved[0]?.amount === 1500000 && saved[0]?.sd === '2026-03-01',
@@ -314,7 +315,8 @@ try {
       { name: 'ชื่อที่ไม่ควรถูกเขียน', contractAmount: 1 }, { cookie: supJar })
     const b = await r.json().catch(() => ({}))
     const { rows } = await sql(
-      `select name, contract_amount::float8 as amount from public.sites where id='${mineId}'`)
+      `select s.name, f.contract_amount::float8 as amount from public.sites s
+       join public.site_finance f on f.site_id = s.id where s.id='${mineId}'`)
     check('P1-API-10 หัวหน้าไซต์ PATCH ไซต์ → 403 · ชื่อและค่างานไม่เปลี่ยน',
       r.status === 403 && b.error === 'FORBIDDEN'
       && rows[0].name === 'ทดสอบ ไซต์ที่มีรายละเอียด' && rows[0].amount === 3000000,
@@ -330,8 +332,10 @@ try {
       clientName: 'คุณสมชาย', clientPhone: '0891112222', address: 'ซอยทดสอบ 5',
     }, { cookie: ownerJar })
     const { rows } = await sql(
-      `select name, status::text as status, contract_amount::float8 as amount,
-              end_date::text as ed, client_phone, address from public.sites where id='${mineId}'`)
+      `select s.name, s.status::text as status, f.contract_amount::float8 as amount,
+              s.end_date::text as ed, s.client_phone, s.address
+       from public.sites s join public.site_finance f on f.site_id = s.id
+       where s.id='${mineId}'`)
     const a = rows[0]
     check('P1-API-11 เจ้าของ PATCH → 200 · ทุกคอลัมน์ถูกเขียนจริง',
       r.status === 200 && a.name === 'ทดสอบ ไซต์ที่แก้ชื่อแล้ว' && a.status === 'paused'
@@ -438,6 +442,19 @@ try {
       missing.length === 0, missing.length ? `ขาด: ${missing.join(', ')}` : '6/6')
   }
 
+  // ── P1-UI-14 · หัวหน้าไซต์ไม่เห็นค่างานบนหน้าจอ ──────────────────
+  // ครึ่งบวก: เจ้าของเห็นทั้งตัวเลขและหัวข้อ ในไซต์เดียวกัน หน้าเดียวกัน
+  // 🔴 นี่เป็นแค่ชั้นหน้าจอ · ชั้นที่บังคับจริงคือ RLS ของตาราง site_finance
+  // ซึ่งพิสูจน์แยกที่ P1-DB-14 — ถ้ามีแค่แถวนี้ ก็คือการซ่อนปุ่ม ไม่ใช่การคุมสิทธิ์
+  {
+    const sup = await page(`/sites/${mineId}`, supJar)
+    const own = await page(`/sites/${mineId}`, ownerJar)
+    check('P1-UI-14 หัวหน้าไซต์ไม่เห็นค่างานบนหน้ารายละเอียด · เจ้าของเห็น',
+      !sup.includes('3,500,000') && !sup.includes('ค่างานตามสัญญา')
+      && own.includes('3,500,000') && own.includes('ค่างานตามสัญญา'),
+      `หัวหน้าไซต์เห็นตัวเลข=${sup.includes('3,500,000')} · เจ้าของเห็น=${own.includes('3,500,000')}`)
+  }
+
   // ── P1-CALC-05 · ค่างาน 0 ต้องไม่หารด้วยศูนย์ ────────────────────
   // `othersId` ถูกสร้างโดยไม่ใส่ค่างาน → contract_amount = 0
   // ครึ่งบวก: ไซต์ที่ตั้งค่างานแล้วต้องแสดงตัวเลข ไม่ใช่ข้อความเดียวกัน
@@ -510,11 +527,13 @@ try {
   {
     const o = await rpc(ownerToken)
     const s = await rpc(supToken)
-    check('P1-DB-13 site_overview() เป็น security invoker — เจ้าของเห็นทุกไซต์ หัวหน้าไซต์เห็นแค่ของตัวเอง',
+    // ค่างานเป็นความลับจากหัวหน้าไซต์แล้ว (P1-DB-16) แถวนี้จึงวัดที่ **การนับไซต์**
+    // ซึ่งยังเป็นตัวชี้ว่า invoker ทำงาน: definer จะทำให้เขานับได้ทั้งบริษัท
+    check('P1-DB-13 site_overview() เป็น security invoker — เจ้าของนับได้ทุกไซต์ หัวหน้าไซต์นับได้แค่ของตัวเอง',
       o?.active_count >= 2 && o?.overdue_count >= 1
-      && Number(s?.active_count) === 1 && Number(s?.active_contract) === 1000000
-      && Number(s?.overdue_count) === 0,
-      `เจ้าของ active=${o?.active_count} เลยกำหนด=${o?.overdue_count} · หัวหน้าไซต์ active=${s?.active_count} ค่างาน=${s?.active_contract}`)
+      && Number(s?.active_count) === 1 && Number(s?.overdue_count) === 0
+      && Number(s?.total_count) === 1,
+      `เจ้าของ active=${o?.active_count} เลยกำหนด=${o?.overdue_count} · หัวหน้าไซต์ active=${s?.active_count} total=${s?.total_count}`)
   }
 
   // ── P1-UI-09 · หน้าภาพรวมของเจ้าของ ──────────────────────────────

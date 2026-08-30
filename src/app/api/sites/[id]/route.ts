@@ -58,5 +58,18 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   // ถ้าไม่เช็คตรงนี้ หน้าจอจะขึ้น "บันทึกแล้ว" ทั้งที่ไม่มีอะไรถูกเขียน
   if (!data) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
 
+  // ค่างานอยู่คนละตาราง — เขียนเสมอ (ไม่ใช่เฉพาะตอน > 0) เพราะการแก้ค่างาน
+  // กลับเป็น 0 คือการลบค่าที่เคยตั้งไว้ ซึ่งต้องบันทึกได้เหมือนกัน
+  const { data: fin, error: fErr } = await sb
+    .from('site_finance')
+    .update({ contract_amount: parsed.contractAmount })
+    .eq('site_id', id)
+    .select('site_id')
+    .maybeSingle()
+  if (fErr || !fin) {
+    console.error('[sites] บันทึกค่างานไม่สำเร็จ', fErr?.message ?? 'โดน 0 แถว')
+    return NextResponse.json({ error: 'CONTRACT_SAVE_FAILED' }, { status: 500 })
+  }
+
   return NextResponse.json({ ok: true, site: data })
 }

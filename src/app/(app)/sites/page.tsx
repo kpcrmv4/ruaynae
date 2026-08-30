@@ -38,7 +38,7 @@ export default async function SitesPage({
 
   let listQuery = sb
     .from('sites')
-    .select('id, name, client_name, contract_amount, start_date, end_date, status')
+    .select('id, name, client_name, start_date, end_date, status')
   if (status !== 'all') listQuery = listQuery.eq('status', status)
   if (search) listQuery = listQuery.or(search)
 
@@ -56,9 +56,25 @@ export default async function SitesPage({
     return count ?? 0
   }
 
-  const [listResult, ...counts] = await Promise.all([
+  // ค่างานอยู่ตาราง `site_finance` ที่หัวหน้าไซต์อ่านไม่ได้เลย
+  // จึงดึงเฉพาะตอนเป็นเจ้าของ — ถ้าดึงทุกครั้งจะได้ลิสต์ว่างเงียบ ๆ
+  // ซึ่งแยกไม่ออกจาก "ยังไม่มีใครตั้งค่างาน"
+  const isOwner = me.role === 'owner'
+
+  const [listResult, financeRows, ...counts] = await Promise.all([
     // .order() + .range() ทุกลิสต์ ไม่พึ่งค่าเริ่มต้นของ PostgREST
     listQuery.order('created_at', { ascending: false }).range(0, PAGE_SIZE - 1),
+    isOwner
+      ? sb
+          .from('site_finance')
+          .select('site_id, contract_amount')
+          .order('site_id', { ascending: true })
+          .range(0, PAGE_SIZE - 1)
+          .then(({ data, error: fErr }) => {
+            if (fErr) console.error('[sites] อ่านค่างานไม่ได้', fErr.message)
+            return data ?? []
+          })
+      : Promise.resolve([]),
     countFor('all'),
     ...SITE_STATUSES.map((s) => countFor(s)),
   ])
@@ -84,7 +100,7 @@ export default async function SitesPage({
     })),
   ]
 
-  const isOwner = me.role === 'owner'
+  const contractOf = new Map(financeRows.map((f) => [f.site_id, Number(f.contract_amount)]))
   const rows = sites ?? []
   // ไม่มีผลการค้นหา กับ ยังไม่มีไซต์เลย เป็นคนละสถานะ — ข้อความเดียวกันทำให้
   // คนคิดว่าข้อมูลหายไปทั้งที่แค่ตัวกรองไม่ตรง
@@ -137,9 +153,15 @@ export default async function SitesPage({
               }
               aside={
                 <>
-                  <span className="text-sm font-semibold tnum text-ink">
-                    {s.contract_amount > 0 ? fmtBaht(s.contract_amount) : 'ยังไม่ได้ตั้งค่างาน'}
-                  </span>
+                  {/* หัวหน้าไซต์ไม่เห็นช่องนี้เลย — และไม่ใช่แค่ซ่อนบนหน้าจอ
+                      ฐานข้อมูลไม่ยอมให้เขาอ่านตาราง site_finance ตั้งแต่แรก */}
+                  {isOwner && (
+                    <span className="text-sm font-semibold tnum text-ink">
+                      {(contractOf.get(s.id) ?? 0) > 0
+                        ? fmtBaht(contractOf.get(s.id))
+                        : 'ยังไม่ได้ตั้งค่างาน'}
+                    </span>
+                  )}
                   <Badge tone={SITE_STATUS_TONE[s.status]} dot>
                     {SITE_STATUS_LABEL[s.status]}
                   </Badge>

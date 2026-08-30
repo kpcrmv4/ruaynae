@@ -45,5 +45,22 @@ export async function POST(req: NextRequest) {
   // insert ที่ไม่คืนแถวคือการปฏิเสธแบบเงียบ — ห้ามตอบสำเร็จ
   if (!data) return NextResponse.json({ error: 'CREATE_FAILED' }, { status: 500 })
 
+  // ค่างานอยู่คนละตาราง (`site_finance`) ที่เจ้าของเท่านั้นอ่าน/เขียนได้
+  // trigger `sites_ensure_finance` สร้างแถวให้แล้วด้วยค่า 0 ตรงนี้จึงเป็น update
+  if (parsed.contractAmount > 0) {
+    const { data: fin, error: fErr } = await sb
+      .from('site_finance')
+      .update({ contract_amount: parsed.contractAmount })
+      .eq('site_id', data.id)
+      .select('site_id')
+      .maybeSingle()
+    // 🔴 update ที่ถูก RLS ปฏิเสธไม่คืน error — มันโดน 0 แถวแล้วบอกว่าสำเร็จ
+    // ปล่อยผ่านคือไซต์ที่ผู้ใช้กรอกค่างานไว้แต่ระบบบันทึกเป็น 0 โดยไม่มีใครรู้
+    if (fErr || !fin) {
+      console.error('[sites] บันทึกค่างานไม่สำเร็จ', fErr?.message ?? 'โดน 0 แถว')
+      return NextResponse.json({ error: 'CONTRACT_SAVE_FAILED' }, { status: 500 })
+    }
+  }
+
   return NextResponse.json({ ok: true, site: data }, { status: 201 })
 }

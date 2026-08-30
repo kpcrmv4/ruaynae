@@ -155,6 +155,35 @@ export type Database = {
         }
         Relationships: []
       }
+      site_finance: {
+        Row: {
+          contract_amount: number
+          created_at: string
+          site_id: string
+          updated_at: string
+        }
+        Insert: {
+          contract_amount?: number
+          created_at?: string
+          site_id: string
+          updated_at?: string
+        }
+        Update: {
+          contract_amount?: number
+          created_at?: string
+          site_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_finance_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: true
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_milestones: {
         Row: {
           created_at: string
@@ -240,7 +269,6 @@ export type Database = {
           address: string | null
           client_name: string | null
           client_phone: string | null
-          contract_amount: number
           created_at: string
           created_by: string | null
           end_date: string | null
@@ -254,7 +282,6 @@ export type Database = {
           address?: string | null
           client_name?: string | null
           client_phone?: string | null
-          contract_amount?: number
           created_at?: string
           created_by?: string | null
           end_date?: string | null
@@ -268,7 +295,6 @@ export type Database = {
           address?: string | null
           client_name?: string | null
           client_phone?: string | null
-          contract_amount?: number
           created_at?: string
           created_by?: string | null
           end_date?: string | null

@@ -14,6 +14,77 @@ export type Database = {
   }
   public: {
     Tables: {
+      advances: {
+        Row: {
+          advance_date: string
+          amount: number
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          note: string | null
+          pay_method: Database["public"]["Enums"]["pay_method"]
+          payroll_run_id: string | null
+          site_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          advance_date: string
+          amount: number
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          note?: string | null
+          pay_method?: Database["public"]["Enums"]["pay_method"]
+          payroll_run_id?: string | null
+          site_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          advance_date?: string
+          amount?: number
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          note?: string | null
+          pay_method?: Database["public"]["Enums"]["pay_method"]
+          payroll_run_id?: string | null
+          site_id?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "advances_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advances_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advances_payroll_run_id_fkey"
+            columns: ["payroll_run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advances_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       app_settings: {
         Row: {
           address: string | null
@@ -414,6 +485,114 @@ export type Database = {
           },
         ]
       }
+      payroll_lines: {
+        Row: {
+          accrued: number
+          advance_deducted: number
+          created_at: string
+          days: number
+          employee_id: string
+          id: string
+          net_paid: number
+          run_id: string
+        }
+        Insert: {
+          accrued?: number
+          advance_deducted?: number
+          created_at?: string
+          days?: number
+          employee_id: string
+          id?: string
+          net_paid?: number
+          run_id: string
+        }
+        Update: {
+          accrued?: number
+          advance_deducted?: number
+          created_at?: string
+          days?: number
+          employee_id?: string
+          id?: string
+          net_paid?: number
+          run_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_lines_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_lines_run_id_fkey"
+            columns: ["run_id"]
+            isOneToOne: false
+            referencedRelation: "payroll_runs"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      payroll_runs: {
+        Row: {
+          closed_at: string | null
+          closed_by: string | null
+          created_at: string
+          id: string
+          period_end: string
+          period_start: string
+          site_id: string | null
+          status: Database["public"]["Enums"]["payroll_status"]
+          total_accrued: number
+          total_advance_deducted: number
+          total_paid: number
+          updated_at: string
+        }
+        Insert: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          period_end: string
+          period_start: string
+          site_id?: string | null
+          status?: Database["public"]["Enums"]["payroll_status"]
+          total_accrued?: number
+          total_advance_deducted?: number
+          total_paid?: number
+          updated_at?: string
+        }
+        Update: {
+          closed_at?: string | null
+          closed_by?: string | null
+          created_at?: string
+          id?: string
+          period_end?: string
+          period_start?: string
+          site_id?: string | null
+          status?: Database["public"]["Enums"]["payroll_status"]
+          total_accrued?: number
+          total_advance_deducted?: number
+          total_paid?: number
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "payroll_runs_closed_by_fkey"
+            columns: ["closed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -748,6 +927,23 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      close_payroll_run: {
+        Args: { p_run: string }
+        Returns: {
+          accrued: number
+          deducted: number
+          lines: number
+          paid: number
+        }[]
+      }
+      employee_balance: {
+        Args: { p_employee: string }
+        Returns: {
+          accrued: number
+          advanced: number
+          balance: number
+        }[]
+      }
       is_owner: { Args: never; Returns: boolean }
       save_employee: {
         Args: {
@@ -800,6 +996,7 @@ export type Database = {
       income_kind: "deposit" | "installment" | "variation_order" | "other"
       notification_kind: "txn_pending" | "txn_approved" | "txn_rejected"
       pay_method: "cash" | "transfer"
+      payroll_status: "open" | "closed"
       site_status: "planning" | "active" | "paused" | "done" | "cancelled"
       txn_kind: "income" | "expense"
       txn_status: "pending" | "approved" | "rejected"
@@ -935,6 +1132,7 @@ export const Constants = {
       income_kind: ["deposit", "installment", "variation_order", "other"],
       notification_kind: ["txn_pending", "txn_approved", "txn_rejected"],
       pay_method: ["cash", "transfer"],
+      payroll_status: ["open", "closed"],
       site_status: ["planning", "active", "paused", "done", "cancelled"],
       txn_kind: ["income", "expense"],
       txn_status: ["pending", "approved", "rejected"],

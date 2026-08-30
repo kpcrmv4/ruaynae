@@ -24,7 +24,13 @@ const clearAttempts = async () => {
   }).catch(() => {})
 }
 
-const SCRIPTS = ['verify-p0', 'verify-rls', 'verify-auth', 'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api']
+const SCRIPTS = [
+  'verify-p0', 'verify-rls', 'verify-auth', 'verify-shell',
+  'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api',
+  // ท้ายสุดเสมอ — ตรวจว่า "ติ๊ก" ในตารางตรวจรับมีของจริงรองรับ
+  // ตัวนี้ไม่ได้ทดสอบแอป มันทดสอบ**เอกสารที่บอกว่าแอปถูกทดสอบแล้ว**
+  'verify-matrix',
+]
 
 let pass = 0
 let fail = 0

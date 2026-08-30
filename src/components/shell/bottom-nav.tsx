@@ -45,7 +45,10 @@ export function BottomNav({ role }: { role: Role }) {
 
   return (
     <>
-      <nav className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden">
+      <nav
+        data-nav="bottom"
+        className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+      >
         {BOTTOM_NAV.slice(0, 2).map((i) => (
           <Slot key={i.href} href={i.href} label={i.label} active={isActive(i.href)}>
             <i.icon className="size-5.5" strokeWidth={1.8} />

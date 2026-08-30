@@ -204,6 +204,28 @@ console.log('\n── P0-DB · RLS และ audit ─────────�
   }
 }
 
+// ── P0-DB-08 · ลบ audit_log ไม่ได้ (แต่ PostgREST ไม่บอกว่าล้มเหลว) ────
+// 🔴 ไม่มี policy สำหรับ DELETE บนตารางนี้ แถวจึงมองไม่เห็นสำหรับคำสั่งลบ
+// PostgREST ตอบว่าสำเร็จทั้งที่โดน 0 แถว — ต้องวัดที่จำนวนแถวที่เปลี่ยน
+// ไม่ใช่ที่ status · ครึ่งบวก: ต้องมีแถวอยู่ก่อนจริง ไม่งั้น 0→0 ผ่านฟรี
+{
+  const countAudit = async () => {
+    const r = await asService('/audit_log?select=id')
+    return Array.isArray(r.body) ? r.body.length : -1
+  }
+
+  const before = await countAudit()
+  const del = await db(ownerTok, '/audit_log?id=neq.00000000-0000-0000-0000-000000000000', {
+    method: 'DELETE',
+    headers: { Prefer: 'return=representation' },
+  })
+  const after = await countAudit()
+  const removed = Array.isArray(del.body) ? del.body.length : 0
+  check('P0-DB-08 เจ้าของลบ audit_log ไม่ได้ — โดน 0 แถว และจำนวนแถวเท่าเดิม',
+    before > 0 && removed === 0 && after === before,
+    `แถวที่ถูกลบ ${removed} · ${before}→${after}`)
+}
+
 console.log('\n══════════════════════════════════════════════')
 const pass = results.filter((r) => r.ok).length
 console.log(`  ${results.length} แถว: ผ่าน ${pass} · ตก ${results.length - pass}`)

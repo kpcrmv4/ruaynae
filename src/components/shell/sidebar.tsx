@@ -32,7 +32,12 @@ export function Sidebar({
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
 
   return (
-    <nav className="sticky top-0 hidden h-svh w-61 shrink-0 flex-col overflow-y-auto border-r border-sidebar-line bg-sidebar px-2.5 py-4 lg:flex">
+    // data-nav เป็นจุดยึดของตัวตรวจ — ตัวตรวจที่จับด้วยคลาส Tailwind จะแดง
+    // ทุกครั้งที่มีคนแก้สไตล์ แล้วสุดท้ายจะถูกลบทิ้งเพราะ "มันแดงมั่ว"
+    <nav
+      data-nav="sidebar"
+      className="sticky top-0 hidden h-svh w-61 shrink-0 flex-col overflow-y-auto border-r border-sidebar-line bg-sidebar px-2.5 py-4 lg:flex"
+    >
       <div className="flex items-center gap-2.5 px-2.5 pb-4">
         <span className="flex size-8.5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white text-sidebar">
           {logoUrl ? (

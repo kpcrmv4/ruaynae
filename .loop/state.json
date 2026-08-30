@@ -56,7 +56,7 @@
         {
           "id": "P0-9",
           "t": "migration: profiles + enums + RLS + is_owner() + audit trigger",
-          "s": "todo"
+          "s": "done"
         },
         {
           "id": "P0-10",
@@ -161,6 +161,11 @@
       "what": "pin_hash กับรหัสผ่าน auth.users ใช้คนละ domain prefix",
       "why": "ถ้าสูตรเดียวกัน ค่าในคอลัมน์ pin_hash จะใช้เป็นรหัสผ่านได้ตรง ๆ — DB ที่รั่วกลายเป็นรายการรหัสผ่านพร้อมใช้ ผู้โจมตีไม่ต้องเดา PIN เลย",
       "cost_if_wrong": "สูง — เท่ากับเก็บรหัสผ่าน plaintext ไว้ในตาราง"
+    },
+    {
+      "what": "ใช้ Management API ผ่าน scripts/db.mjs แทน Supabase MCP",
+      "why": "MCP ของ plugin ตอบ Invalid project ref: ${SUPABASE_PROJECT_REF} — ตัวแปรใน config ไม่ถูกแทนค่า จึงไม่ได้ผูกกับโปรเจ็คนี้ · db.mjs ตรึง ref จาก .env.local และเช็คว่าตรงกับ subdomain ใน URL ก่อนยิงทุกครั้ง",
+      "cost_if_wrong": "ต่ำ — เป็นเครื่องมือ ไม่ใช่โค้ดที่ ship · ถ้าแก้ MCP ได้ทีหลังก็สลับกลับได้"
     }
   ],
   "blocked": [],

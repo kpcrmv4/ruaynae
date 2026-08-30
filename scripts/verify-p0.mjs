@@ -139,6 +139,66 @@ console.log('\n── P0-SEC · ความปลอดภัยระดับ
   check('P0-SEC-04 ไม่มีความลับขึ้นต้นด้วย NEXT_PUBLIC_', bad.length === 0, bad.join(', ') || 'ไม่มี')
 }
 
+console.log('\n── P0-DB · schema · RLS · audit ────────────────────────────')
+
+const sql = async (q) => {
+  const r = await fetch(`https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/database/query`, {
+    method: 'POST',
+    headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query: q }),
+  })
+  if (!r.ok) throw new Error(`HTTP ${r.status}: ${(await r.text()).slice(0, 300)}`)
+  return r.json()
+}
+
+// P0-DB-11 · is_owner() ต้องไม่มีทางลัด service-role
+// (ตัดคอมเมนต์ก่อน ไม่งั้นคอมเมนต์ที่อธิบายกฎจะทำให้ check ผ่านเอง)
+try {
+  const [{ src }] = await sql(
+    "select prosrc as src from pg_proc p join pg_namespace n on n.oid=p.pronamespace where n.nspname='public' and p.proname='is_owner'",
+  )
+  const bare = stripComments(src).replace(/--.*$/gm, '')
+  check('P0-DB-11 is_owner() ไม่มีทางลัด auth.uid() is null',
+    !/auth\.uid\(\)\s*is\s+null/i.test(bare), bare.replace(/\s+/g, ' ').trim().slice(0, 90))
+} catch (e) {
+  check('P0-DB-11 is_owner() ไม่มีทางลัด auth.uid() is null', false, e.message)
+}
+
+// P0-DB-12 · ทุกตารางใน public ต้องเปิด RLS
+try {
+  const rows = await sql("select tablename from pg_tables where schemaname='public' and rowsecurity=false")
+  const all = await sql("select count(*)::int as n from pg_tables where schemaname='public'")
+  check('P0-DB-12 ทุกตารางเปิด RLS',
+    rows.length === 0 && all[0].n > 0, `ปิดอยู่ ${rows.length} จาก ${all[0].n} ตาราง`)
+} catch (e) {
+  check('P0-DB-12 ทุกตารางเปิด RLS', false, e.message)
+}
+
+// P0-DB-14 · advisors ต้องไม่มี ERROR
+for (const kind of ['security', 'performance']) {
+  try {
+    const r = await fetch(
+      `https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/advisors/${kind}`,
+      { headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}` } },
+    )
+    const { lints = [] } = await r.json()
+    const errs = lints.filter((l) => l.level === 'ERROR')
+    check(`P0-DB-14 advisors(${kind}) ไม่มี ERROR`, errs.length === 0,
+      `ERROR ${errs.length} · WARN ${lints.filter((l) => l.level === 'WARN').length}`)
+  } catch (e) {
+    check(`P0-DB-14 advisors(${kind}) ไม่มี ERROR`, false, e.message)
+  }
+}
+
+// P0-DB-16 · database.types.ts ต้องไม่ใช่โครงเปล่า
+// ขั้นนี้คือขั้นที่คนข้ามบ่อยที่สุด และถ้าข้ามแล้ว tsc จะเขียวทั้งที่ไม่ได้ตรวจ
+// data layer เลยสักบรรทัด — แยกไม่ออกจาก "ทำงานได้" จนกว่าจะสาย
+{
+  const t = readFileSync('src/lib/database.types.ts', 'utf8')
+  const rows = (t.match(/Row:\s*\{/g) ?? []).length
+  check('P0-DB-16 database.types.ts มีตารางจริง ไม่ใช่ stub', rows >= 2, `${rows} Row blocks`)
+}
+
 console.log('\n══════════════════════════════════════════════')
 const pass = results.filter((r) => r.ok === true).length
 const fail = results.filter((r) => r.ok === false).length

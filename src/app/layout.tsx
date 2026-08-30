@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from 'next'
 import { IBM_Plex_Sans_Thai } from 'next/font/google'
+import { Toaster } from 'sonner'
 import { ThemeProvider } from '@/components/theme-provider'
 import { APP_NAME, APP_TAGLINE } from '@/lib/constants'
 import './globals.css'
@@ -31,7 +32,11 @@ export default function RootLayout({ children }: LayoutProps<'/'>) {
   return (
     <html lang="th" suppressHydrationWarning className={`${plexThai.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col">
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          {children}
+          {/* toast แทน alert() เสมอ · richColors ให้สีสำเร็จ/ผิดพลาดต่างกันชัด */}
+          <Toaster position="bottom-center" richColors closeButton />
+        </ThemeProvider>
       </body>
     </html>
   )

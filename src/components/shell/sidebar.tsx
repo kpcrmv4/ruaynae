@@ -15,11 +15,13 @@ export function Sidebar({
   userName,
   roleLabel,
   companyName,
+  logoUrl,
 }: {
   role: Role
   userName: string
   roleLabel: string
   companyName: string
+  logoUrl: string | null
 }) {
   // 🔴 คำนวณเมนูในฝั่ง client เอง ห้ามรับเป็น prop จาก Server Component
   // เพราะ icon เป็นคอมโพเนนต์ (ฟังก์ชัน) ซึ่งข้ามเส้น server→client ไม่ได้
@@ -32,8 +34,13 @@ export function Sidebar({
   return (
     <nav className="sticky top-0 hidden h-svh w-61 shrink-0 flex-col overflow-y-auto border-r border-sidebar-line bg-sidebar px-2.5 py-4 lg:flex">
       <div className="flex items-center gap-2.5 px-2.5 pb-4">
-        <span className="flex size-8.5 shrink-0 items-center justify-center rounded-md bg-white text-sidebar">
-          <HardHat className="size-5" strokeWidth={1.8} />
+        <span className="flex size-8.5 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white text-sidebar">
+          {logoUrl ? (
+            // eslint-disable-next-line @next/next/no-img-element
+            <img src={logoUrl} alt="" className="size-full object-contain" />
+          ) : (
+            <HardHat className="size-5" strokeWidth={1.8} />
+          )}
         </span>
         <span className="min-w-0">
           <span className="block truncate text-sm font-bold text-sidebar-title">{companyName}</span>

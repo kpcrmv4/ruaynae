@@ -19,8 +19,13 @@ export default async function LoginPage() {
         <div className="mb-6 text-center">
           {/* ชื่อมาจากตาราง branding ซึ่ง anon อ่านได้ — หน้านี้ทำงานตอนยังไม่ล็อกอิน
               อ่านไม่ได้จะได้ค่าสำรองแทน หน้าล็อกอินห้ามพังเพราะโหลดชื่อบริษัทไม่ได้ */}
-          <span className="mx-auto mb-3 flex size-14 items-center justify-center rounded-lg bg-sidebar text-white">
-            <HardHat className="size-8" strokeWidth={1.6} />
+          <span className="mx-auto mb-3 flex size-14 items-center justify-center overflow-hidden rounded-lg bg-sidebar text-white">
+            {branding.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={branding.logoUrl} alt="" className="size-full object-contain" />
+            ) : (
+              <HardHat className="size-8" strokeWidth={1.6} />
+            )}
           </span>
           <h1 className="text-lg font-bold text-ink">{branding.companyName}</h1>
           <p className="mt-0.5 text-sm text-muted-token">{APP_TAGLINE}</p>

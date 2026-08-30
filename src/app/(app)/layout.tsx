@@ -19,6 +19,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
         userName={user.fullName}
         roleLabel={ROLE_LABEL[user.role]}
         companyName={branding.companyName}
+        logoUrl={branding.logoUrl}
       />
       {/* min-w-0 บนคอลัมน์เนื้อหา ไม่งั้นตารางกว้าง ๆ จะดันทั้งหน้าให้เลื่อนออกด้านข้าง
           แทนที่จะเลื่อนอยู่ในกล่องของตัวเอง */}

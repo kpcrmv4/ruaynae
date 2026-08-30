@@ -114,6 +114,56 @@ try {
   }
 }
 
+// เปลี่ยนโลโก้ → ไฟล์เก่าต้องถูกลบ ไม่ใช่ทิ้งกำพร้าไว้ใน bucket ตลอดกาล
+{
+  const { ListObjectsV2Command } = await import('@aws-sdk/client-s3')
+  const listBranding = async () => {
+    const r = await s3.send(new ListObjectsV2Command({ Bucket: env.R2_BUCKET, Prefix: 'branding/' }))
+    return (r.Contents ?? []).map((o) => o.Key)
+  }
+  const patch = (body) =>
+    fetch(`${BASE}/api/settings/branding`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json', cookie: ownerJar },
+      body: JSON.stringify(body),
+    })
+
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==',
+    'base64',
+  )
+  const uploadLogo = async () => {
+    const sign = await (
+      await post('/api/uploads/sign', { purpose: 'logo', contentType: 'image/png' }, { cookie: ownerJar })
+    ).json()
+    const put = await fetch(sign.url, { method: 'PUT', headers: { 'Content-Type': 'image/png' }, body: png })
+    if (!put.ok) throw new Error(`PUT ล้มเหลว ${put.status}`)
+    const save = await patch({ logoObjectKey: sign.key })
+    if (!save.ok) throw new Error(`บันทึกคีย์ล้มเหลว ${save.status} ${await save.text()}`)
+    return sign.key
+  }
+
+  // ล้างของค้างก่อน เพื่อให้แถวนี้วัดพฤติกรรมจริง ไม่ใช่วัดขยะจากรอบก่อน
+  const { DeleteObjectCommand: Del } = await import('@aws-sdk/client-s3')
+  for (const k of await listBranding()) {
+    await s3.send(new Del({ Bucket: env.R2_BUCKET, Key: k })).catch(() => {})
+  }
+  await patch({ logoObjectKey: null })
+
+  const first = await uploadLogo()
+  const afterFirst = await listBranding()
+  const second = await uploadLogo()
+  const afterSecond = await listBranding()
+
+  check('P05-R2-09 เปลี่ยนโลโก้แล้วไฟล์เก่าถูกลบ — เหลือไฟล์เดียว และเป็นไฟล์ใหม่',
+    afterFirst.length === 1 && afterFirst[0] === first &&
+      afterSecond.length === 1 && afterSecond[0] === second,
+    `หลังรอบแรก ${afterFirst.length} ไฟล์ · หลังรอบสอง ${afterSecond.length} ไฟล์`)
+
+  const wrong = await post('/api/settings/branding', { companyName: 'x' }, { cookie: ownerJar })
+  check('P05-R2-10 POST ไปที่ endpoint ที่รองรับแค่ PATCH → 405', wrong.status === 405, `${wrong.status}`)
+}
+
 console.log('\n══════════════════════════════════════════════')
 const pass = results.filter((r) => r.ok).length
 console.log(`  ${results.length} แถว: ผ่าน ${pass} · ตก ${results.length - pass}`)

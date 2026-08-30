@@ -1,0 +1,61 @@
+{
+  "updated": "2026-08-30",
+  "note": "สถานะจริงยืนยันด้วย git log เสมอ — ถ้าไฟล์นี้ขัดกับ git ให้เชื่อ git",
+  "gate": "npm run gate",
+  "phases": [
+    {
+      "id": "P0",
+      "title": "ฐานระบบ",
+      "status": "doing",
+      "tasks": [
+        { "id": "P0-1", "t": "scaffold Next 16 + Tailwind v4 + TS", "s": "done", "commit": "b171f3f" },
+        { "id": "P0-2", "t": "โทเคน Navy & White + verify-contrast ผ่าน 58 คู่ สองโหมด", "s": "done", "commit": "b171f3f" },
+        { "id": "P0-3", "t": "IBM Plex Sans Thai + next-themes (class strategy)", "s": "done", "commit": "b171f3f" },
+        { "id": "P0-4", "t": "allowedDevOrigins + header sw.js + vercel.json sin1", "s": "done", "commit": "b171f3f" },
+        { "id": "P0-5", "t": "npm run gate (typegen+tsc / contrast / build)", "s": "done", "commit": "b171f3f" },
+        { "id": "P0-6", "t": "docs/test-plan/P0.md — acceptance matrix", "s": "todo" },
+        { "id": "P0-7", "t": "Supabase clients 4 ตัว (browser/server/admin/middleware)", "s": "todo" },
+        { "id": "P0-8", "t": "src/proxy.ts + matcher ยกเว้น /api/*, /sw.js, /manifest.webmanifest", "s": "todo" },
+        { "id": "P0-9", "t": "migration: profiles + enums + RLS + is_owner() + audit trigger", "s": "todo" },
+        { "id": "P0-10", "t": "หน้า login อีเมล + PIN (rate-limited) · คุกกี้ผูกกับ response", "s": "todo" },
+        { "id": "P0-11", "t": "shell: sidebar เดสก์ท็อป ↔ bottom nav มือถือ 5 ช่อง", "s": "todo" }
+      ]
+    },
+    { "id": "P0.5", "title": "แบรนด์ + จัดการผู้ใช้", "status": "todo", "tasks": [] },
+    { "id": "P1", "title": "ไซต์ + ภาพรวม 3 แถบ", "status": "todo", "tasks": [] },
+    { "id": "P2", "title": "รายรับ-รายจ่าย + R2", "status": "todo", "tasks": [] },
+    { "id": "P3", "title": "อนุมัติ + แจ้งเตือนในแอป", "status": "todo", "tasks": [] },
+    { "id": "P4", "title": "พนักงาน + คนเข้าไซต์", "status": "todo", "tasks": [] },
+    { "id": "P5", "title": "เบิกล่วงหน้า + รอบจ่าย", "status": "todo", "tasks": [] },
+    { "id": "P6", "title": "Audit log", "status": "todo", "tasks": [] },
+    { "id": "P7", "title": "PWA + web push", "status": "todo", "tasks": [] },
+    { "id": "P8", "title": "seed/reset + ตรวจรับ", "status": "todo", "tasks": [] }
+  ],
+  "rulings": [
+    {
+      "what": "ใช้พอร์ต 3100 แทน 3000",
+      "why": "3000 ถูกใช้อยู่แล้วโดย PID 22088 ซึ่งไม่ใช่ของ session นี้ และ LOOP.md ห้ามฆ่าของคนอื่น",
+      "cost_if_wrong": "ไม่มี — เปลี่ยนพอร์ตกลับได้ทันที"
+    },
+    {
+      "what": "แก้ --muted โหมดสว่างจาก #64707f เป็น #5c6875 ต่างจากค่าในเดโม่",
+      "why": "ค่าเดิมวัดได้ 4.28:1 บน --surface-3 ซึ่งตก AA · ค่าใหม่ 4.83:1",
+      "cost_if_wrong": "ต่ำมาก — ตาแยกไม่ออก บันทึกไว้ใน DESIGN.md แล้ว"
+    },
+    {
+      "what": "แก้ verify-contrast.mjs ของคิตในสำเนาของโปรเจ็คนี้",
+      "why": "บั๊ก indexOf('.dark') ทำให้โหมดมืดไม่เคยถูกตรวจเลย · ปล่อยไว้ = gate ที่แดงไม่เป็น",
+      "cost_if_wrong": "ต่ำ — เป็นสคริปต์ตรวจ ไม่ใช่โค้ดที่ ship · เสนอกลับไปที่คิตตอนจบ build"
+    },
+    {
+      "what": "commit บล็อก nextjs-agent-rules ที่ next dev ต่อท้าย CLAUDE.md",
+      "why": "ลบแล้ว next dev สร้างใหม่ทุกครั้ง ทำให้ git status ไม่มีวันสะอาด",
+      "cost_if_wrong": "ไม่มี"
+    }
+  ],
+  "blocked": [],
+  "open_questions_for_owner": [
+    "ชื่อบริษัทจริง (ตอนนี้ใช้ค่าสำรองใน constants.ts — ย้ายไปตาราง branding ที่ P0.5)",
+    "หมวดค่าใช้จ่ายจริง (ใช้ชุดตั้งต้น 10 หมวด แก้ในหน้าตั้งค่าได้)"
+  ]
+}

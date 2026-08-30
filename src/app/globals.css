@@ -1,0 +1,325 @@
+/* ════════════════════════════════════════════════════════════════════════
+   thai-admin-page-kit — design tokens (Tailwind v4, CSS-first)
+   Drop into `src/app/globals.css`. Every value here is verified AA in BOTH
+   themes by `verify-contrast.mjs`; re-run it after any change.
+
+   THE ONLY BLOCK YOU EDIT PER PROJECT is "BRAND" below. The placeholder is a
+   neutral teal on purpose — it is not any client's colour, so an unedited
+   build looks deliberately generic rather than accidentally wrong.
+   ════════════════════════════════════════════════════════════════════════ */
+
+@import 'tailwindcss';
+@custom-variant dark (&:where(.dark, .dark *));   /* class strategy — next-themes */
+
+:root {
+  color-scheme: light;
+
+  /* ── BRAND — replace these six, keep the relationships ──────────────────
+     A brand hue has TWO jobs and they need different values:
+       --brand        text · icons · borders · the active-item colour
+       --brand-solid  a FILL with white text on top   (button, raised FAB)
+     A hue tuned for one fails the other. Verify, never eyeball:
+       white on --brand-solid / -hover / -active   ≥ 4.5:1
+       --brand-on-tint on --brand-tint             ≥ 4.5:1
+       --brand on --surface and on --canvas        ≥ 4.5:1
+     The -solid family is IDENTICAL in both themes. Dark mode lightens
+     --brand so it reads as text on a dark panel; reusing that lightened
+     value as a fill under white text is how you land at 2.8:1. */
+  --brand: #1d4ed8;
+  --brand-tint: #e8effd;          /* pale wash — active rows, brand badges   */
+  --brand-tint-strong: #c2d5f8;   /* the ring around those badges           */
+  --brand-on-tint: #123a9e;       /* text ON --brand-tint                   */
+  --brand-solid: #1d4ed8;         /* fill under WHITE text                  */
+  --brand-solid-hover: #1a45be;
+  --brand-solid-active: #16389b;
+
+  /* ── Surfaces: four levels, not one ────────────────────────────────────
+     One surface value makes every panel float on the same plane and the UI
+     reads flat. Four gives you page → panel → subhead → disabled. */
+  --canvas: #f2f5fa;      /* the page behind every panel                    */
+  --surface: #ffffff;     /* panels, cards, rows                            */
+  --card: #ffffff;        /* alias — some components read this name         */
+  --surface-2: #f7f9fc;   /* table heads · hovered rows · panel subheads     */
+  --surface-3: #e7edf6;   /* disabled inputs · scroll track                 */
+
+  /* ── Ink: three levels ─────────────────────────────────────────────────── */
+  --ink: #111827;         /* titles, primary values                          */
+  --ink-2: #414b5c;       /* body, labels                                    */
+  --muted: #5c6875;       /* captions, units, inactive tabs                  */
+
+  /* ── Lines: three weights ──────────────────────────────────────────────
+     A single line weight is the fastest way to look like a template. */
+  --line: #dde4ee;        /* panel border                                    */
+  --line-soft: #eaeff7;   /* row divider INSIDE a panel                      */
+  --line-strong: #c4cddc; /* section rule · input border                     */
+
+  /* ── Sidebar: a NEUTRAL panel ──────────────────────────────────────────
+     Do not paint it in the brand colour. It is the largest colour field on
+     the screen sitting where people look least, while the content area —
+     where the work happens — gets none. The active item is brand TEXT on a
+     brand TINT; a solid brand fill with a white label cannot pass AA. */
+  --sidebar: #14264a;
+  --sidebar-title: #f4f7fc;
+  --sidebar-fg: #a7b6cf;
+  --sidebar-fg-dim: #7f92b3;      /* group headings                          */
+  --sidebar-hover: #1c3159;
+  --sidebar-active-bg: rgb(147 197 253 / 0.16);
+  --sidebar-active-fg: #a9c6ff;
+  --sidebar-line: #21365f;
+
+  /* ── Status: fg / bg / ring — always three ─────────────────────────────
+     The ring is what makes a badge read as an object. Without it, several
+     badges in one row merge into a single smear of colour and you cannot
+     tell how many there are. */
+  --status-pending: #545b66;  --status-pending-bg: #f1f2f4;  --status-pending-ring: #d9dce1;
+  --status-progress: #96540a; --status-progress-bg: #fdf3e3; --status-progress-ring: #f0dcbb;
+  --status-done: #0c6b3c;     --status-done-bg: #e7f5ee;     --status-done-ring: #bfe3d0;
+  --status-info: #1b4fc4;     --status-info-bg: #eaf0ff;     --status-info-ring: #c6d6fb;
+  --urgent: #b3271d;          --urgent-bg: #fdecea;          --urgent-ring: #f6cdc8;
+  /* solid red under WHITE text (the count on a bell). Must stay dark in BOTH
+     themes — dark-mode --urgent is a light salmon tuned for text on a dark
+     panel; white on it measures 2.24:1. */
+  --urgent-solid: #b3271d;
+
+  /* ── Quantity scale: one hue, four steps ───────────────────────────────
+     "how full is this" is a magnitude, not a verdict. Green→amber→red says
+     29% is bad, when it may mean "this person can take more work". */
+  --scale-1: #c3d3f7; --scale-2: #86a6ea; --scale-3: #4470d4; --scale-4: #1b4fc4;
+
+  /* ── Chart fills ───────────────────────────────────────────────────────
+     Status colours above are tuned to be READ AS TEXT on a light surface, so
+     they are very dark. Used as bar/area fills they turn into muddy slabs.
+     Same families, retuned as fills. */
+  --chart-brand: #2563eb; --chart-info: #2563eb; --chart-done: #12915a;
+  --chart-progress: #d98324; --chart-urgent: #dc3226;
+
+  /* ── Radius: assigned by ROLE, not by taste ────────────────────────────
+     One 16px value everywhere is what makes an admin tool look like a toy. */
+  --r-xs: 4px;   /* chips · progress bars      */
+  --r-sm: 6px;   /* small buttons · menu items */
+  --r-md: 8px;   /* buttons · inputs           */
+  --r-lg: 10px;  /* panels · cards             */
+  --r-xl: 14px;  /* dialogs · bottom sheets    */
+
+  /* ── Depth: directional and blurred, never a halo ──────────────────────── */
+  --sh-1: 0 1px 2px rgb(16 18 22 / 0.05), 0 1px 1px rgb(16 18 22 / 0.04);
+  --sh-2: 0 2px 4px rgb(16 18 22 / 0.05), 0 6px 16px rgb(16 18 22 / 0.07);
+  --sh-3: 0 8px 16px rgb(16 18 22 / 0.08), 0 24px 48px rgb(16 18 22 / 0.14);
+
+  --ring: rgb(29 78 216 / 0.38);   /* focus — derive from --brand */
+
+  /* ── MONEY — รายรับ/รายจ่ายมีโทเคนของตัวเอง ไม่ยืม status มาใช้ ─────────
+     "เข้า/ออก" เป็นทิศทางของเงิน ไม่ใช่สถานะของงาน ปนกันเมื่อไหร่จะแก้สีหนึ่ง
+     แล้วอีกอันเปลี่ยนตามโดยไม่ตั้งใจ */
+  --income: #0c6b3c;   --income-bg: #e7f5ee;   --income-ring: #bfe3d0;
+  --expense: #b3271d;  --expense-bg: #fdecea;  --expense-ring: #f6cdc8;
+
+  /* ── แถบความคืบหน้า 3 เส้น — สามความหมาย ต้องแยกออกจากกันได้ในแวบเดียว ── */
+  --bar-time: #2563eb;   /* เวลาที่ผ่านไป   */
+  --bar-paid: #0c6b3c;   /* เงินที่เก็บได้   */
+  --bar-cost: #b45309;   /* ต้นทุนที่จ่ายจริง */
+  --bar-track: #e2e8f2;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* brand TEXT lightens; the -solid FILL family does not move */
+  --brand: #7da6ff;
+  --brand-tint: #16224a;
+  --brand-tint-strong: #25376b;
+  --brand-on-tint: #a9c6ff;
+  --brand-solid: #1d4ed8;
+  --brand-solid-hover: #2a5ce5;
+  --brand-solid-active: #16389b;
+
+  --canvas: #0b1017;
+  --surface: #141a23;
+  --card: #141a23;
+  --surface-2: #1a222d;
+  --surface-3: #232c39;
+
+  --ink: #e6eaf1;
+  --ink-2: #bfc8d5;
+  --muted: #8e99a8;
+
+  --line: #28313e;
+  --line-soft: #1f2733;
+  --line-strong: #384252;
+
+  --sidebar: #0d1526;
+  --sidebar-title: #eef3fb;
+  --sidebar-fg: #9fadc4;
+  --sidebar-fg-dim: #78879f;
+  --sidebar-hover: #16203a;
+  --sidebar-active-bg: rgb(147 197 253 / 0.15);
+  --sidebar-active-fg: #a9c6ff;
+  --sidebar-line: #1c2740;
+
+  --status-pending: #aeb6c0;  --status-pending-bg: #23272d;  --status-pending-ring: #343941;
+  --status-progress: #e8a95e; --status-progress-bg: #2e2317; --status-progress-ring: #4a3720;
+  --status-done: #5bd08e;     --status-done-bg: #14291f;     --status-done-ring: #21432f;
+  --status-info: #8fb2ff;     --status-info-bg: #182240;     --status-info-ring: #27365c;
+  --urgent: #f4938a;          --urgent-bg: #33201e;          --urgent-ring: #4d2e2b;
+  --urgent-solid: #d0342a;
+
+  --chart-brand: #6f9bff; --chart-info: #6f9bff; --chart-done: #34c07d;
+  --chart-progress: #e8a34a; --chart-urgent: #ef6a5e;
+
+  --sh-1: 0 1px 2px rgb(0 0 0 / 0.4);
+  --sh-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 6px 16px rgb(0 0 0 / 0.5);
+  --sh-3: 0 8px 16px rgb(0 0 0 / 0.5), 0 24px 48px rgb(0 0 0 / 0.6);
+
+  --ring: rgb(125 166 255 / 0.45);
+
+  --income: #34c07d;   --income-bg: #12291f;   --income-ring: #1f4331;
+  --expense: #f4938a;  --expense-bg: #33201e;  --expense-ring: #4d2e2b;
+
+  --bar-time: #6f9bff;
+  --bar-paid: #34c07d;
+  --bar-cost: #e8a34a;
+  --bar-track: #28313e;
+}
+
+@theme inline {
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-card: var(--card);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-muted-token: var(--muted);
+  --color-line: var(--line);
+  --color-line-soft: var(--line-soft);
+  --color-line-strong: var(--line-strong);
+  --color-brand: var(--brand);
+  --color-brand-tint: var(--brand-tint);
+  --color-brand-tint-strong: var(--brand-tint-strong);
+  --color-brand-on-tint: var(--brand-on-tint);
+  --color-brand-solid: var(--brand-solid);
+  --color-brand-solid-hover: var(--brand-solid-hover);
+  --color-brand-solid-active: var(--brand-solid-active);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-fg: var(--sidebar-fg);
+  --color-sidebar-fg-dim: var(--sidebar-fg-dim);
+  --color-sidebar-active-bg: var(--sidebar-active-bg);
+  --color-sidebar-active-fg: var(--sidebar-active-fg);
+  --color-sidebar-line: var(--sidebar-line);
+  --color-status-pending: var(--status-pending);
+  --color-status-pending-bg: var(--status-pending-bg);
+  --color-status-pending-ring: var(--status-pending-ring);
+  --color-status-progress: var(--status-progress);
+  --color-status-progress-bg: var(--status-progress-bg);
+  --color-status-progress-ring: var(--status-progress-ring);
+  --color-status-done: var(--status-done);
+  --color-status-done-bg: var(--status-done-bg);
+  --color-status-done-ring: var(--status-done-ring);
+  --color-status-info: var(--status-info);
+  --color-status-info-bg: var(--status-info-bg);
+  --color-status-info-ring: var(--status-info-ring);
+  --color-urgent: var(--urgent);
+  --color-urgent-bg: var(--urgent-bg);
+  --color-urgent-ring: var(--urgent-ring);
+  --color-urgent-solid: var(--urgent-solid);
+
+  --radius-xs: var(--r-xs);
+  --radius-sm: var(--r-sm);
+  --radius-md: var(--r-md);
+  --radius-lg: var(--r-lg);
+  --radius-xl: var(--r-xl);
+
+  --shadow-e1: var(--sh-1);
+  --shadow-e2: var(--sh-2);
+  --shadow-e3: var(--sh-3);
+
+  --font-sans: var(--font-thai), 'IBM Plex Sans Thai', system-ui, sans-serif;
+  --color-income: var(--income);
+  --color-income-bg: var(--income-bg);
+  --color-income-ring: var(--income-ring);
+  --color-expense: var(--expense);
+  --color-expense-bg: var(--expense-bg);
+  --color-expense-ring: var(--expense-ring);
+  --color-bar-time: var(--bar-time);
+  --color-bar-paid: var(--bar-paid);
+  --color-bar-cost: var(--bar-cost);
+  --color-bar-track: var(--bar-track);
+}
+
+@layer base {
+  /* clip, NOT hidden — `hidden` creates a scroll container and breaks sticky.
+     Note this makes horizontal overflow UNREACHABLE, so pair it with min-w-0
+     on flex/grid children (see SKILL.md). */
+  html, body { overflow-x: clip; }
+  body { background: var(--canvas); color: var(--ink); }
+  /* Thai ascenders/descenders get clipped below this */
+  body { line-height: 1.5; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md bg-brand-solid px-4 py-2.5
+           text-base font-semibold text-white transition-colors duration-150
+           hover:bg-brand-solid-hover active:bg-brand-solid-active
+           disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-secondary {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-line-strong
+           bg-surface px-4 py-2.5 text-base font-medium text-ink transition-colors duration-150
+           hover:border-brand hover:text-brand disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-ghost {
+    @apply inline-flex items-center justify-center gap-2 rounded-sm px-2.5 py-1.5 text-sm
+           font-medium text-ink-2 transition-colors duration-150 hover:bg-surface-2 hover:text-ink
+           disabled:pointer-events-none disabled:opacity-50;
+  }
+  .btn-danger {
+    @apply inline-flex items-center justify-center gap-2 rounded-md border border-urgent-ring
+           bg-urgent-bg px-4 py-2.5 text-base font-semibold text-urgent transition-colors
+           duration-150 hover:bg-urgent-solid hover:text-white
+           disabled:pointer-events-none disabled:opacity-50;
+  }
+
+  .input-base {
+    @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2.5 text-base text-ink
+           transition-colors duration-150 placeholder:text-muted-token focus:border-brand
+           focus:outline-none disabled:cursor-not-allowed disabled:bg-surface-3
+           disabled:text-muted-token;
+  }
+  .input-base:focus { box-shadow: 0 0 0 3px var(--ring); }
+  .label-base { @apply mb-1.5 block text-sm font-medium text-ink-2; }
+
+  .card-surface { @apply rounded-lg border border-line bg-surface; }
+  .panel        { @apply overflow-hidden rounded-lg border border-line bg-surface; }
+  .panel-head   { @apply flex items-center gap-3 border-b border-line bg-surface-2 px-4 py-2.5
+                         text-sm font-semibold text-ink-2; }
+
+  /* section heading + right-aligned count, e.g.  ใบสั่งซื้อ        12 รายการ */
+  .sec-head       { @apply mb-2.5 flex items-baseline gap-2.5 border-b border-line-strong pb-2
+                           text-lg font-semibold text-ink; }
+  .sec-head .count{ @apply ml-auto text-sm font-normal text-muted-token; }
+  .sec-sub        { @apply -mt-1 mb-3 text-sm leading-5 text-muted-token; }
+
+  .chip { @apply inline-flex items-center gap-1.5 whitespace-nowrap rounded-xs px-2 py-0.5
+                 text-xs font-semibold ring-1 ring-inset; }
+
+  /* horizontal chip strips on phones scroll; the scrollbar itself is noise */
+  .no-scrollbar { scrollbar-width: none; -ms-overflow-style: none; }
+  .no-scrollbar::-webkit-scrollbar { display: none; }
+
+  .tbl                    { @apply w-full border-collapse text-base; }
+  .tbl thead th           { @apply sticky top-0 z-10 whitespace-nowrap border-b border-line
+                                   bg-surface-2 px-3 py-2 text-left text-xs font-semibold
+                                   uppercase tracking-wider text-muted-token; }
+  .tbl tbody td           { @apply border-b border-line-soft px-3 py-2.5 align-middle; }
+  .tbl tbody tr:last-child td { @apply border-b-0; }
+  .tbl tbody tr           { @apply transition-colors duration-100 hover:bg-surface-2; }
+
+  /* tabular figures — any column of numbers that gets compared vertically */
+  .tnum { font-variant-numeric: tabular-nums; }
+}
+
+@media print {
+  :root { color-scheme: light; }
+  .no-print { display: none !important; }
+}

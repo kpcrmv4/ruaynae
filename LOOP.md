@@ -65,9 +65,16 @@
 ## 3 · Gate — ต้องเขียวก่อน mark done
 
 ```bash
-npx tsc --noEmit
-npm run build
+npm run gate     # = typecheck (next typegen && tsc) → verify:contrast → build
 ```
+
+แยกรันทีละอันได้: `npm run typecheck` · `npm run verify:contrast` · `npm run build`
+
+⚠️ **ห้ามใช้ `npx tsc --noEmit` เปล่า ๆ** — `LayoutProps` / `PageProps` เป็น type ที่ Next
+generate ตอน build ถ้า `.next/types` ยังไม่มีจะแดงทั้งที่โค้ดถูก · `npm run typecheck` มี typegen นำหน้าให้แล้ว
+
+⚠️ **ห้ามต่อ `| tail` แล้วดู exit code** — exit code จะกลายเป็นของ `tail` ซึ่งเป็น 0 เสมอ
+ใช้ `set -o pipefail` หรืออ่าน `${PIPESTATUS[0]}` หรือรันเดี่ยวแล้ว `echo "exit=$?"`
 
 เพิ่มตามสิ่งที่แตะ:
 

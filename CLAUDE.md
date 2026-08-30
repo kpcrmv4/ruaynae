@@ -76,7 +76,7 @@ create type payroll_status as enum ('open','closed');
 |---|---|---|
 | `branding` | แถวเดียว: `company_name`, `logo_object_key`, `updated_at` | **`anon` SELECT ได้** (หน้า login ต้องอ่านตอนยังไม่ล็อกอิน) · UPDATE เฉพาะ owner |
 | `app_settings` | แถวเดียว: ที่อยู่, เลขผู้เสียภาษี, ผู้ลงนาม, นโยบายเก็บรูป ฯลฯ | **owner เท่านั้น ทั้งอ่านและเขียน** |
-| `profiles` | `id → auth.users`, `full_name`, `role`, `pin` (ข้อความจริง + `revoke select (pin)`), `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
+| `profiles` | `id → auth.users`, `full_name`, `role`, `pin_hash` (HMAC + pepper, unique), `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
 | `sites` | `name`, `client_name`, `contract_amount`, `start_date`, `end_date`, `status` | owner ทั้งหมด · supervisor อ่านเฉพาะไซต์ที่ดูแล |
 | `site_supervisors` | `site_id`, `profile_id`, **`effective_from`, `effective_to`** | owner เขียน · supervisor อ่านแถวตัวเอง |
 | `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date`, `collected_txn_id` | ตามไซต์ |
@@ -274,17 +274,21 @@ Admin API ด้วย `SUPABASE_SECRET_KEY` ซึ่งไม่ได้ถ�
 - ⚠️ **PIN ต้องไม่ซ้ำกันระหว่างผู้ใช้** — หน้าล็อกอินมีแต่แป้นตัวเลข ไม่ได้ถามว่าคุณคือใคร
   ระบบจึงระบุตัวตนจาก PIN อย่างเดียว · PIN ซ้ำ = กดแล้วเข้าไปเป็นบัญชีของคนอื่น
 
-  **วิธีเก็บ:** `profiles.pin` เก็บเป็น **ข้อความจริง** + `unique index` +
-  `revoke select (pin) on profiles from anon, authenticated` → เหลือแค่ service-role ที่อ่านได้
-  · รหัสผ่านของ `auth.users` **derive จาก PIN + `PIN_PEPPER` แบบ deterministic**
-  (`lib/pin.ts`) เพื่อให้ล็อกอินผ่าน `signInWithPassword` ปกติได้
+  **วิธีเก็บ:** `profiles.pin_hash` = **HMAC-SHA256(key=`PIN_PEPPER`, msg=`'pin-lookup:'+pin`)**
+  + `unique index` · ไม่เก็บ PIN เป็นข้อความจริงที่ไหนเลย
 
-  *ทำไมไม่เก็บเป็น hash:* เจ้าของต้อง **ดู** PIN ที่ลูกน้องลืมได้ ซึ่ง hash ทำไม่ได้
-  · ที่ปลอดภัยพอเพราะคอลัมน์ถูก revoke ไว้ และ pepper อยู่ใน env ไม่ได้อยู่ในฐานข้อมูล
+  *ทำไม deterministic ไม่ใช่ bcrypt:* หน้าล็อกอินมีแต่แป้นตัวเลข ระบบต้อง **หาเจ้าของ PIN
+  จากค่าที่กดมา** และต้องมี unique index กันซ้ำ — bcrypt ที่ salt สุ่มทุกครั้งทำทั้งสองอย่างไม่ได้
+
+  *ทำไมไม่ต้องให้เจ้าของดู PIN เดิม:* คนลืม PIN → เจ้าของ**ตั้งใหม่**ให้ จำนวนคลิกเท่ากับการเปิดดู
+  แต่ปลอดภัยกว่า · ตอนสร้างผู้ใช้เจ้าของเป็นคนตั้งเองอยู่แล้ว ไม่มีจังหวะไหนที่ต้องอ่านค่าเดิมกลับมา
+
+  🔴 **`pin_hash` กับรหัสผ่านของ `auth.users` ต้องมาจากคนละ domain**
+  (`'pin-lookup:'` vs `'auth-password:'`) — ถ้าใช้สูตรเดียวกัน ฐานข้อมูลที่รั่วจะกลายเป็น
+  รายการรหัสผ่านพร้อมใช้ทันที ผู้โจมตีไม่ต้องเดา PIN เลย เอาค่าในคอลัมน์ไปล็อกอินตรง ๆ ได้
+
+  · ปลอดภัยพอเพราะ **pepper อยู่ใน env ไม่ได้อยู่ในฐานข้อมูล** — DB รั่วอย่างเดียวยังไล่เดาไม่ได้
   · แต่ **ต้องมี rate limit เสมอ** เพราะ 6 หลักมีแค่ล้านความเป็นไปได้
-
-  ⚠️ **ผลข้างเคียงของ column grant:** `select('*')` บน `profiles` จะพังทันที
-  ทุก query ต้องระบุคอลัมน์เอง — เก็บเป็นค่าคงที่ `PROFILE_COLS` ที่ไม่มี `pin`
 - ⚠️ **อีเมลสังเคราะห์ของบัญชี PIN ห้ามโผล่บนหน้าจอ** — คนใช้ไม่เคยพิมพ์มันและมันรับเมลไม่ได้
   ให้แสดงชื่อคนแทน และไม่ต้องมีปุ่มเปลี่ยนอีเมลให้บัญชีแบบนี้
 - ⚠️ **ปุ่มเข้าใช้แบบเดโม่เป็น opt-in เท่านั้น** — `ENABLE_DEMO_LOGIN=1` (ฝั่งเซิร์ฟเวอร์ ห้ามมีฝาแฝด

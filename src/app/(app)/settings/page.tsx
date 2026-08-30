@@ -1,4 +1,4 @@
-import { ChevronRight, Lock, Users } from 'lucide-react'
+import { ChevronRight, Lock, Tags, Users } from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getBranding } from '@/lib/branding'
@@ -49,9 +49,23 @@ export default async function SettingsPage() {
         </Link>
       )}
 
+      {isOwner && (
+        <Link
+          href="/settings/categories"
+          className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-brand"
+        >
+          <Tags className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">หมวดรายรับ-รายจ่าย</span>
+            <span className="block text-xs text-muted-token">เพิ่ม เปลี่ยนลำดับ และปิดหมวดที่ไม่ใช้แล้ว</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-token" />
+        </Link>
+      )}
+
       <section className="rounded-lg border border-line bg-surface px-4 py-6 text-center">
         <p className="text-sm text-muted-token">
-          ส่วนแจ้งเตือน หมวดค่าใช้จ่าย และพื้นที่เก็บรูป จะเพิ่มในเฟสถัดไป
+          ส่วนแจ้งเตือนและพื้นที่เก็บรูป จะเพิ่มในเฟสถัดไป
         </p>
       </section>
     </div>

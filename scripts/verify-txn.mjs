@@ -344,6 +344,7 @@ if (!ownerJar || !supJar) throw new Error('ล็อกอินไม่สำ�
 
 let apiSite = null
 let apiOther = null
+let tempCategoryId = null
 const apiTxns = []
 try {
   ;[{ id: apiSite }] = (await sql(
@@ -492,6 +493,69 @@ try {
       'ตรวจทั้งฝั่งมีและฝั่งไม่มี')
   }
 
+  // ── P2-API-09 · หัวหน้าไซต์เพิ่มหมวดไม่ได้ ─────────────────────────
+  {
+    const catCount = async () =>
+      (await sql('select count(*)::int as n from public.categories')).rows[0].n
+    const before = await catCount()
+    const r = await req('POST', '/api/settings/categories',
+      { name: 'หมวดที่ไม่ควรถูกสร้าง', kind: 'expense' }, { cookie: supJar })
+    const b = await r.json().catch(() => ({}))
+    const after = await catCount()
+    // ครึ่งบวก: เจ้าของเพิ่มได้จริงในคำสั่งถัดไป
+    const own = await req('POST', '/api/settings/categories',
+      { name: 'ทดสอบ หมวดชั่วคราว', kind: 'expense', sortOrder: 950 }, { cookie: ownerJar })
+    const ob = await own.json().catch(() => ({}))
+    if (ob.category?.id) tempCategoryId = ob.category.id
+    check('P2-API-09 หัวหน้าไซต์ POST หมวด → 403 · ไม่มีแถวใหม่ · เจ้าของเพิ่มได้',
+      r.status === 403 && b.error === 'FORBIDDEN' && after === before && own.status === 201
+      && ob.category?.sort_order === 950,
+      `${r.status} ${b.error} · ${before}→${after} · เจ้าของ ${own.status} ลำดับ ${ob.category?.sort_order}`)
+  }
+
+  // ── P2-API-10 · ปิดหมวดที่ถูกใช้แล้ว ต้องไม่ทำให้ประวัติพัง ────────
+  // 🔴 ปิดหมวด ≠ ลบหมวด · รายการเก่าที่อ้างหมวดนั้นต้องอ่านชื่อได้เหมือนเดิม
+  // และหมวดต้องหายจากฟอร์มบันทึกใหม่เท่านั้น
+  {
+    const made = await req('POST', '/api/transactions', {
+      kind: 'expense', siteId: apiSite, categoryId: tempCategoryId, amount: 777,
+      txnDate: today, payMethod: 'cash',
+    }, { cookie: ownerJar })
+    const mb = await made.json().catch(() => ({}))
+    if (mb.transaction?.id) apiTxns.push(mb.transaction.id)
+
+    const off = await req('PATCH', `/api/settings/categories/${tempCategoryId}`,
+      { isActive: false }, { cookie: ownerJar })
+
+    const { rows } = await sql(
+      `select c.name from public.transactions t
+       join public.categories c on c.id = t.category_id
+       where t.id = '${mb.transaction?.id}'`)
+    const form = await page('/entry', ownerJar)
+    const open = form.indexOf('<select id="category"')
+    const block = open === -1 ? '' : form.slice(open, form.indexOf('</select>', open))
+
+    check('P2-API-10 ปิดหมวดที่ถูกใช้แล้ว → 200 · รายการเก่ายังอ่านชื่อหมวดได้ · หายจากฟอร์มใหม่',
+      made.status === 201 && off.status === 200
+      && rows[0]?.name === 'ทดสอบ หมวดชั่วคราว'
+      && !block.includes('ทดสอบ หมวดชั่วคราว'),
+      `${off.status} · รายการเก่าอ่านได้=${rows[0]?.name === 'ทดสอบ หมวดชั่วคราว'} · อยู่ในฟอร์ม=${block.includes('ทดสอบ หมวดชั่วคราว')}`)
+  }
+
+  // ── P2-UI-08 · ปุ่มถ่ายรูปกับเลือกจากแกลอรี่ต้องแยกกัน ────────────
+  // 🔴 ปุ่มเดียวแล้วให้ระบบถามว่าจะถ่ายหรือเลือก คือการเพิ่มขั้นตอนให้คนที่
+  // ตัดสินใจไปแล้ว · และ capture="environment" คือสิ่งที่ทำให้กดแล้วเปิด
+  // กล้องหลังตรง ๆ ไม่ใช่เด้งตัวเลือกไฟล์ขึ้นมาก่อน
+  {
+    const own = await page('/entry', ownerJar)
+    const fileInputs = (own.match(/type="file"/g) ?? []).length
+    const hasCapture = own.includes('capture="environment"')
+    const hasBoth = own.includes('ถ่ายรูป') && own.includes('เลือกจากแกลอรี่')
+    check('P2-UI-08 มีช่องเลือกไฟล์สองช่องแยกกัน · ปุ่มถ่ายรูปมี capture=environment',
+      fileInputs === 2 && hasCapture && hasBoth,
+      `ช่องไฟล์ ${fileInputs} · capture=${hasCapture} · ปุ่มครบ=${hasBoth}`)
+  }
+
   // ── P2-UI-05 · หมวดกรองตามชนิด ────────────────────────────────────
   // ค่าเริ่มต้นของฟอร์มคือรายจ่าย → HTML ที่เซิร์ฟเวอร์เรนเดอร์ต้องมีแต่หมวดรายจ่าย
   // (การสลับไปรายรับเป็นงานของเบราว์เซอร์ ตรวจที่ P8)
@@ -515,6 +579,7 @@ try {
   }
 } finally {
   for (const id of apiTxns) await sql(`delete from public.transactions where id = '${id}'`)
+  if (tempCategoryId) await sql(`delete from public.categories where id = '${tempCategoryId}'`)
   for (const id of [apiSite, apiOther]) {
     if (id) {
       await sql(`delete from public.transactions where site_id = '${id}'`)
@@ -562,6 +627,52 @@ for (const kind of ['security', 'performance']) {
   const errs = lints.filter((l) => l.level === 'ERROR')
   check(`P2-DB-16 advisors(${kind}) ไม่มี ERROR`, errs.length === 0,
     `ERROR ${errs.length} · WARN ${lints.filter((l) => l.level === 'WARN').length}`)
+}
+
+// ── P2-DB-17 · ทุกคอลัมน์ที่ไม่ใช่ generated มีโค้ดเขียน ───────────────
+// คอลัมน์ที่ schema มีให้แต่ไม่มีใครเขียนลงไป คือฟีเจอร์ที่ออกแบบไว้แล้วไม่ได้สร้าง
+// — tsc เขียว หน้าจอปกติ และไม่มีอะไรบอกว่ามันว่างอยู่ตลอดกาล
+{
+  const { readFileSync, readdirSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)])
+  const src = walk('src').filter((f) => /\.tsx?$/.test(f))
+    .map((f) => readFileSync(f, 'utf8'))
+    .join('\n')
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    // ตัดสตริงทิ้งด้วย — `.select('a, b, c')` ทำให้ทุกคอลัมน์ในลิสต์ดูเหมือน
+    // ถูก *เขียน* ทั้งที่มันคือการ *อ่าน*
+    .replace(/'[^'\n]*'/g, "''").replace(/"[^"\n]*"/g, '""').replace(/`[^`]*`/g, '``')
+
+  const COLUMNS = [
+    'kind', 'site_id', 'category_id', 'amount', 'txn_date', 'pay_method', 'status',
+    'income_kind', 'installment_no', 'note', 'rejected_reason',
+    'object_key', 'thumb_key', 'byte_size', 'content_type',
+    'expires_at', 'consumed_at', 'sort_order', 'is_active',
+  ]
+  // จับ **ค่า** ที่อยู่หลังโคลอนมาเทียบ ไม่ใช่ใช้ negative lookahead หลัง \s*
+  // ซึ่งถอยกลับไปแมตช์ศูนย์ตัวได้แล้วผ่านตลอด (บทเรียนจาก P1-DB-12)
+  const TYPE_WORDS = new Set([
+    'string', 'number', 'boolean', 'unknown', 'null', 'Date',
+    'TxnKind', 'TxnStatus', 'PayMethod', 'IncomeKind', 'ReactNode',
+  ])
+  // ยอมรับทั้งรูป object literal (`col: value` / `col,`) และการกำหนดค่าทีละฟิลด์
+  // (`patch.col = value`) ซึ่งเป็นสำนวนที่ route แบบมีเงื่อนไขใช้จริง
+  const writes = (c) => {
+    if (new RegExp(`\\.${c}\\s*=[^=]`).test(src)) return true
+    const re = new RegExp(`\\b${c}\\s*(?:(,)|:\\s*([^\\s,;}]+))`, 'g')
+    let m
+    while ((m = re.exec(src)) !== null) {
+      if (m[1]) return true
+      if (!TYPE_WORDS.has(m[2])) return true
+    }
+    return false
+  }
+  const orphans = COLUMNS.filter((c) => !writes(c))
+  check('P2-DB-17 ทุกคอลัมน์ของ P2 มีโค้ดที่เขียนค่าลงไปจริง',
+    orphans.length === 0,
+    orphans.length ? `ไม่มีใครเขียน: ${orphans.join(', ')}` : `${COLUMNS.length} คอลัมน์`)
 }
 
 console.log('\n══════════════════════════════════════════════')

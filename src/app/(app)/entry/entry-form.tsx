@@ -1,10 +1,11 @@
 'use client'
 
-import { Banknote, Check, Loader2, Wallet } from 'lucide-react'
+import { Banknote, Camera, Check, ImagePlus, Loader2, Wallet, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { Role } from '@/lib/auth/current-user'
+import { IMAGE, MAX_ATTACHMENTS } from '@/lib/constants'
 import { fmtBaht } from '@/lib/format'
 import {
   INCOME_KINDS, INCOME_KIND_LABEL, PAY_METHODS, PAY_METHOD_LABEL,
@@ -12,6 +13,7 @@ import {
 } from '@/lib/transactions'
 
 type Site = { id: string; name: string }
+type Slip = { objectKey: string; thumbKey: string; preview: string; size: number }
 type Category = { id: string; name: string; kind: TxnKind }
 
 const MESSAGES: Record<string, string> = {
@@ -30,6 +32,12 @@ const MESSAGES: Record<string, string> = {
   INCOME_KIND_REQUIRED: 'กรุณาเลือกประเภทของรายรับ',
   INSTALLMENT_INVALID: 'เลขงวดต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป',
   CREATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
+  UNSUPPORTED_TYPE: 'รองรับเฉพาะไฟล์รูปภาพ',
+  FILE_TOO_LARGE: 'ไฟล์ใหญ่เกินไป ลองถ่ายใหม่หรือเลือกรูปที่เล็กกว่า',
+  TOO_MANY_ATTACHMENTS: 'แนบรูปได้ไม่เกินจำนวนที่กำหนดต่อรายการ',
+  INTENT_NOT_FOUND: 'สลิปหมดอายุแล้ว กรุณาแนบใหม่',
+  FILE_NOT_UPLOADED: 'อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่',
+  ATTACH_FAILED: 'บันทึกรายการแล้ว แต่แนบสลิปไม่สำเร็จ',
 }
 const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
 
@@ -51,6 +59,10 @@ export function EntryForm({
   const [kind, setKind] = useState<TxnKind>('expense')
   const [busy, setBusy] = useState(false)
   const [fieldError, setFieldError] = useState<{ field: string; text: string } | null>(null)
+  const [slips, setSlips] = useState<Slip[]>([])
+  const [uploading, setUploading] = useState(false)
+  const cameraRef = useRef<HTMLInputElement>(null)
+  const galleryRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     siteId: sites[0]?.id ?? (isOwner ? CENTRAL : ''),
     categoryId: '',
@@ -83,6 +95,96 @@ export function EntryForm({
   const amountNumber = Number(form.amount.replace(/,/g, ''))
   const amountValid = Number.isFinite(amountNumber) && amountNumber > 0
 
+  /**
+   * บีบรูปแล้วอัปตรงเข้า R2 · ไบต์ไม่ผ่านเซิร์ฟเวอร์ของเราเลย
+   *
+   * 🔴 นำเข้าไลบรารีบีบรูปแบบ dynamic — มันหนักกว่าโค้ดทั้งหน้ารวมกัน
+   * และคนส่วนใหญ่เปิดหน้านี้เพื่อกรอกตัวเลข ไม่ได้แนบรูปทุกครั้ง
+   */
+  async function addFile(file: File) {
+    if (slips.length >= MAX_ATTACHMENTS) {
+      toast.error('แนบได้ไม่เกิน ' + MAX_ATTACHMENTS + ' รูปต่อรายการ')
+      return
+    }
+    if (!file.type.startsWith('image/')) {
+      toast.error('รองรับเฉพาะไฟล์รูปภาพ')
+      return
+    }
+    setUploading(true)
+    try {
+      const { default: compress } = await import('browser-image-compression')
+      const [full, thumb] = await Promise.all([
+        compress(file, {
+          maxWidthOrHeight: IMAGE.full.maxWidthOrHeight,
+          maxSizeMB: IMAGE.full.maxSizeMB,
+          fileType: IMAGE.type,
+          useWebWorker: true,
+        }),
+        compress(file, {
+          maxWidthOrHeight: IMAGE.thumb.maxWidthOrHeight,
+          maxSizeMB: IMAGE.thumb.maxSizeMB,
+          fileType: IMAGE.type,
+          useWebWorker: true,
+        }),
+      ])
+
+      const signRes = await fetch('/api/uploads/sign', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          purpose: 'slip',
+          contentType: IMAGE.type,
+          siteId: form.siteId === CENTRAL ? null : form.siteId,
+          byteSize: full.size,
+        }),
+      })
+      const sign = await signRes.json().catch(() => ({}))
+      if (!signRes.ok) {
+        toast.error(fail(sign.error))
+        return
+      }
+
+      const put = async (url: string, blob: Blob) => {
+        const r = await fetch(url, {
+          method: 'PUT',
+          headers: { 'Content-Type': IMAGE.type },
+          body: blob,
+        })
+        if (!r.ok) throw new Error('อัปโหลดไม่สำเร็จ (' + r.status + ')')
+      }
+      await Promise.all([put(sign.url, full), put(sign.thumbUrl, thumb)])
+
+      setSlips((cur) => [
+        ...cur,
+        {
+          objectKey: sign.key,
+          thumbKey: sign.thumbKey,
+          preview: URL.createObjectURL(thumb),
+          size: full.size,
+        },
+      ])
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : 'แนบรูปไม่สำเร็จ')
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  /**
+   * เอารูปออกจากรายการที่กำลังจะบันทึก
+   *
+   * ไฟล์ที่อัปไปแล้วยังอยู่ใน R2 — ปล่อยให้ตัวกวาด (sweep-orphans) จัดการ
+   * เมื่อ upload_intents หมดอายุ · ลบทันทีที่นี่จะต้องมี endpoint ลบไฟล์
+   * ซึ่งเป็นปุ่มที่ใครก็ยิงได้ถ้าเดาคีย์ถูก และเราไม่ได้ต้องการมัน
+   */
+  const removeSlip = (key: string) => {
+    setSlips((cur) => {
+      const gone = cur.find((s) => s.objectKey === key)
+      if (gone) URL.revokeObjectURL(gone.preview)
+      return cur.filter((s) => s.objectKey !== key)
+    })
+  }
+
   async function submit() {
     if (busy) return
     if (!amountValid) return setFieldError({ field: 'amount', text: 'จำนวนเงินต้องมากกว่า 0' })
@@ -112,6 +214,7 @@ export function EntryForm({
           // ฐานข้อมูลจะปฏิเสธแถวที่สอง · ปุ่ม disabled กันได้แค่กรณีปกติ
           // เน็ตช้าแล้วกดซ้ำ หรือเปิดสองแท็บ ยังผ่านมาได้
           clientRef: crypto.randomUUID(),
+          attachments: slips.map((s) => ({ objectKey: s.objectKey, thumbKey: s.thumbKey })),
         }),
       })
       const b = await r.json().catch(() => ({}))
@@ -119,9 +222,12 @@ export function EntryForm({
         toast.error(fail(b.error))
         return
       }
-      toast.success(
-        isOwner ? 'บันทึกแล้ว' : 'บันทึกแล้ว รอเจ้าของอนุมัติ',
-      )
+      // แนบไม่ติดแต่ตัวเลขบันทึกแล้ว — ต้องบอกให้ชัด ไม่ใช่ขึ้น "สำเร็จ" เฉย ๆ
+      // แล้วผู้ใช้เชื่อว่าสลิปอยู่ในระบบทั้งที่ไม่มี
+      if (b.attachError) toast.error(fail(b.attachError))
+      else toast.success(isOwner ? 'บันทึกแล้ว' : 'บันทึกแล้ว รอเจ้าของอนุมัติ')
+      for (const s of slips) URL.revokeObjectURL(s.preview)
+      setSlips([])
       setForm((f) => ({ ...f, amount: '', note: '', installmentNo: '' }))
       router.refresh()
     } catch {
@@ -310,12 +416,86 @@ export function EntryForm({
           />
         </div>
 
-        {/* แนบสลิปมาต่อที่ P2-c — ปุ่มถ่ายรูปกับเลือกจากแกลอรี่แยกกัน */}
-        <p className="rounded-md border border-line-soft bg-surface-2 px-3 py-2 text-sm text-muted-token">
-          การแนบสลิปจะเพิ่มในขั้นถัดไป (P2-c) — ตอนนี้บันทึกตัวเลขได้ก่อน
-        </p>
+        {/* ── แนบสลิป ─────────────────────────────────────────────────
+            🔴 **สองปุ่มแยกกัน** ไม่ใช่ปุ่มเดียวแล้วให้ระบบถาม —
+            คนกลางไซต์ที่ถือมือถือเปื้อนปูนรู้อยู่แล้วว่าจะถ่ายใหม่หรือหยิบรูปเก่า
+            การถามซ้ำคือการเพิ่มขั้นตอนให้คนที่ตัดสินใจไปแล้ว
+            · capture="environment" เปิดกล้องหลังตรง ๆ ไม่ผ่านตัวเลือกไฟล์ */}
+        <div>
+          <span className="label-base">สลิป / บิล (ไม่บังคับ)</span>
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={() => cameraRef.current?.click()}
+              disabled={uploading || slips.length >= MAX_ATTACHMENTS}
+              className="btn-secondary"
+            >
+              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
+              ถ่ายรูป
+            </button>
+            <button
+              type="button"
+              onClick={() => galleryRef.current?.click()}
+              disabled={uploading || slips.length >= MAX_ATTACHMENTS}
+              className="btn-secondary"
+            >
+              <ImagePlus className="size-4" />
+              เลือกจากแกลอรี่
+            </button>
+          </div>
 
-        <button onClick={submit} disabled={busy} className="btn-primary w-full py-3 text-lg">
+          <input
+            ref={cameraRef}
+            type="file"
+            accept="image/*"
+            capture="environment"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) void addFile(f)
+            }}
+          />
+          <input
+            ref={galleryRef}
+            type="file"
+            accept="image/*"
+            hidden
+            onChange={(e) => {
+              const f = e.target.files?.[0]
+              e.target.value = ''
+              if (f) void addFile(f)
+            }}
+          />
+
+          {slips.length > 0 && (
+            <ul className="mt-3 flex flex-wrap gap-2">
+              {slips.map((s) => (
+                <li key={s.objectKey} className="relative">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={s.preview}
+                    alt="สลิปที่แนบ"
+                    className="size-20 rounded-md border border-line object-cover animate-pop-in"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => removeSlip(s.objectKey)}
+                    aria-label="เอารูปนี้ออก"
+                    className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full border-2 border-surface bg-urgent-solid text-white transition-transform active:scale-90"
+                  >
+                    <X className="size-3.5" strokeWidth={2.5} />
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+          <p className="mt-1.5 text-xs text-muted-token">
+            แนบได้สูงสุด {MAX_ATTACHMENTS} รูป · ระบบย่อรูปให้อัตโนมัติก่อนอัปโหลด
+          </p>
+        </div>
+
+        <button onClick={submit} disabled={busy || uploading} className="btn-primary w-full py-3 text-lg">
           {busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
           {busy ? 'กำลังบันทึก…' : 'บันทึก'}
         </button>

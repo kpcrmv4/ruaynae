@@ -1,6 +1,8 @@
 import 'server-only'
 
-import { DeleteObjectCommand, GetObjectCommand, PutObjectCommand, S3Client } from '@aws-sdk/client-s3'
+import {
+  DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client,
+} from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { SIGNED_URL_TTL_SECONDS } from '@/lib/constants'
 
@@ -62,6 +64,27 @@ export function presignGet(key: string, ttl = SIGNED_URL_TTL_SECONDS) {
 
 export async function deleteObject(key: string) {
   await r2().send(new DeleteObjectCommand({ Bucket: r2Bucket(), Key: key }))
+}
+
+/**
+ * ถามขนาดและชนิดจริงของไฟล์ที่อยู่ใน R2 · คืน `null` ถ้าไม่มีไฟล์นั้น
+ *
+ * 🔴 ขนาดที่ client บอกมาเป็นแค่คำกล่าวอ้าง — ตอนบันทึกแถว `attachments`
+ * ต้องถาม R2 เองว่าไฟล์มีจริงและใหญ่เท่าไร ไม่งั้นได้แถวที่ชี้ไปยังไฟล์
+ * ที่ไม่เคยถูกอัปโหลด (รูปที่กดดูแล้วพังตลอดกาล) หรือขนาดที่ไม่ตรงความจริง
+ */
+export async function headObject(
+  key: string,
+): Promise<{ size: number; contentType: string } | null> {
+  try {
+    const r = await r2().send(new HeadObjectCommand({ Bucket: r2Bucket(), Key: key }))
+    return {
+      size: Number(r.ContentLength ?? 0),
+      contentType: r.ContentType ?? 'application/octet-stream',
+    }
+  } catch {
+    return null
+  }
 }
 
 /**

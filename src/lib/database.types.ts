@@ -44,6 +44,44 @@ export type Database = {
         }
         Relationships: []
       }
+      attachments: {
+        Row: {
+          byte_size: number
+          content_type: string
+          created_at: string
+          id: string
+          object_key: string
+          thumb_key: string
+          transaction_id: string
+        }
+        Insert: {
+          byte_size: number
+          content_type: string
+          created_at?: string
+          id?: string
+          object_key: string
+          thumb_key: string
+          transaction_id: string
+        }
+        Update: {
+          byte_size?: number
+          content_type?: string
+          created_at?: string
+          id?: string
+          object_key?: string
+          thumb_key?: string
+          transaction_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attachments_transaction_id_fkey"
+            columns: ["transaction_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -95,6 +133,33 @@ export type Database = {
           id?: boolean
           logo_object_key?: string | null
           updated_at?: string
+        }
+        Relationships: []
+      }
+      categories: {
+        Row: {
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["txn_kind"]
+          name: string
+          sort_order: number
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind: Database["public"]["Enums"]["txn_kind"]
+          name: string
+          sort_order?: number
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["txn_kind"]
+          name?: string
+          sort_order?: number
         }
         Relationships: []
       }
@@ -314,6 +379,143 @@ export type Database = {
           },
         ]
       }
+      transactions: {
+        Row: {
+          amount: number
+          approved_at: string | null
+          approved_by: string | null
+          category_id: string
+          created_at: string
+          created_by: string | null
+          id: string
+          income_kind: Database["public"]["Enums"]["income_kind"] | null
+          installment_no: number | null
+          kind: Database["public"]["Enums"]["txn_kind"]
+          note: string | null
+          pay_method: Database["public"]["Enums"]["pay_method"]
+          rejected_reason: string | null
+          site_id: string | null
+          status: Database["public"]["Enums"]["txn_status"]
+          txn_date: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          income_kind?: Database["public"]["Enums"]["income_kind"] | null
+          installment_no?: number | null
+          kind: Database["public"]["Enums"]["txn_kind"]
+          note?: string | null
+          pay_method?: Database["public"]["Enums"]["pay_method"]
+          rejected_reason?: string | null
+          site_id?: string | null
+          status?: Database["public"]["Enums"]["txn_status"]
+          txn_date: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          income_kind?: Database["public"]["Enums"]["income_kind"] | null
+          installment_no?: number | null
+          kind?: Database["public"]["Enums"]["txn_kind"]
+          note?: string | null
+          pay_method?: Database["public"]["Enums"]["pay_method"]
+          rejected_reason?: string | null
+          site_id?: string | null
+          status?: Database["public"]["Enums"]["txn_status"]
+          txn_date?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "transactions_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      upload_intents: {
+        Row: {
+          consumed_at: string | null
+          created_at: string
+          created_by: string
+          expires_at: string
+          id: string
+          object_key: string
+          site_id: string | null
+          thumb_key: string
+        }
+        Insert: {
+          consumed_at?: string | null
+          created_at?: string
+          created_by: string
+          expires_at: string
+          id?: string
+          object_key: string
+          site_id?: string | null
+          thumb_key: string
+        }
+        Update: {
+          consumed_at?: string | null
+          created_at?: string
+          created_by?: string
+          expires_at?: string
+          id?: string
+          object_key?: string
+          site_id?: string | null
+          thumb_key?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "upload_intents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "upload_intents_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
@@ -336,7 +538,11 @@ export type Database = {
       }
     }
     Enums: {
+      income_kind: "deposit" | "installment" | "variation_order" | "other"
+      pay_method: "cash" | "transfer"
       site_status: "planning" | "active" | "paused" | "done" | "cancelled"
+      txn_kind: "income" | "expense"
+      txn_status: "pending" | "approved" | "rejected"
       user_role: "owner" | "site_supervisor"
     }
     CompositeTypes: {
@@ -465,7 +671,11 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      income_kind: ["deposit", "installment", "variation_order", "other"],
+      pay_method: ["cash", "transfer"],
       site_status: ["planning", "active", "paused", "done", "cancelled"],
+      txn_kind: ["income", "expense"],
+      txn_status: ["pending", "approved", "rejected"],
       user_role: ["owner", "site_supervisor"],
     },
   },

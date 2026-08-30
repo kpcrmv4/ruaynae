@@ -10,7 +10,8 @@
     "typecheck": "next typegen && tsc --noEmit",
     "verify:contrast": "node scripts/verify-contrast.mjs src/app/globals.css",
     "gate": "npm run typecheck && npm run verify:contrast && npm run build",
-    "verify:all": "node scripts/verify-all.mjs"
+    "verify:all": "node scripts/verify-all.mjs",
+    "verify:e2e": "node scripts/verify-e2e.mjs"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1121.0",
@@ -29,6 +30,7 @@
     "web-push": "^3.6.7"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

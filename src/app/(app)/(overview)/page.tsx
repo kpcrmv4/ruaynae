@@ -225,7 +225,15 @@ export default async function OverviewPage() {
                 href={`/sites/${site.id}`}
                 // ไล่ขึ้นมาทีละใบ ห่าง 50ms — บอกลำดับการอ่านโดยไม่ต้องเขียนอธิบาย
                 style={{ animationDelay: `${i * 50}ms` }}
-                className="card-surface animate-rise-in p-4 shadow-e1 transition-colors duration-100 hover:border-brand"
+                /*
+                  🔴 `min-w-0` บนตัวการ์ดเอง ไม่ใช่แค่ข้างใน — ช่องของ grid เป็น
+                  `1fr` ซึ่งย่อว่า `minmax(auto, 1fr)` และ `auto` ตัวนั้นคือ
+                  **ความกว้างขั้นต่ำของเนื้อหา** · การ์ดที่มีชิปเรียงกันจึงดัน
+                  ช่องให้กว้างเกินจอ · วัดได้จริงบนจอ 390px: ขอบขวาไปอยู่ที่
+                  461px แล้วส่วนที่เกินถูก `overflow-x: clip` ของเชลล์ตัดทิ้ง
+                  โดยไม่มีแถบเลื่อนให้รู้ตัว (แถว P8-E2E-04)
+                */
+                className="card-surface animate-rise-in min-w-0 p-4 shadow-e1 transition-colors duration-100 hover:border-brand"
               >
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">

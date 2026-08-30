@@ -3,6 +3,7 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { todayInBangkok } from '@/lib/format'
 import { EntryForm } from './entry-form'
+import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'บันทึกรายรับ-รายจ่าย' }
 
@@ -31,10 +32,7 @@ export default async function EntryPage() {
   if (sErr || cErr) {
     console.error('[entry] โหลดตัวเลือกไม่ได้', sErr?.message ?? cErr?.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดหน้าบันทึกไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดหน้าบันทึกไม่สำเร็จ" />
     )
   }
 

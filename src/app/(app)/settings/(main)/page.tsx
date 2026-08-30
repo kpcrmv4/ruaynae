@@ -1,9 +1,9 @@
 import { ChevronRight, Lock, Tags, Users } from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
-import { PushToggle } from './push-client'
+import { PushToggle } from '../push-client'
 import { getBranding } from '@/lib/branding'
-import { BrandingForm } from './branding-form'
+import { BrandingForm } from '../branding-form'
 
 export const metadata = { title: 'ตั้งค่า' }
 

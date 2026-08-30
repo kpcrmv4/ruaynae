@@ -10,6 +10,7 @@ import {
   changedFields, fieldValue, isAuditAction, tableLabel,
 } from '@/lib/audit'
 import { Badge } from '@/components/ui/badge'
+import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 
 export const metadata = { title: 'ประวัติการแก้ไข' }
@@ -59,10 +60,7 @@ export default async function AuditPage({
   if (error) {
     console.error('[audit] อ่านประวัติไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดประวัติการแก้ไขไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดประวัติการแก้ไขไม่สำเร็จ" />
     )
   }
 

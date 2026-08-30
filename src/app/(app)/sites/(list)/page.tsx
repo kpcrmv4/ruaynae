@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { ListRow } from '@/components/ui/list-row'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
-import { NewSiteButton } from './sites-client'
+import { NewSiteButton } from '../sites-client'
 
 export const metadata = { title: 'ไซต์งาน' }
 
@@ -146,7 +146,13 @@ export default async function SitesPage({
               href={`/sites/${s.id}`}
               title={s.name}
               meta={
-                <span className="truncate">
+                /*
+                  🔴 `truncate` บน span เปล่า ๆ ไม่ทำงาน — `overflow: hidden`
+                  ไม่มีผลกับกล่องแบบ inline · สแปนจึงกว้างตามเนื้อหาจริงและดัน
+                  แถวออกนอกจอ (วัดได้ 397px บนจอ 390px) โดยไม่มี ellipsis ให้เห็น
+                  ว่าโดนตัด · ต้องเป็น block (หรือ inline-block) ก่อน
+                */
+                <span className="block truncate">
                   {s.client_name ? `${s.client_name} · ` : ''}
                   {fmtDate(s.start_date)} – {fmtDate(s.end_date)}
                 </span>

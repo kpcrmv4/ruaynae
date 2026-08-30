@@ -9,6 +9,7 @@ import {
   isTxnKind, isTxnStatus,
 } from '@/lib/transactions'
 import { Badge } from '@/components/ui/badge'
+import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 
@@ -114,10 +115,7 @@ export default async function LedgerPage({
   if (error) {
     console.error('[ledger] อ่านรายการไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดรายการไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดรายการไม่สำเร็จ" />
     )
   }
 

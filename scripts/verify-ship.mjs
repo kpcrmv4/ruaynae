@@ -224,7 +224,13 @@ console.log('\n── P8-SHIP · เช็คลิสต์ก่อนส่�
 {
   const tracked = sh('git ls-files').out.split('\n')
   const envFiles = tracked.filter((f) => /^\.env($|\.local|\.production)/.test(f))
-  const srcSecret = sh('git grep -lE "sb_secret_|SUPABASE_SECRET_KEY=|eyJhbGciOi" -- src scripts').out.trim()
+  // 🔴 ประกอบคำค้นจากชิ้นส่วน เพื่อไม่ให้ไฟล์นี้มีคำเต็ม ๆ อยู่ในตัวเอง —
+  // ตอนยังไม่ commit ไฟล์นี้ `git grep` มองไม่เห็นมัน แถวจึงเขียว · พอ commit
+  // เข้าไปแล้วมันเจอคำค้นของตัวเองแล้วรายงานว่า "มีคีย์ลับฝังในซอร์ส"
+  // · ไม่แก้ด้วยการยกเว้นไฟล์ตัวเอง เพราะนั่นคือการเปิดจุดบอดถาวรตรงที่
+  // ที่ไม่มีใครมองอีกเลย
+  const needles = ['sb_' + 'secret_', 'SUPABASE_SECRET' + '_KEY=', 'eyJhbGci' + 'Oi'].join('|')
+  const srcSecret = sh(`git grep -lE "${needles}" -- src scripts`).out.trim()
   check('P8-SHIP-06 ไม่มีไฟล์ .env จริงถูก track และไม่มีคีย์ลับฝังในซอร์ส',
     envFiles.length === 0 && srcSecret === '',
     envFiles.length ? envFiles.join(', ') : (srcSecret || 'สะอาด'))

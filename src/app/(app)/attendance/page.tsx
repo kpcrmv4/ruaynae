@@ -5,6 +5,7 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDateLong, todayInBangkok } from '@/lib/format'
 import { EmptyState } from '@/components/ui/states'
+import { DataError } from '@/components/ui/data-error'
 import { AttendanceBoard } from './attendance-client'
 
 export const metadata = { title: 'คนเข้าไซต์' }
@@ -53,10 +54,7 @@ export default async function AttendancePage({
   if (sErr) {
     console.error('[attendance] อ่านไซต์ไม่ได้', sErr.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดรายชื่อไซต์ไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดรายชื่อไซต์ไม่สำเร็จ" />
     )
   }
 
@@ -140,10 +138,7 @@ export default async function AttendancePage({
   if (eErr || aErr) {
     console.error('[attendance] โหลดข้อมูลไม่ได้', eErr?.message ?? aErr?.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดข้อมูลคนเข้าไซต์ไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดข้อมูลคนเข้าไซต์ไม่สำเร็จ" />
     )
   }
 

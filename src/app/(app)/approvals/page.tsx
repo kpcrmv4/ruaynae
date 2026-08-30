@@ -7,6 +7,7 @@ import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDate } from '@/lib/format'
 import { INCOME_KIND_LABEL, PAY_METHOD_LABEL } from '@/lib/transactions'
 import { EmptyState } from '@/components/ui/states'
+import { DataError } from '@/components/ui/data-error'
 import { ApprovalActions } from './approvals-client'
 
 export const metadata = { title: 'รออนุมัติ' }
@@ -55,10 +56,7 @@ export default async function ApprovalsPage({
   if (error) {
     console.error('[approvals] อ่านคิวไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดคิวอนุมัติไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดคิวอนุมัติไม่สำเร็จ" />
     )
   }
 

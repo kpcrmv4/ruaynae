@@ -34,3 +34,8 @@ npm-debug.log*
 # แคชของเครื่องมือ
 .impeccable/
 .loop/tmp/
+
+# Playwright
+/test-results/
+/playwright-report/
+/.playwright/

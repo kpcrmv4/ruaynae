@@ -47,6 +47,33 @@ export type Database = {
         }
         Relationships: []
       }
+      login_attempts: {
+        Row: {
+          at: string
+          id: number
+          identifier: string | null
+          ip: string | null
+          kind: string
+          ok: boolean
+        }
+        Insert: {
+          at?: string
+          id?: number
+          identifier?: string | null
+          ip?: string | null
+          kind: string
+          ok: boolean
+        }
+        Update: {
+          at?: string
+          id?: number
+          identifier?: string | null
+          ip?: string | null
+          kind?: string
+          ok?: boolean
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string

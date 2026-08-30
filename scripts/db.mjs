@@ -16,7 +16,7 @@
  *   node scripts/db.mjs advisors security|performance
  *   node scripts/db.mjs types > src/lib/database.types.ts
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, writeFileSync } from 'node:fs'
 
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8')
@@ -58,6 +58,16 @@ if (cmd === 'query') {
   const out = await runSql(sql)
   console.error(`✅ applied ${arg} (project ${REF})`)
   console.log(out)
+
+  // regenerate types ทันที ไม่ต้องพึ่งความจำ
+  // ขั้นนี้คือขั้นที่คนข้ามบ่อยที่สุด และอาการคือ .from('ตารางใหม่') กลายเป็น
+  // never ซึ่ง tsc จับได้ก็ต่อเมื่อไฟล์ type เป็นของจริง — ถ้าเป็น stub จะเงียบสนิท
+  const t = JSON.parse(await api('/types/typescript'))
+  const target = 'src/lib/database.types.ts'
+  const rows = (t.types.match(/Row:\s*\{/g) ?? []).length
+  if (rows < 1) throw new Error(`types ที่ได้กลับมาไม่มีตารางเลย (${rows} Row blocks) — ไม่เขียนทับ`)
+  writeFileSync(target, t.types, 'utf8')
+  console.error(`✅ regenerated ${target} (${rows} tables)`)
 } else if (cmd === 'advisors') {
   const out = JSON.parse(await api(`/advisors/${arg}`))
   const lints = out.lints ?? []

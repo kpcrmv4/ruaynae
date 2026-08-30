@@ -98,11 +98,14 @@ try {
              values ('${siteA}','${sup1.id}','2000-01-01')`)
 
   ;[{ id: dailyId }] = (await sql(
-    `insert into public.employees(full_name, job_title, wage_type, daily_rate)
-     values ('${MARK} สมชาย', 'ช่างปูน', 'daily', 600) returning id`)).rows
+    `insert into public.employees(full_name, job_title)
+     values ('${MARK} สมชาย', 'ช่างปูน') returning id`)).rows
+  await sql(`insert into public.employee_wages(employee_id, wage_type, daily_rate)
+             values ('${dailyId}', 'daily', 600)`)
   ;[{ id: monthlyId }] = (await sql(
-    `insert into public.employees(full_name, wage_type, monthly_salary)
-     values ('${MARK} สมหญิง', 'monthly', 18000) returning id`)).rows
+    `insert into public.employees(full_name) values ('${MARK} สมหญิง') returning id`)).rows
+  await sql(`insert into public.employee_wages(employee_id, wage_type, monthly_salary)
+             values ('${monthlyId}', 'monthly', 18000)`)
 
   // รายจ่ายที่อนุมัติแล้วของไซต์ ก — ฐานของ P4-CALC-01
   await sql(`insert into public.transactions
@@ -139,23 +142,32 @@ try {
     const b = await r.json().catch(() => ({}))
     attId = b.attendance?.id ?? null
     const costAfter = costOf(cardOf(await page('/', ownerJar), siteA))
-    check('P4-UI-06 หัวหน้าไซต์ติ๊กคนเข้าไซต์ → 201 · attendance +1',
-      r.status === 201 && Boolean(attId) && Number(b.attendance?.amount) === 600,
-      `${r.status} · amount=${b.attendance?.amount}`)
+    // 🔴 API ไม่คืนยอดเงินกลับมาแล้ว — หัวหน้าไซต์เป็นคนยิง และเขาไม่มีสิทธิ์เห็นเงิน
+    // จึงยืนยันที่ **แถวในฐานข้อมูล** แทน ไม่ใช่ที่ response
+    const [{ n: made }] = (await sql(
+      `select count(*)::int n from public.attendance where id = '${attId ?? '00000000-0000-0000-0000-000000000000'}'`)).rows
+    check('P4-UI-06 หัวหน้าไซต์ติ๊กคนเข้าไซต์ → 201 · attendance +1 · API ไม่คืนยอดเงินกลับมา',
+      r.status === 201 && Boolean(attId) && Number(made) === 1
+      && b.attendance?.amount === undefined,
+      `${r.status} · แถว ${made} · เงินใน response=${b.attendance?.amount ?? 'ไม่มี'}`)
     check('P4-CALC-01 ต้นทุนไซต์ = รายจ่ายอนุมัติ ฿300,000 + ค่าแรง ฿600 = ฿300,600 ทันที ไม่ต้องอนุมัติ',
       costBefore === 300000 && costAfter === 300600,
       `ก่อน ฿${costBefore} → หลัง ฿${costAfter}`)
   }
 
-  // ── P4-CALC-04 · ยอดค่าแรงวันนี้ตรงกับ SQL ────────────────────────
+  // ── P4-CALC-04 · ยอดค่าแรงวันนี้ตรงกับ SQL (เจ้าของเท่านั้น) ──────
+  // 🔴 ตรวจสองฝั่งในบล็อกเดียว: เจ้าของเห็นตัวเลขตรงกับ SQL
+  // และหัวหน้าไซต์**ไม่มีการ์ดนั้นเลย** ไม่ใช่เห็นเป็น ฿0
   {
-    const html = await page(`/attendance?site=${siteA}&date=${today}`, supJar)
+    const ownerHtml = await page(`/attendance?site=${siteA}&date=${today}`, ownerJar)
+    const supHtml = await page(`/attendance?site=${siteA}&date=${today}`, supJar)
     const [{ n }] = (await sql(
-      `select coalesce(sum(amount),0)::float8 n from public.attendance
-       where site_id = '${siteA}' and work_date = '${today}'`)).rows
-    check('P4-CALC-04 ยอด "ค่าแรงวันนี้" บนหน้าจอ = Σ amount ของวันนั้นในไซต์นั้น ตรงกับ SQL',
-      Number(n) > 0 && dayWage(html) === Number(n),
-      `จอ ${dayWage(html)} · SQL ${n}`)
+      `select coalesce(sum(aw.amount),0)::float8 n
+       from public.attendance a join public.attendance_wages aw on aw.attendance_id = a.id
+       where a.site_id = '${siteA}' and a.work_date = '${today}'`)).rows
+    check('P4-CALC-04 ยอด "ค่าแรงวันนี้" ของเจ้าของ = Σ amount ตรงกับ SQL · หัวหน้าไซต์ไม่มีการ์ดนี้',
+      Number(n) > 0 && dayWage(ownerHtml) === Number(n) && dayWage(supHtml) === null,
+      `เจ้าของ ${dayWage(ownerHtml)} · SQL ${n} · หัวหน้าไซต์ ${dayWage(supHtml) ?? 'ไม่มีการ์ด'}`)
   }
 
   // ── P4-CALC-05 · ค่าแรงไซต์ ก ไม่เข้าไซต์ ข ───────────────────────
@@ -177,11 +189,11 @@ try {
       r.status === 201 && before === after && after === 300600,
       `${r.status} · ก่อน ฿${before} → หลัง ฿${after}`)
 
-    // ฝั่งบวก: OT ของคนรายเดือนเข้าต้นทุน
+    // ฝั่งบวก: OT ของคนรายเดือนเข้าต้นทุน — OT เป็นเงิน เจ้าของเป็นคนกรอก
     await req('DELETE', `/api/attendance/${(await r.json().catch(() => ({}))).attendance?.id ?? ''}`,
       undefined, supJar)
     const r2 = await req('POST', '/api/attendance', {
-      siteId: siteA, employeeId: monthlyId, workDate: today, workUnits: 1, otAmount: 250 }, supJar)
+      siteId: siteA, employeeId: monthlyId, workDate: today, workUnits: 1, otAmount: 250 }, ownerJar)
     const withOt = costOf(cardOf(await page('/', ownerJar), siteA))
     check('P4-CALC-02b OT ของคนรายเดือน **เข้า**ต้นทุน (฿300,600 → ฿300,850) — เงินเดือนไม่เข้า แต่ OT เข้า',
       r2.status === 201 && withOt === 300850, `฿${withOt}`)
@@ -201,39 +213,50 @@ try {
 
   // ── P4-UI-08 · เลือกวันย้อนหลัง ───────────────────────────────────
   {
+    // แถวก่อนหน้าลบของวันนี้ออกไปแล้ว — สร้างใหม่เพื่อให้ "วันนี้ > 0" มีความหมาย
+    // ไม่งั้นทั้งสองวันเป็น 0 แล้วแถวนี้จะผ่านบน `0 === 0`
+    await req('POST', '/api/attendance', {
+      siteId: siteA, employeeId: dailyId, workDate: today, workUnits: 1 }, ownerJar)
     const past = '2000-03-15'
-    const html = await page(`/attendance?site=${siteA}&date=${past}`, supJar)
-    const now = await page(`/attendance?site=${siteA}&date=${today}`, supJar)
+    const html = await page(`/attendance?site=${siteA}&date=${past}`, ownerJar)
+    const now = await page(`/attendance?site=${siteA}&date=${today}`, ownerJar)
     check('P4-UI-08 เลือกวันย้อนหลัง → รายการเปลี่ยนตามวัน และวันที่อยู่ใน URL (แชร์ลิงก์ได้)',
       html.includes(`value="${past}"`) && now.includes(`value="${today}"`)
       && dayWage(html) === 0 && (dayWage(now) ?? 0) > 0,
       `วันเก่า ฿${dayWage(html)} · วันนี้ ฿${dayWage(now)}`)
   }
 
-  // ── P4-CALC-06 · หัวหน้าไซต์เห็นค่าแรง ไม่เห็นค่างาน ──────────────
+  // ── P4-CALC-06 · หัวหน้าไซต์ไม่เห็นตัวเลขเงินของไซต์เลย ───────────
+  // เจ้าของสั่งไว้ 31 ส.ค. 2569 · ฝั่งบวกคือ "ยังเปิดหน้าไซต์ตัวเองได้อยู่"
+  // ไม่งั้น 404 ก็ผ่านแถวนี้ได้เหมือนกันโดยไม่ได้พิสูจน์อะไร
   {
     const html = await page(`/sites/${siteA}`, supJar)
-    const leaks = ['เก็บเงินแล้ว', 'กำไรคงเหลือ', 'ค่างานตามสัญญา', '1,000,000']
+    const leaks = ['เก็บเงินแล้ว', 'กำไรคงเหลือ', 'ค่างานตามสัญญา', 'ต้นทุนที่จ่ายจริง',
+      'ต้นทุนไซต์นี้', '1,000,000', '300,000']
       .filter((w) => html.includes(w))
-    check('P4-CALC-06 หัวหน้าไซต์เห็นต้นทุนไซต์ตัวเอง (รวมค่าแรง) แต่ไม่เห็นค่างาน รายรับ กำไร',
-      leaks.length === 0 && html.includes('ต้นทุนไซต์นี้') && html.includes('รวมค่าแรง'),
-      leaks.length ? `หลุด: ${leaks.join(', ')}` : 'เห็นต้นทุน + บอกที่มาว่ารวมค่าแรง')
+    check('P4-CALC-06 หัวหน้าไซต์เปิดหน้าไซต์ตัวเองได้ แต่ไม่มีตัวเลขเงินสักตัวบนหน้านั้น',
+      leaks.length === 0 && html.includes(`${MARK} ไซต์ก`) && html.includes('ความคืบหน้า'),
+      leaks.length ? `หลุด: ${leaks.join(', ')}` : 'เห็นชื่อไซต์และแถบเวลา · ไม่มีเงิน')
   }
   // ── P4-DB-21 · ทุกคอลัมน์มีคนเขียนจริง ────────────────────────────
   // 🔴 ตัดสตริงและคอมเมนต์ก่อน grep — คอมเมนต์ที่ "อธิบาย" คอลัมน์
   // จะทำให้ตัวตรวจเขียวโดยที่ไม่มีใครเขียนคอลัมน์นั้นเลย
   {
-    const strip = (s) =>
-      s.replace(/--[^\n]*/g, '')
-        .replace(/\/\*[\s\S]*?\*\//g, '')
-        .replace(/\/\/[^\n]*/g, '')
-        .replace(/'[^']*'/g, "''")
+    // 🔴 ตัดคอมเมนต์ก่อน grep — คอมเมนต์ที่ "อธิบาย" คอลัมน์จะทำให้ตัวตรวจเขียว
+    // โดยที่ไม่มีใครเขียนคอลัมน์นั้นเลย
+    // 🔴 แต่ **ห้ามตัดสตริงใน SQL** — ไฟล์ migration มี `''` และ `$$…$$` เต็มไปหมด
+    // การจับคู่ single quote ข้ามทั้งไฟล์จะกลืนคำสั่ง insert ทิ้งไปด้วย
+    // (เจอจริงตอน P4.5 — สี่คอลัมน์รายงานว่า "ไม่มีใครเขียน" ทั้งที่เขียนอยู่)
+    const stripSql = (t) => t.replace(/--.*/g, '')
+    const stripTs = (t) =>
+      t.replace(/\/\/.*/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/'[^'\r\n]*'/g, "''")
     const src = [
-      'supabase/migrations/20260830230000_p4_employees_attendance.sql',
-      'src/app/api/employees/route.ts',
-      'src/app/api/attendance/route.ts',
-      'src/lib/employees.ts',
-    ].map((f) => strip(readFileSync(f, 'utf8'))).join('\n')
+      ['supabase/migrations/20260830230000_p4_employees_attendance.sql', stripSql],
+      ['supabase/migrations/20260831000000_p45_wage_secrecy.sql', stripSql],
+      ['src/app/api/employees/route.ts', stripTs],
+      ['src/app/api/attendance/route.ts', stripTs],
+      ['src/lib/employees.ts', stripTs],
+    ].map(([f, fn]) => fn(readFileSync(f, 'utf8'))).join('\n\n')
 
     const cols = [
       'full_name', 'job_title', 'wage_type', 'daily_rate', 'monthly_salary',
@@ -241,8 +264,14 @@ try {
       'work_date', 'site_id', 'employee_id', 'work_units', 'ot_amount', 'wage_snapshot', 'note',
     ]
     // "เขียน" = ปรากฏเป็นคีย์ของ payload (`col:`) หรือถูกกำหนดใน trigger (`new.col :=`)
+    // "เขียน" = คีย์ของ payload ฝั่ง JS (`col:`) · กำหนดใน trigger (`new.col :=`)
+    // · หรืออยู่ในรายการคอลัมน์ของ `insert into … (…)` / `set col = …` ฝั่ง SQL
     const written = cols.filter(
-      (c) => new RegExp(`${c}\\s*:(?!=)`).test(src) || src.includes(`new.${c} :=`),
+      (c) =>
+        new RegExp(`${c}\\s*:(?!=)`).test(src) ||
+        src.includes(`new.${c} :=`) ||
+        new RegExp(`insert into[^(]*\\([^)]*\\b${c}\\b`, 's').test(src) ||
+        new RegExp(`\\b${c}\\s*=\\s*\\S`).test(src),
     )
     const missing = cols.filter((c) => !written.includes(c))
     check('P4-DB-21 ทั้ง 15 คอลัมน์ของ employees/attendance มีโค้ดหรือ trigger ที่เขียนจริง',

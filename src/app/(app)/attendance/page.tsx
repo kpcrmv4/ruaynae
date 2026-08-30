@@ -83,21 +83,57 @@ export default async function AttendancePage({
 
   const [{ data: employees, error: eErr }, { data: rows, error: aErr }, { data: dayWage }] =
     await Promise.all([
+      // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้เลย — หัวหน้าไซต์มีหน้าที่บันทึกว่าใครมาทำงาน
+      // ไม่ใช่ดูเงิน (เจ้าของสั่งไว้ 31 ส.ค. 2569) · เรตอยู่ `employee_wages`
+      // ซึ่ง RLS ไม่ให้เขาอ่านอยู่แล้ว การไม่ขอมาตั้งแต่แรกทำให้หน้าไม่ต้องมี if
       sb
         .from('employees')
-        .select('id, full_name, job_title, wage_type, daily_rate')
+        .select('id, full_name, job_title')
         .eq('is_active', true)
         .order('full_name', { ascending: true })
         .range(0, PAGE_SIZE - 1),
-      sb
-        .from('attendance')
-        .select('id, employee_id, work_units, ot_amount, wage_snapshot, amount, note')
-        .eq('site_id', siteId)
-        .eq('work_date', date)
-        .order('created_at', { ascending: true })
-        .range(0, PAGE_SIZE - 1),
+      // 🔴 สอง query ที่เขียนสตริง select ไว้ตายตัว ไม่ใช่สตริงที่ต่อจากตัวแปร —
+      // ตัวตรวจชนิดของ PostgREST อ่านสตริงตอน compile ถ้าต่อจากตัวแปรมันจะยอมแพ้
+      // แล้วทั้ง query กลายเป็น `any` ซึ่งแปลว่าไม่มีใครตรวจให้อีกเลย
+      isOwner
+        ? sb
+            .from('attendance')
+            .select('id, employee_id, work_units, note, attendance_wages(amount, ot_amount)')
+            .eq('site_id', siteId)
+            .eq('work_date', date)
+            .order('created_at', { ascending: true })
+            .range(0, PAGE_SIZE - 1)
+            .then(({ data, error }) => ({
+              error,
+              data: (data ?? []).map((r) => ({
+                id: r.id,
+                employee_id: r.employee_id,
+                work_units: Number(r.work_units),
+                amount: Number(r.attendance_wages?.amount ?? 0),
+                otAmount: Number(r.attendance_wages?.ot_amount ?? 0),
+              })),
+            }))
+        : sb
+            .from('attendance')
+            .select('id, employee_id, work_units, note')
+            .eq('site_id', siteId)
+            .eq('work_date', date)
+            .order('created_at', { ascending: true })
+            .range(0, PAGE_SIZE - 1)
+            .then(({ data, error }) => ({
+              error,
+              data: (data ?? []).map((r) => ({
+                id: r.id,
+                employee_id: r.employee_id,
+                work_units: Number(r.work_units),
+                // `null` = ไม่มีสิทธิ์เห็น ไม่ใช่ 0 ที่อ่านเหมือน "ทำงานฟรี"
+                amount: null,
+                otAmount: null,
+              })),
+            })),
       // 🔴 ยอดรวมมาจากฐานข้อมูล ไม่ใช่บวกแถวที่หน้านี้โหลดมา —
       // ไซต์ที่มีคนงานเกินหนึ่งหน้า ยอดจะน้อยกว่าความจริงโดยไม่มี error
+      // · RPC คืน null ให้คนที่ไม่ใช่เจ้าของ การ์ดจึงหายไปทั้งใบ ไม่ใช่โชว์ ฿0
       sb.rpc('site_day_wage', { p_site: siteId, p_on: date }),
     ])
 
@@ -113,17 +149,15 @@ export default async function AttendancePage({
 
   return (
     <>
-      <Header date={date} total={Number(dayWage ?? 0)} />
+      <Header date={date} total={dayWage === null ? undefined : Number(dayWage)} />
       <AttendanceBoard
         date={date}
         today={today}
         siteId={siteId}
         sites={sites.map((s) => ({ id: s.id, name: s.name }))}
         employees={employees ?? []}
-        // `amount` เป็น generated column — ตัวสร้างชนิดเขียนว่า nullable ทั้งที่
-        // ส่วนประกอบทุกตัวเป็น not null · แปลงตรงนี้ครั้งเดียว ไม่ปล่อยให้ทั้งหน้า
-        // ต้องเช็ค null ที่เกิดขึ้นไม่ได้จริง
-        signedIn={(rows ?? []).map((r) => ({ ...r, amount: Number(r.amount ?? 0) }))}
+        canSeeMoney={isOwner}
+        signedIn={rows}
       />
     </>
   )

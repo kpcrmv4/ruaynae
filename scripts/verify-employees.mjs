@@ -1,14 +1,15 @@
 #!/usr/bin/env node
 /**
- * verify-employees.mjs — ปิดแถว P4-DB-* ใน docs/test-plan/P4.md
+ * verify-employees.mjs — ปิดแถว P4-DB-* และ P4-SEC-* ใน docs/test-plan/P4.md
  *
  * ยิง PostgREST **ในนามของแต่ละ role จริง ๆ** เพราะ policy และ trigger
  * ทั้งชุดอ่าน `auth.uid()` — คำสั่งที่รันด้วย service role จะได้ `null`
  * แล้วเส้นทางที่อยากทดสอบจะไม่เคยถูกเดินเลย
  *
- * 🔴 แถวที่สำคัญที่สุดคือ P4-DB-10 (snapshot ของเรตค่าแรง) และ P4-DB-12
- * (คนเดียวทำงานได้ไม่เกินหนึ่งวันต่อวัน) — ทั้งคู่คือ "ต้นทุนบวกซ้ำ"
- * ในรูปแบบที่ไม่มี error ที่ไหนเลย
+ * 🔴 ตั้งแต่ P4.5 ค่าแรงอยู่คนละตารางกับข้อมูลคนงาน
+ *   employees / attendance              ทุกคนที่เกี่ยวข้องอ่านได้
+ *   employee_wages / attendance_wages   เจ้าของเท่านั้น
+ * เพราะ RLS ของ Postgres คุมระดับแถว ไม่ใช่ระดับคอลัมน์
  */
 import { readFileSync } from 'node:fs'
 import { derivePassword, syntheticEmail } from '../src/lib/pin-core.ts'
@@ -51,6 +52,10 @@ async function db(token, path, init = {}) {
 const asService = (path, init = {}) =>
   db(SECRET, path, { ...init, headers: { apikey: SECRET, ...init.headers } })
 
+/** เรียก RPC ในนามใครสักคน */
+const rpc = (token, name, args) =>
+  db(token, `/rpc/${name}`, { method: 'POST', body: JSON.stringify(args) })
+
 const sql = async (q) => {
   const r = await fetch(
     `https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/database/query`,
@@ -92,12 +97,17 @@ let siteA = null
 let siteB = null
 const empIds = []
 
-const mkEmp = (fields) =>
-  sql(`insert into public.employees (full_name, wage_type, daily_rate, monthly_salary, is_active)
-       values ('${fields.name}', '${fields.wage}',
-               ${fields.daily ?? 'null'}, ${fields.monthly ?? 'null'},
-               ${fields.active ?? true})
-       returning id`)
+/** สร้างคนงานผ่าน RPC เดียวกับที่แอปใช้ — สองตารางในทรานแซกชันเดียว */
+const save = (token, args) =>
+  rpc(token, 'save_employee', {
+    p_id: null, p_job_title: null, p_daily: null, p_monthly: null,
+    p_default_site: null, p_is_active: true, p_profile: null, ...args,
+  })
+
+const wageOf = async (empId) =>
+  (await asService(`/employee_wages?select=wage_type,daily_rate,monthly_salary&employee_id=eq.${empId}`)).body?.[0]
+const attWageOf = async (attId) =>
+  (await asService(`/attendance_wages?select=work_units,wage_snapshot,ot_amount,amount&attendance_id=eq.${attId}`)).body?.[0]
 
 try {
   ;[{ id: siteA }] = (await sql(
@@ -109,72 +119,64 @@ try {
              values ('${siteA}','${sup1.id}','${today}')`)
 
   // ── P4-DB-01 · สร้างคนงานรายวัน ───────────────────────────────────
+  let dailyId = null
   {
     const before = (await sql("select count(*)::int n from public.audit_log where table_name='employees'")).rows[0].n
-    const r = await db(ownerTok, '/employees', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        full_name: `${MARK} สมชาย ช่างปูน`, job_title: 'ช่างปูน',
-        wage_type: 'daily', daily_rate: 600,
-      }),
+    const r = await save(ownerTok, {
+      p_full_name: `${MARK} สมชาย ช่างปูน`, p_job_title: 'ช่างปูน',
+      p_wage_type: 'daily', p_daily: 600,
     })
-    const row = Array.isArray(r.body) ? r.body[0] : null
-    if (row) empIds.push(row.id)
+    dailyId = typeof r.body === 'string' ? r.body : null
+    if (dailyId) empIds.push(dailyId)
+    const w = dailyId ? await wageOf(dailyId) : null
     const after = (await sql("select count(*)::int n from public.audit_log where table_name='employees'")).rows[0].n
-    check('P4-DB-01 เจ้าของสร้างคนงานรายวันพร้อมเรต → สำเร็จ · audit_log +1',
-      r.status === 201 && Number(row?.daily_rate) === 600 && after === Number(before) + 1,
-      `${r.status} · rate=${row?.daily_rate} · audit +${after - Number(before)}`)
+    check('P4-DB-01 เจ้าของสร้างคนงานรายวันพร้อมเรต → สำเร็จ · เรตลง employee_wages · audit_log +1',
+      r.status === 200 && Number(w?.daily_rate) === 600 && after === Number(before) + 1,
+      `${r.status} · rate=${w?.daily_rate} · audit +${after - Number(before)}`)
   }
 
   // ── P4-DB-02 · รายวันไม่มีเรต ─────────────────────────────────────
   {
-    const r = await db(ownerTok, '/employees', {
-      method: 'POST',
-      body: JSON.stringify({ full_name: `${MARK} ไม่มีเรต`, wage_type: 'daily' }),
-    })
+    const r = await save(ownerTok, { p_full_name: `${MARK} ไม่มีเรต`, p_wage_type: 'daily' })
     check('P4-DB-02 คนรายวันที่ไม่มีเรต → ถูกปฏิเสธด้วย check constraint',
-      r.status >= 400 && /employees_daily_needs_rate/.test(r.raw ?? ''),
-      `${r.status} ${(r.body?.message ?? '').slice(0, 60)}`)
+      r.status >= 400 && /wages_daily_needs_rate/.test(r.raw ?? ''),
+      `${r.status} ${(r.body?.message ?? '').slice(0, 50)}`)
   }
 
   // ── P4-DB-03 · คนรายเดือน ─────────────────────────────────────────
   let monthlyId = null
   {
-    const r = await db(ownerTok, '/employees', {
-      method: 'POST',
-      headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({
-        full_name: `${MARK} สมหญิง โฟร์แมน`, wage_type: 'monthly', monthly_salary: 18000,
-      }),
-    })
-    const row = Array.isArray(r.body) ? r.body[0] : null
-    if (row) { empIds.push(row.id); monthlyId = row.id }
+    const r = await save(ownerTok, {
+      p_full_name: `${MARK} สมหญิง โฟร์แมน`, p_wage_type: 'monthly', p_monthly: 18000 })
+    monthlyId = typeof r.body === 'string' ? r.body : null
+    if (monthlyId) empIds.push(monthlyId)
+    const w = monthlyId ? await wageOf(monthlyId) : null
     check('P4-DB-03 คนรายเดือนพร้อมเงินเดือน → สำเร็จ · daily_rate เป็น null',
-      r.status === 201 && row?.daily_rate === null && Number(row?.monthly_salary) === 18000,
-      `${r.status} · daily=${row?.daily_rate} · monthly=${row?.monthly_salary}`)
+      r.status === 200 && w?.daily_rate === null && Number(w?.monthly_salary) === 18000,
+      `${r.status} · daily=${w?.daily_rate} · monthly=${w?.monthly_salary}`)
   }
 
   // ── P4-DB-04 · หัวหน้าไซต์สร้างคนงานไม่ได้ ────────────────────────
   {
     const before = (await sql("select count(*)::int n from public.employees")).rows[0].n
-    const bad = await db(supTok, '/employees', {
-      method: 'POST',
-      body: JSON.stringify({ full_name: `${MARK} คนที่ไม่ควรมี`, wage_type: 'daily', daily_rate: 500 }),
-    })
+    const bad = await save(supTok, {
+      p_full_name: `${MARK} คนที่ไม่ควรมี`, p_wage_type: 'daily', p_daily: 500 })
     const after = (await sql("select count(*)::int n from public.employees")).rows[0].n
     // ฝั่งบวก: เจ้าของยังสร้างได้ในคำสั่งถัดไป
-    const good = await mkEmp({ name: `${MARK} กรรมกร`, wage: 'daily', daily: 450 })
-    if (good.rows[0]) empIds.push(good.rows[0].id)
-    check('P4-DB-04 หัวหน้าไซต์สร้างคนงานไม่ได้ · จำนวนเท่าเดิม · เจ้าของยังสร้างได้',
-      bad.status >= 400 && Number(after) === Number(before) && Boolean(good.rows[0]),
+    const good = await save(ownerTok, {
+      p_full_name: `${MARK} กรรมกร`, p_wage_type: 'daily', p_daily: 450 })
+    if (typeof good.body === 'string') empIds.push(good.body)
+    check('P4-DB-04 หัวหน้าไซต์สร้างคนงานไม่ได้ (/FORBIDDEN/) · จำนวนเท่าเดิม · เจ้าของยังสร้างได้',
+      bad.status >= 400 && /FORBIDDEN/.test(bad.raw ?? '')
+      && Number(after) === Number(before) && good.status === 200,
       `${bad.status} · ${before}→${after}`)
   }
 
   // ── P4-DB-05 · หัวหน้าไซต์เห็นเฉพาะคนที่ยังใช้งาน ─────────────────
   {
-    const off = await mkEmp({ name: `${MARK} คนที่ลาออกแล้ว`, wage: 'daily', daily: 400, active: false })
-    if (off.rows[0]) empIds.push(off.rows[0].id)
+    const off = await save(ownerTok, {
+      p_full_name: `${MARK} คนที่ลาออกแล้ว`, p_wage_type: 'daily', p_daily: 400, p_is_active: false })
+    if (typeof off.body === 'string') empIds.push(off.body)
     const supActive = await db(supTok, '/employees?select=id&is_active=eq.true')
     const supOff = await db(supTok, '/employees?select=id&is_active=eq.false')
     const ownerOff = await db(ownerTok, '/employees?select=id&is_active=eq.false')
@@ -182,6 +184,31 @@ try {
       (supActive.body?.length ?? 0) > 0 && (supOff.body?.length ?? 0) === 0
       && (ownerOff.body?.length ?? 0) > 0,
       `หัวหน้าไซต์ active ${supActive.body?.length} / inactive ${supOff.body?.length} · เจ้าของ inactive ${ownerOff.body?.length}`)
+  }
+
+  // ── P4-SEC-01 · หัวหน้าไซต์อ่านเรตค่าแรงไม่ได้เลย ─────────────────
+  // 🔴 นี่คือคำสั่งของเจ้าของเมื่อ 31 ส.ค. 2569 · ต้องตรวจทั้ง "อ่านตารางตรง ๆ"
+  // และ "เห็นชื่อคนได้อยู่" ในการตรวจเดียวกัน — ไม่งั้น 0 แถวอาจแปลว่า
+  // เซสชันตายไปแล้ว ซึ่งผ่านเหมือนกันแต่ไม่ได้พิสูจน์อะไร
+  {
+    const wages = await db(supTok, '/employee_wages?select=employee_id,daily_rate')
+    const names = await db(supTok, '/employees?select=id,full_name&is_active=eq.true')
+    const ownerWages = await db(ownerTok, '/employee_wages?select=employee_id,daily_rate')
+    check('P4-SEC-01 หัวหน้าไซต์อ่าน employee_wages ได้ 0 แถว แต่ยังเห็นชื่อคนงาน · เจ้าของอ่านได้ > 0',
+      (Array.isArray(wages.body) ? wages.body.length : 0) === 0
+      && (names.body?.length ?? 0) > 0 && (ownerWages.body?.length ?? 0) > 0,
+      `เรต ${Array.isArray(wages.body) ? wages.body.length : '?'} · ชื่อ ${names.body?.length} · เจ้าของ ${ownerWages.body?.length}`)
+  }
+
+  // ── P4-SEC-02 · ไม่มีคอลัมน์เงินหลงเหลือใน employees/attendance ────
+  {
+    const { rows } = await sql(
+      `select table_name, column_name from information_schema.columns
+       where table_schema = 'public' and table_name in ('employees','attendance')
+         and column_name in ('daily_rate','monthly_salary','wage_type','wage_snapshot','ot_amount','amount')`)
+    check('P4-SEC-02 ไม่มีคอลัมน์เงินหลงเหลือในตารางที่หัวหน้าไซต์อ่านได้',
+      rows.length === 0,
+      rows.length ? rows.map((r) => `${r.table_name}.${r.column_name}`).join(', ') : 'สะอาด')
   }
 
   // ── P4-DB-22 · profile_id ผูกได้คนเดียว ───────────────────────────
@@ -195,8 +222,6 @@ try {
     await sql(`update public.employees set profile_id = null where id = '${empIds[0]}'`)
   }
 
-  const dailyId = empIds[0]
-
   // ── P4-DB-07 + P4-DB-09 · ลงชื่อ + เรตมาจากฐานข้อมูล ──────────────
   let attId = null
   {
@@ -204,18 +229,32 @@ try {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
-        work_date: today, site_id: siteA, employee_id: dailyId, work_units: 1,
-        // 🔴 ค่าที่ client ยัดมาต้องถูกเพิกเฉย
-        wage_snapshot: 99999,
-      }),
+        work_date: today, site_id: siteA, employee_id: dailyId, work_units: 1 }),
     })
-    const row = Array.isArray(r.body) ? r.body[0] : null
-    attId = row?.id ?? null
+    attId = (Array.isArray(r.body) ? r.body[0] : null)?.id ?? null
+    const w = attId ? await attWageOf(attId) : null
     check('P4-DB-07 หัวหน้าไซต์ลงชื่อคนเข้าไซต์ตัวเองได้ · wage_snapshot = เรตของคนนั้น',
-      r.status === 201 && Number(row?.wage_snapshot) === 600 && Number(row?.amount) === 600,
-      `${r.status} · snapshot=${row?.wage_snapshot} · amount=${row?.amount}`)
-    check('P4-DB-09 ค่า wage_snapshot ที่ client ส่งมาถูกเพิกเฉย (ส่ง 99999 ได้ 600)',
-      Number(row?.wage_snapshot) === 600, `snapshot=${row?.wage_snapshot}`)
+      r.status === 201 && Number(w?.wage_snapshot) === 600 && Number(w?.amount) === 600,
+      `${r.status} · snapshot=${w?.wage_snapshot} · amount=${w?.amount}`)
+
+    // 🔴 ค่าที่ client ยัดมาต้องถูกเพิกเฉย — ตอนนี้ยัดไม่ได้เลยเพราะคอลัมน์
+    // ไม่ได้อยู่ในตารางที่เขาเขียนได้ · ตรวจว่า insert ที่มีคอลัมน์นั้นถูกปฏิเสธ
+    const forged = await db(supTok, '/attendance', {
+      method: 'POST',
+      body: JSON.stringify({
+        work_date: day(-7), site_id: siteA, employee_id: dailyId, wage_snapshot: 99999 }),
+    })
+    check('P4-DB-09 ยัด wage_snapshot มาใน insert ไม่ได้เลย — คอลัมน์ไม่ได้อยู่ในตารางที่เขาเขียนได้',
+      forged.status >= 400, `${forged.status}`)
+  }
+
+  // ── P4-SEC-03 · หัวหน้าไซต์อ่านยอดเงินของ attendance ไม่ได้ ───────
+  {
+    const wages = await db(supTok, '/attendance_wages?select=attendance_id,amount')
+    const rows = await db(supTok, `/attendance?select=id,employee_id&site_id=eq.${siteA}`)
+    check('P4-SEC-03 หัวหน้าไซต์อ่าน attendance_wages ได้ 0 แถว แต่ยังเห็นว่าใครมาทำงาน',
+      (Array.isArray(wages.body) ? wages.body.length : 0) === 0 && (rows.body?.length ?? 0) > 0,
+      `ยอดเงิน ${Array.isArray(wages.body) ? wages.body.length : '?'} · รายชื่อ ${rows.body?.length}`)
   }
 
   // ── P4-DB-08 · ไซต์ที่ไม่ได้ดูแล ──────────────────────────────────
@@ -259,7 +298,6 @@ try {
       method: 'POST',
       body: JSON.stringify({ work_date: today, site_id: siteB, employee_id: dailyId, work_units: 1 }),
     })
-    // ฝั่งบวก: ครึ่ง + ครึ่ง ที่สองไซต์ต้องผ่าน
     await sql(`delete from public.attendance where employee_id = '${dailyId}' and work_date = '${today}'`)
     const half1 = await db(ownerTok, '/attendance', {
       method: 'POST',
@@ -281,17 +319,19 @@ try {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
-        work_date: today, site_id: siteA, employee_id: dailyId,
-        work_units: 0.5, ot_amount: 150,
-      }),
+        work_date: today, site_id: siteA, employee_id: dailyId, work_units: 0.5 }),
     })
-    const row = Array.isArray(r.body) ? r.body[0] : null
-    const wrote = await db(ownerTok, `/attendance?id=eq.${row?.id}`, {
+    const id = (Array.isArray(r.body) ? r.body[0] : null)?.id
+    await db(ownerTok, `/attendance_wages?attendance_id=eq.${id}`, {
+      method: 'PATCH', body: JSON.stringify({ ot_amount: 150 }),
+    })
+    const w = await attWageOf(id)
+    const wrote = await db(ownerTok, `/attendance_wages?attendance_id=eq.${id}`, {
       method: 'PATCH', body: JSON.stringify({ amount: 1 }),
     })
     check('P4-DB-11 ครึ่งวัน ฿600 + OT ฿150 → amount = ฿450 · เขียนทับ amount ตรง ๆ ไม่ได้',
-      Number(row?.amount) === 450 && wrote.status >= 400,
-      `amount=${row?.amount} · เขียนทับ ${wrote.status}`)
+      Number(w?.amount) === 450 && wrote.status >= 400,
+      `amount=${w?.amount} · เขียนทับ ${wrote.status}`)
   }
 
   // ── P4-DB-14 · work_units นอกช่วง ─────────────────────────────────
@@ -315,72 +355,66 @@ try {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
-        work_date: today, site_id: siteA, employee_id: monthlyId, work_units: 1, ot_amount: 200,
-      }),
+        work_date: today, site_id: siteA, employee_id: monthlyId, work_units: 1 }),
     })
-    const row = Array.isArray(r.body) ? r.body[0] : null
+    const id = (Array.isArray(r.body) ? r.body[0] : null)?.id
+    await db(ownerTok, `/attendance_wages?attendance_id=eq.${id}`, {
+      method: 'PATCH', body: JSON.stringify({ ot_amount: 200 }),
+    })
+    const w = await attWageOf(id)
     check('P4-DB-15 คนรายเดือน → wage_snapshot = 0 · amount = เฉพาะ OT (฿200)',
-      r.status === 201 && Number(row?.wage_snapshot) === 0 && Number(row?.amount) === 200,
-      `snapshot=${row?.wage_snapshot} · amount=${row?.amount}`)
+      r.status === 201 && Number(w?.wage_snapshot) === 0 && Number(w?.amount) === 200,
+      `snapshot=${w?.wage_snapshot} · amount=${w?.amount}`)
   }
 
   // ── P4-DB-10 · 🔴 ขึ้นค่าแรงแล้วของเก่าต้องไม่ขยับ ────────────────
   {
-    const [before] = (await sql(
-      `select wage_snapshot, amount from public.attendance
+    const [old1] = (await sql(
+      `select id from public.attendance
        where employee_id = '${dailyId}' and work_date = '${today}' and site_id = '${siteA}'`)).rows
+    const before = await attWageOf(old1.id)
 
-    await db(ownerTok, `/employees?id=eq.${dailyId}`, {
-      method: 'PATCH', body: JSON.stringify({ daily_rate: 900 }),
+    await save(ownerTok, {
+      p_id: dailyId, p_full_name: `${MARK} สมชาย ช่างปูน`, p_wage_type: 'daily', p_daily: 900 })
+
+    const after = await attWageOf(old1.id)
+
+    // ── P4-DB-10b · แตะแถวเก่าหลังขึ้นค่าแรงก็ยังต้องไม่ขยับ ────────
+    await db(ownerTok, `/attendance?id=eq.${old1.id}`, {
+      method: 'PATCH', body: JSON.stringify({ note: 'แก้โน้ตเฉย ๆ' }),
     })
+    const afterEdit = await attWageOf(old1.id)
 
-    const [after] = (await sql(
-      `select wage_snapshot, amount from public.attendance
-       where employee_id = '${dailyId}' and work_date = '${today}' and site_id = '${siteA}'`)).rows
-
-    // ฝั่งบวก: แถวที่ลงใหม่หลังขึ้นค่าแรงต้องใช้เรตใหม่
     const fresh = await db(ownerTok, '/attendance', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
         work_date: day(-5), site_id: siteA, employee_id: dailyId, work_units: 1 }),
     })
-    const freshRow = Array.isArray(fresh.body) ? fresh.body[0] : null
+    const freshWage = await attWageOf((Array.isArray(fresh.body) ? fresh.body[0] : null)?.id)
 
-    // ── P4-DB-10b · 🔴 แตะแถวเก่าหลังขึ้นค่าแรงก็ยังต้องไม่ขยับ ─────
-    // เวอร์ชันแรกของ guard ถ่าย snapshot ใหม่ทุกครั้งที่แถวถูก UPDATE
-    // ผลคือแค่ไป "แก้โน้ต" ของแถวเมื่อสามเดือนก่อน ต้นทุนของงานที่ปิดไปแล้ว
-    // ก็ขยับขึ้นเงียบ ๆ · แถวข้างบนจับไม่ได้เพราะไม่เคย UPDATE หลังขึ้นเรต
-    const [old2] = (await sql(
-      `select id, wage_snapshot from public.attendance
-       where employee_id = '${dailyId}' and work_date = '${today}' and site_id = '${siteA}'`)).rows
-    await db(ownerTok, `/attendance?id=eq.${old2.id}`, {
-      method: 'PATCH', body: JSON.stringify({ note: 'แก้โน้ตเฉย ๆ' }),
-    })
-    const [afterEdit] = (await sql(
-      `select wage_snapshot, amount from public.attendance where id = '${old2.id}'`)).rows
     check('P4-DB-10b แก้โน้ตของแถวเก่าหลังขึ้นค่าแรง → wage_snapshot ยังเป็น ฿600 ไม่ถูกถ่ายใหม่',
-      Number(afterEdit?.wage_snapshot) === 600,
-      `หลังแก้โน้ต snapshot=${afterEdit?.wage_snapshot}`)
-
+      Number(afterEdit?.wage_snapshot) === 600, `หลังแก้โน้ต snapshot=${afterEdit?.wage_snapshot}`)
     check('P4-DB-10 ขึ้นค่าแรงแล้ว attendance ของวันเก่าไม่ขยับ (฿600) · แถวใหม่ใช้เรตใหม่ (฿900)',
       Number(before?.wage_snapshot) === 600 && Number(after?.wage_snapshot) === 600
       && Number(after?.amount) === Number(before?.amount)
-      && Number(freshRow?.wage_snapshot) === 900,
-      `เก่า ${before?.wage_snapshot}→${after?.wage_snapshot} · ใหม่ ${freshRow?.wage_snapshot}`)
+      && Number(freshWage?.wage_snapshot) === 900,
+      `เก่า ${before?.wage_snapshot}→${after?.wage_snapshot} · ใหม่ ${freshWage?.wage_snapshot}`)
   }
 
   // ── P4-DB-06 · anon ───────────────────────────────────────────────
   {
-    const e = await db('anon', '/employees?select=id')
-    const a = await db('anon', '/attendance?select=id')
+    const tables = ['employees', 'attendance', 'employee_wages', 'attendance_wages']
+    const counts = []
+    for (const t of tables) {
+      const r = await db('anon', `/${t}?select=*`)
+      counts.push(Array.isArray(r.body) ? r.body.length : -1)
+    }
     const oe = await db(ownerTok, '/employees?select=id')
     const oa = await db(ownerTok, '/attendance?select=id')
-    check('P4-DB-06 anon อ่านทั้งสองตารางได้ 0 แถว · เจ้าของอ่านได้ > 0',
-      (Array.isArray(e.body) ? e.body.length : 0) === 0
-      && (Array.isArray(a.body) ? a.body.length : 0) === 0
-      && (oe.body?.length ?? 0) > 0 && (oa.body?.length ?? 0) > 0,
-      `anon ${Array.isArray(e.body) ? e.body.length : '?'}/${Array.isArray(a.body) ? a.body.length : '?'} · owner ${oe.body?.length}/${oa.body?.length}`)
+    check('P4-DB-06 anon อ่านทั้งสี่ตารางได้ 0 แถว · เจ้าของอ่านได้ > 0',
+      counts.every((c) => c === 0) && (oe.body?.length ?? 0) > 0 && (oa.body?.length ?? 0) > 0,
+      `anon ${counts.join('/')} · owner ${oe.body?.length}/${oa.body?.length}`)
   }
 
   // ── P4-DB-19 · index ──────────────────────────────────────────────
@@ -397,29 +431,21 @@ try {
   {
     const { rows } = await sql(
       `select c.relname, t.tgname from pg_trigger t join pg_class c on c.oid = t.tgrelid
-       where c.relname in ('employees','attendance') and not t.tgisinternal`)
+       where c.relname in ('employees','attendance','employee_wages','attendance_wages')
+         and not t.tgisinternal`)
     const names = rows.map((r) => r.tgname)
-    check('P4-DB-20 audit trigger ครอบทั้งสองตารางใหม่',
-      names.includes('employees_audit') && names.includes('attendance_audit'),
-      names.join(', '))
+    const want = ['employees_audit', 'attendance_audit', 'employee_wages_audit', 'attendance_wages_audit']
+    check('P4-DB-20 audit trigger ครอบทั้งสี่ตาราง (รวมสองตารางเงินที่แยกออกมา)',
+      want.every((w) => names.includes(w)), want.filter((w) => !names.includes(w)).join(', ') || 'ครบ')
   }
 
-  // ── P4-DB-21 · ทุกคอลัมน์มีคนเขียน ────────────────────────────────
+  // ── P4-DB-21a · คอลัมน์ที่ trigger ต้องเขียนเอง ───────────────────
   {
-    const strip = (s) => s.replace(/--[^\n]*/g, '').replace(/\/\*[\s\S]*?\*\//g, '')
-    const mig = strip(readFileSync(
-      'supabase/migrations/20260830230000_p4_employees_attendance.sql', 'utf8'))
-    const cols = [
-      'full_name', 'job_title', 'wage_type', 'daily_rate', 'monthly_salary',
-      'default_site_id', 'is_active', 'profile_id',
-      'work_date', 'site_id', 'employee_id', 'work_units', 'ot_amount', 'wage_snapshot', 'note',
-    ]
-    // เฉพาะคอลัมน์ที่ trigger เป็นคนเขียน — ที่เหลือรอ route ของ P4-b/P4-c
-    const byTrigger = ['wage_snapshot']
-    const missing = byTrigger.filter((c) => !mig.includes(`new.${c} :=`))
-    check('P4-DB-21a คอลัมน์ที่ trigger ต้องเขียนเอง (wage_snapshot) มีโค้ดเขียนจริง',
-      missing.length === 0 && cols.length === 15,
-      missing.length ? `ขาด: ${missing.join(', ')}` : 'ครบ · อีก 14 คอลัมน์รอ route ที่ P4-b/P4-c')
+    const mig = readFileSync('supabase/migrations/20260831000000_p45_wage_secrecy.sql', 'utf8')
+      .replace(/--[^\n]*/g, '')
+    check('P4-DB-21a `wage_snapshot` ถูกกำหนดใน trigger จริง (ไม่ใช่ default ที่ client ส่งทับได้)',
+      /insert into public\.attendance_wages[\s\S]{0,400}wage_snapshot/.test(mig),
+      'trigger sync_attendance_wage เป็นคนเขียน')
   }
 } finally {
   await sql(`delete from public.attendance where site_id in ('${siteA}','${siteB}')`)
@@ -444,7 +470,7 @@ try {
   const { rows: all } = await sql(
     "select count(*)::int n from pg_tables where schemaname='public'")
   check('P4-DB-17 ทุกตารางใน public เปิด RLS · ไม่มีตารางไหนหลุด',
-    Number(rows[0].off) === 0 && Number(all[0].n) >= 16,
+    Number(rows[0].off) === 0 && Number(all[0].n) >= 18,
     `ปิดอยู่ ${rows[0].off} จาก ${all[0].n} ตาราง`)
 }
 

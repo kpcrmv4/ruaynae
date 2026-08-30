@@ -13,19 +13,27 @@ export const WAGE_TYPE_LABEL: Record<WageType, string> = {
 export const isWageType = (v: unknown): v is WageType =>
   typeof v === 'string' && (WAGE_TYPES as readonly string[]).includes(v)
 
-export type EmployeeFields = {
-  full_name: string
-  job_title: string | null
-  wage_type: WageType
-  daily_rate: number | null
-  monthly_salary: number | null
-  default_site_id: string | null
-  is_active: boolean
-  profile_id: string | null
+/**
+ * อาร์กิวเมนต์ของ RPC `save_employee`
+ *
+ * 🔴 ค่าแรงอยู่คนละตารางกับข้อมูลคนงาน (`employee_wages` เจ้าของอ่านได้คนเดียว)
+ * เพราะ RLS ของ Postgres คุมระดับแถว ไม่ใช่ระดับคอลัมน์ · สองตารางต้องเปลี่ยน
+ * พร้อมกันหรือไม่เปลี่ยนเลย จึงยิงผ่าน RPC ตัวเดียวที่อยู่ในทรานแซกชันเดียว
+ */
+export type EmployeeArgs = {
+  p_id: string | null
+  p_full_name: string
+  p_job_title: string | null
+  p_wage_type: WageType
+  p_daily: number | null
+  p_monthly: number | null
+  p_default_site: string | null
+  p_is_active: boolean
+  p_profile: string | null
 }
 
 export type EmployeeParse =
-  | { ok: true; fields: EmployeeFields }
+  | { ok: true; args: EmployeeArgs }
   | { ok: false; error: string }
 
 /**
@@ -33,12 +41,11 @@ export type EmployeeParse =
  *
  * 🔴 คนรายวันต้องมีเรต และคนรายเดือนต้องมีเงินเดือน — ฐานข้อมูลก็บังคับด้วย
  * check constraint อยู่แล้ว แต่ตอบ 400 พร้อมเหตุผลดีกว่าปล่อยให้เป็น 500
- * ที่ผู้ใช้อ่านไม่ออกว่าต้องแก้อะไร
  *
- * 🔴 ฟิลด์ของอีกประเภทถูก **ล้างเป็น null** ไม่ใช่ปล่อยติดมา — คนที่เคยเป็น
- * รายวันแล้วเปลี่ยนเป็นรายเดือน ถ้าเรตรายวันยังค้างอยู่ วันหนึ่งจะมีคนอ่านมันไปใช้
+ * 🔴 ฟิลด์ของอีกประเภทถูกส่งเป็น `null` — คนที่เคยเป็นรายวันแล้วเปลี่ยนเป็น
+ * รายเดือน ถ้าเรตรายวันยังค้างอยู่ วันหนึ่งจะมีคนอ่านมันไปใช้
  */
-export function parseEmployeeFields(body: unknown): EmployeeParse {
+export function parseEmployeeFields(body: unknown, id: string | null = null): EmployeeParse {
   const o = (body ?? {}) as Record<string, unknown>
 
   const fullName = String(o.fullName ?? o.full_name ?? '').trim().slice(0, MAX_NAME)
@@ -65,17 +72,18 @@ export function parseEmployeeFields(body: unknown): EmployeeParse {
 
   return {
     ok: true,
-    fields: {
-      full_name: fullName,
-      job_title: jobTitle === '' ? null : jobTitle,
-      wage_type: wageType,
-      daily_rate: wageType === 'daily' ? daily.value : null,
-      monthly_salary: wageType === 'monthly' ? monthly.value : null,
-      default_site_id: isUuid(siteId) ? siteId : null,
-      is_active: o.isActive === undefined && o.is_active === undefined
+    args: {
+      p_id: id,
+      p_full_name: fullName,
+      p_job_title: jobTitle === '' ? null : jobTitle,
+      p_wage_type: wageType,
+      p_daily: wageType === 'daily' ? daily.value : null,
+      p_monthly: wageType === 'monthly' ? monthly.value : null,
+      p_default_site: isUuid(siteId) ? siteId : null,
+      p_is_active: o.isActive === undefined && o.is_active === undefined
         ? true
         : Boolean(o.isActive ?? o.is_active),
-      profile_id: isUuid(profileId) ? profileId : null,
+      p_profile: isUuid(profileId) ? profileId : null,
     },
   }
 }

@@ -169,10 +169,12 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           </div>
         )}
 
-        <p className="mt-3 border-t border-line-soft pt-3 text-xs text-muted-token">
-          ต้นทุนนับจากรายจ่ายที่อนุมัติแล้ว บวกค่าแรงจากการลงชื่อคนเข้าไซต์
-          ซึ่งเกิดขึ้นทันทีที่ติ๊ก ไม่ต้องรออนุมัติ
-        </p>
+        {bars.kind !== 'hidden' && (
+          <p className="mt-3 border-t border-line-soft pt-3 text-xs text-muted-token">
+            ต้นทุนนับจากรายจ่ายที่อนุมัติแล้ว บวกค่าแรงจากการลงชื่อคนเข้าไซต์
+            ซึ่งเกิดขึ้นทันทีที่ติ๊ก ไม่ต้องรออนุมัติ
+          </p>
+        )}
       </section>
 
       {/* ── ตัวเลขเงินสี่ตัว — เจ้าของเท่านั้น ─────────────────────────

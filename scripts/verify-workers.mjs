@@ -90,9 +90,12 @@ try {
     empId = b.employee?.id ?? null
     if (empId) made.push(empId)
     const after = (await sql('select count(*)::int n from public.employees')).rows[0].n
+    // ค่าแรงอยู่ `employee_wages` ตั้งแต่ P4.5 — ตารางที่เจ้าของอ่านได้คนเดียว
     const [row] = (await sql(
-      `select wage_type, daily_rate, monthly_salary, job_title
-       from public.employees where id = '${empId}'`)).rows
+      `select w.wage_type, w.daily_rate, w.monthly_salary, e.job_title
+       from public.employees e
+       join public.employee_wages w on w.employee_id = e.id
+       where e.id = '${empId}'`)).rows
     check('P4-UI-03 เจ้าของเพิ่มคนงานรายวัน → 201 · employees +1 · เรตและตำแหน่งถูกเก็บจริง',
       r.status === 201 && Number(after) === Number(before) + 1
       && Number(row?.daily_rate) === 600 && row?.job_title === 'ช่างปูน'
@@ -106,7 +109,8 @@ try {
       wageType: 'monthly', monthlySalary: '18000',
     }, ownerJar)
     const [row] = (await sql(
-      `select wage_type, daily_rate, monthly_salary from public.employees where id = '${empId}'`)).rows
+      `select wage_type, daily_rate, monthly_salary
+       from public.employee_wages where employee_id = '${empId}'`)).rows
     check('P4-API-04 เปลี่ยนเป็นรายเดือน → daily_rate ถูกล้างเป็น null · ไม่เหลือเรตค้างให้ใครอ่านไปใช้',
       r.status === 200 && row?.wage_type === 'monthly' && row?.daily_rate === null
       && Number(row?.monthly_salary) === 18000,
@@ -120,7 +124,8 @@ try {
   {
     const off = await req('PATCH', `/api/employees/${empId}`, { isActive: false }, ownerJar)
     const [a] = (await sql(
-      `select is_active, daily_rate from public.employees where id = '${empId}'`)).rows
+      `select e.is_active, w.daily_rate from public.employees e
+       join public.employee_wages w on w.employee_id = e.id where e.id = '${empId}'`)).rows
     const on = await req('PATCH', `/api/employees/${empId}`, { isActive: true }, ownerJar)
     const [b] = (await sql(
       `select is_active from public.employees where id = '${empId}'`)).rows

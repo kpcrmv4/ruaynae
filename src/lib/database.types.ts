@@ -84,44 +84,35 @@ export type Database = {
       }
       attendance: {
         Row: {
-          amount: number | null
           created_at: string
           created_by: string | null
           employee_id: string
           id: string
           note: string | null
-          ot_amount: number
           site_id: string
           updated_at: string
-          wage_snapshot: number
           work_date: string
           work_units: number
         }
         Insert: {
-          amount?: number | null
           created_at?: string
           created_by?: string | null
           employee_id: string
           id?: string
           note?: string | null
-          ot_amount?: number
           site_id: string
           updated_at?: string
-          wage_snapshot?: number
           work_date: string
           work_units?: number
         }
         Update: {
-          amount?: number | null
           created_at?: string
           created_by?: string | null
           employee_id?: string
           id?: string
           note?: string | null
-          ot_amount?: number
           site_id?: string
           updated_at?: string
-          wage_snapshot?: number
           work_date?: string
           work_units?: number
         }
@@ -145,6 +136,41 @@ export type Database = {
             columns: ["site_id"]
             isOneToOne: false
             referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      attendance_wages: {
+        Row: {
+          amount: number | null
+          attendance_id: string
+          ot_amount: number
+          updated_at: string
+          wage_snapshot: number
+          work_units: number
+        }
+        Insert: {
+          amount?: number | null
+          attendance_id: string
+          ot_amount?: number
+          updated_at?: string
+          wage_snapshot?: number
+          work_units: number
+        }
+        Update: {
+          amount?: number | null
+          attendance_id?: string
+          ot_amount?: number
+          updated_at?: string
+          wage_snapshot?: number
+          work_units?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_wages_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: true
+            referencedRelation: "attendance"
             referencedColumns: ["id"]
           },
         ]
@@ -230,45 +256,68 @@ export type Database = {
         }
         Relationships: []
       }
+      employee_wages: {
+        Row: {
+          daily_rate: number | null
+          employee_id: string
+          monthly_salary: number | null
+          updated_at: string
+          wage_type: Database["public"]["Enums"]["wage_type"]
+        }
+        Insert: {
+          daily_rate?: number | null
+          employee_id: string
+          monthly_salary?: number | null
+          updated_at?: string
+          wage_type?: Database["public"]["Enums"]["wage_type"]
+        }
+        Update: {
+          daily_rate?: number | null
+          employee_id?: string
+          monthly_salary?: number | null
+          updated_at?: string
+          wage_type?: Database["public"]["Enums"]["wage_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_wages_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employees: {
         Row: {
           created_at: string
-          daily_rate: number | null
           default_site_id: string | null
           full_name: string
           id: string
           is_active: boolean
           job_title: string | null
-          monthly_salary: number | null
           profile_id: string | null
           updated_at: string
-          wage_type: Database["public"]["Enums"]["wage_type"]
         }
         Insert: {
           created_at?: string
-          daily_rate?: number | null
           default_site_id?: string | null
           full_name: string
           id?: string
           is_active?: boolean
           job_title?: string | null
-          monthly_salary?: number | null
           profile_id?: string | null
           updated_at?: string
-          wage_type?: Database["public"]["Enums"]["wage_type"]
         }
         Update: {
           created_at?: string
-          daily_rate?: number | null
           default_site_id?: string | null
           full_name?: string
           id?: string
           is_active?: boolean
           job_title?: string | null
-          monthly_salary?: number | null
           profile_id?: string | null
           updated_at?: string
-          wage_type?: Database["public"]["Enums"]["wage_type"]
         }
         Relationships: [
           {
@@ -700,6 +749,20 @@ export type Database = {
     }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      save_employee: {
+        Args: {
+          p_daily: number
+          p_default_site: string
+          p_full_name: string
+          p_id: string
+          p_is_active: boolean
+          p_job_title: string
+          p_monthly: number
+          p_profile: string
+          p_wage_type: Database["public"]["Enums"]["wage_type"]
+        }
+        Returns: string
+      }
       site_day_wage: { Args: { p_on: string; p_site: string }; Returns: number }
       site_money: {
         Args: { p_site?: string }

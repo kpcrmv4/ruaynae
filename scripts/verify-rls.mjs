@@ -51,6 +51,27 @@ async function db(token, path, init = {}) {
 const asService = (path, init = {}) =>
   db(SECRET, path, { ...init, headers: { apikey: SECRET, ...init.headers } })
 
+/**
+ * นับแถวด้วย `count=exact` ในฐานข้อมูล
+ *
+ * 🔴 ห้ามนับด้วย `.body.length` — PostgREST ตัดผลลัพธ์ที่ 1,000 แถวเงียบ ๆ
+ * แถวนี้เคยเขียวมาตลอดจน `audit_log` โตเกินพัน แล้วรายงาน `1000→1000`
+ * ทั้งที่ trigger ทำงานถูก — กับดักของโปรเจ็คตัวเอง (CLAUDE.md §7)
+ * ที่ย้อนมาโดนสคริปต์ตรวจของตัวเอง
+ */
+const countOf = async (path) => {
+  const r = await fetch(`${URL}/rest/v1${path}`, {
+    headers: {
+      apikey: SECRET,
+      Authorization: `Bearer ${SECRET}`,
+      Prefer: 'count=exact',
+      Range: '0-0',
+    },
+  })
+  const m = /\/(\d+)$/.exec(r.headers.get('content-range') ?? '')
+  return Number(m?.[1] ?? -1)
+}
+
 console.log('\n── เข้าสู่ระบบ ─────────────────────────────────────────────')
 const ownerTok = await signIn(env.SEED_OWNER_EMAIL, env.SEED_OWNER_PASSWORD)
 const supTok = await signIn(syntheticEmail('sup1'), derivePassword(PEPPER, env.SEED_SUPERVISOR1_PIN))
@@ -86,14 +107,14 @@ console.log('\n── P0-DB · RLS และ audit ─────────�
 
 // P0-DB-02 · owner แก้ชื่อตัวเอง → audit UPDATE เพิ่ม
 {
-  const before = (await asService('/audit_log?select=id&action=eq.UPDATE')).body.length
+  const before = await countOf('/audit_log?select=id&action=eq.UPDATE')
   const orig = ownerRow.full_name
   try {
     const upd = await db(ownerTok, `/profiles?id=eq.${ownerRow.id}`, {
       method: 'PATCH', headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ full_name: orig + ' (ทดสอบ)' }),
     })
-    const after = (await asService('/audit_log?select=id&action=eq.UPDATE')).body.length
+    const after = await countOf('/audit_log?select=id&action=eq.UPDATE')
     check('P0-DB-02 owner แก้ชื่อตัวเองได้ และ audit UPDATE +1',
       upd.body?.length === 1 && after === before + 1, `แถวที่เขียน ${upd.body?.length} · audit ${before}→${after}`)
   } finally {

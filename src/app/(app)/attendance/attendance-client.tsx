@@ -5,23 +5,19 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht } from '@/lib/format'
-import { WAGE_TYPE_LABEL, type WageType } from '@/lib/employees'
 
 type Employee = {
   id: string
   full_name: string
   job_title: string | null
-  wage_type: WageType
-  daily_rate: number | null
 }
+/** `amount`/`otAmount` เป็น `null` เมื่อคนดูไม่มีสิทธิ์เห็นเงิน — ไม่ใช่ 0 */
 type Row = {
   id: string
   employee_id: string
   work_units: number
-  ot_amount: number
-  wage_snapshot: number
-  amount: number
-  note: string | null
+  amount: number | null
+  otAmount: number | null
 }
 
 const MESSAGES: Record<string, string> = {
@@ -48,6 +44,7 @@ export function AttendanceBoard({
   sites,
   employees,
   signedIn,
+  canSeeMoney,
 }: {
   date: string
   today: string
@@ -55,6 +52,8 @@ export function AttendanceBoard({
   sites: { id: string; name: string }[]
   employees: Employee[]
   signedIn: Row[]
+  /** เจ้าของเท่านั้น — หัวหน้าไซต์บันทึกว่าใครมา ไม่ได้ดูเงิน */
+  canSeeMoney: boolean
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -85,7 +84,8 @@ export function AttendanceBoard({
           employeeId,
           workDate: date,
           workUnits: half[employeeId] ? 0.5 : 1,
-          otAmount: Number(ot[employeeId] ?? 0) || 0,
+          // ส่งเฉพาะตอนเป็นเจ้าของ · API ก็เพิกเฉยค่าที่หัวหน้าไซต์ส่งมาอีกชั้น
+          ...(canSeeMoney ? { otAmount: Number(ot[employeeId] ?? 0) || 0 } : {}),
         }),
       })
       const b = await r.json().catch(() => ({}))
@@ -179,14 +179,16 @@ export function AttendanceBoard({
                       <span className="ml-1.5 text-sm font-normal text-muted-token">ครึ่งวัน</span>
                     )}
                   </span>
-                  <span className="shrink-0 text-sm font-semibold tnum text-ink">
-                    {fmtBaht(row.amount)}
-                    {Number(row.ot_amount) > 0 && (
-                      <span className="ml-1 text-xs font-normal text-muted-token">
-                        (รวม OT {fmtBaht(row.ot_amount)})
-                      </span>
-                    )}
-                  </span>
+                  {row.amount !== null && (
+                    <span className="shrink-0 text-sm font-semibold tnum text-ink">
+                      {fmtBaht(row.amount)}
+                      {(row.otAmount ?? 0) > 0 && (
+                        <span className="ml-1 text-xs font-normal text-muted-token">
+                          (รวม OT {fmtBaht(row.otAmount)})
+                        </span>
+                      )}
+                    </span>
+                  )}
                   <button
                     type="button"
                     onClick={() => signOut(row)}
@@ -230,8 +232,7 @@ export function AttendanceBoard({
                 <div className="min-w-0 flex-1">
                   <div className="truncate font-medium text-ink">{e.full_name}</div>
                   <div className="truncate text-xs text-muted-token">
-                    {e.job_title ?? 'ไม่ได้ระบุตำแหน่ง'} · {WAGE_TYPE_LABEL[e.wage_type]}
-                    {e.wage_type === 'daily' && ` ${fmtBaht(e.daily_rate)}/วัน`}
+                    {e.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
                   </div>
                 </div>
 
@@ -245,15 +246,18 @@ export function AttendanceBoard({
                   ครึ่งวัน
                 </label>
 
-                <input
-                  type="text"
-                  inputMode="decimal"
-                  value={ot[e.id] ?? ''}
-                  onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
-                  placeholder="OT ฿"
-                  aria-label={`ค่า OT ของ ${e.full_name}`}
-                  className="input-base w-24 shrink-0 tnum"
-                />
+                {/* ช่อง OT เป็นเงิน — เจ้าของเท่านั้นที่เห็นและกรอกได้ */}
+                {canSeeMoney && (
+                  <input
+                    type="text"
+                    inputMode="decimal"
+                    value={ot[e.id] ?? ''}
+                    onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
+                    placeholder="OT ฿"
+                    aria-label={`ค่า OT ของ ${e.full_name}`}
+                    className="input-base w-24 shrink-0 tnum"
+                  />
+                )}
 
                 <button
                   type="button"

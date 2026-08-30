@@ -49,7 +49,9 @@ export async function POST(req: NextRequest) {
   if (rawUnits !== 0.5 && rawUnits !== 1) {
     return NextResponse.json({ error: 'WORK_UNITS_INVALID' }, { status: 400 })
   }
-  const ot = Number(body.otAmount ?? body.ot_amount ?? 0)
+  // 🔴 OT เป็นเงิน — หัวหน้าไซต์ไม่เห็นและไม่ตั้ง (เจ้าของสั่งไว้ 31 ส.ค. 2569)
+  // ค่าที่หัวหน้าไซต์ส่งมาถูกเพิกเฉย ไม่ใช่ตอบ error เพราะหน้าจอของเขาไม่มีช่องนี้อยู่แล้ว
+  const ot = me.role === 'owner' ? Number(body.otAmount ?? body.ot_amount ?? 0) : 0
   if (!Number.isFinite(ot) || ot < 0 || ot > 999_999) {
     return NextResponse.json({ error: 'OT_INVALID' }, { status: 400 })
   }
@@ -63,10 +65,9 @@ export async function POST(req: NextRequest) {
       employee_id: employeeId,
       work_date: workDate,
       work_units: rawUnits,
-      ot_amount: Math.round(ot * 100) / 100,
       note: note === '' ? null : note,
     })
-    .select('id, amount')
+    .select('id')
     .maybeSingle()
 
   if (error) {
@@ -83,6 +84,21 @@ export async function POST(req: NextRequest) {
   }
   // 🔴 RLS ที่ปฏิเสธไม่คืน error เสมอไป — อ่านแถวกลับมาดูว่ามีจริง
   if (!data) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+
+  // ยอดเงินอยู่คนละตาราง (`attendance_wages` เจ้าของอ่านได้คนเดียว) และ trigger
+  // เป็นคนสร้างแถวให้แล้ว · เหลือแค่ OT ที่เจ้าของกรอกเอง
+  if (ot > 0) {
+    const { error: otErr } = await sb
+      .from('attendance_wages')
+      .update({ ot_amount: Math.round(ot * 100) / 100 })
+      .eq('attendance_id', data.id)
+      .select('attendance_id')
+      .maybeSingle()
+    if (otErr) {
+      console.error('[attendance] บันทึก OT ไม่สำเร็จ', otErr.message)
+      return NextResponse.json({ ok: true, attendance: data, otError: 'OT_FAILED' }, { status: 201 })
+    }
+  }
 
   return NextResponse.json({ ok: true, attendance: data }, { status: 201 })
 }

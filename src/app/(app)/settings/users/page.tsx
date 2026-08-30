@@ -38,7 +38,9 @@ export default async function UsersPage({
         .range(0, PAGE_SIZE - 1),
       sb
         .from('employees')
-        .select('id, full_name, job_title, wage_type, daily_rate, monthly_salary, default_site_id, is_active, profile_id')
+        // ค่าแรงอยู่ `employee_wages` ที่เจ้าของอ่านได้คนเดียว — หน้านี้เป็นของ
+        // เจ้าของอยู่แล้ว จึง embed มาได้ · หัวหน้าไซต์เข้าหน้านี้ไม่ได้ตั้งแต่แรก
+        .select('id, full_name, job_title, default_site_id, is_active, profile_id, employee_wages(wage_type, daily_rate, monthly_salary)')
         // คนที่ยังทำงานอยู่ขึ้นก่อน แล้วเรียงตามชื่อ
         .order('is_active', { ascending: false })
         .order('full_name', { ascending: true })
@@ -89,7 +91,17 @@ export default async function UsersPage({
         <UsersClient meId={me.id} users={profiles ?? []} />
       ) : (
         <EmployeesClient
-          employees={employees ?? []}
+          employees={(employees ?? []).map((e) => ({
+            id: e.id,
+            full_name: e.full_name,
+            job_title: e.job_title,
+            default_site_id: e.default_site_id,
+            is_active: e.is_active,
+            profile_id: e.profile_id,
+            wage_type: e.employee_wages?.wage_type ?? 'daily',
+            daily_rate: e.employee_wages?.daily_rate ?? null,
+            monthly_salary: e.employee_wages?.monthly_salary ?? null,
+          }))}
           sites={sites ?? []}
           // ผูกได้เฉพาะบัญชีที่ยังใช้งานอยู่ — ผูกกับบัญชีที่ปิดไปแล้วคือการสร้าง
           // ความสัมพันธ์ที่ไม่มีวันได้ใช้

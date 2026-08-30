@@ -155,14 +155,152 @@ export type Database = {
         }
         Relationships: []
       }
+      site_milestones: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+          planned_amount: number
+          planned_date: string | null
+          seq: number
+          site_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+          planned_amount?: number
+          planned_date?: string | null
+          seq: number
+          site_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+          planned_amount?: number
+          planned_date?: string | null
+          seq?: number
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_milestones_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      site_supervisors: {
+        Row: {
+          created_at: string
+          effective_from: string
+          effective_to: string | null
+          id: string
+          profile_id: string
+          site_id: string
+        }
+        Insert: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          profile_id: string
+          site_id: string
+        }
+        Update: {
+          created_at?: string
+          effective_from?: string
+          effective_to?: string | null
+          id?: string
+          profile_id?: string
+          site_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "site_supervisors_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "site_supervisors_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sites: {
+        Row: {
+          address: string | null
+          client_name: string | null
+          client_phone: string | null
+          contract_amount: number
+          created_at: string
+          created_by: string | null
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: Database["public"]["Enums"]["site_status"]
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          contract_amount?: number
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["site_status"]
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          client_name?: string | null
+          client_phone?: string | null
+          contract_amount?: number
+          created_at?: string
+          created_by?: string | null
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: Database["public"]["Enums"]["site_status"]
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sites_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      supervises_site: {
+        Args: { p_on?: string; p_site: string }
+        Returns: boolean
+      }
     }
     Enums: {
+      site_status: "planning" | "active" | "paused" | "done" | "cancelled"
       user_role: "owner" | "site_supervisor"
     }
     CompositeTypes: {
@@ -291,6 +429,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      site_status: ["planning", "active", "paused", "done", "cancelled"],
       user_role: ["owner", "site_supervisor"],
     },
   },

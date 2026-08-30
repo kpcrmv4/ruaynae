@@ -117,8 +117,24 @@
     {
       "id": "P1",
       "title": "ไซต์ + ภาพรวม 3 แถบ",
-      "status": "todo",
-      "tasks": []
+      "status": "doing",
+      "tasks": [
+        {
+          "id": "P1-a",
+          "t": "ตารางตรวจรับ P1 + migration (sites, site_supervisors, site_milestones, RLS)",
+          "s": "done"
+        },
+        {
+          "id": "P1-b",
+          "t": "API + หน้า /sites และ /sites/[id]",
+          "s": "todo"
+        },
+        {
+          "id": "P1-c",
+          "t": "หน้าภาพรวม / พร้อมแถบ 3 เส้น",
+          "s": "todo"
+        }
+      ]
     },
     {
       "id": "P2",
@@ -229,6 +245,11 @@
       "what": "ไม่มี GET /api/settings/users — หน้าอ่านฐานข้อมูลตรง",
       "why": "เหตุผลเดียวกับ /api/branding: หน้าเป็น Server Component มี GET ไว้ก็ไม่มีใครเรียก กลายเป็น endpoint กำพร้าที่ไม่มีใครทดสอบ",
       "cost_if_wrong": "ไม่มี — ถ้าวันหน้าต้องการ pagination ฝั่ง client ค่อยเพิ่ม"
+    },
+    {
+      "what": "ย้าย btree_gist จาก schema public ไป extensions",
+      "why": "advisor แจ้ง extension_in_public (เสี่ยงถูกแย่งชื่อผ่าน search_path) · ทดสอบแล้วว่า exclusion constraint ยังกันช่วงทับกันได้และยังยอมช่วงที่ต่อกันพอดี",
+      "cost_if_wrong": "ถ้า constraint พังจะรู้ทันทีจาก verify-sites ซึ่งรันทุกรอบ"
     }
   ],
   "blocked": [],

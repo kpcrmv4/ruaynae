@@ -8,28 +8,122 @@
       "title": "ฐานระบบ",
       "status": "doing",
       "tasks": [
-        { "id": "P0-1", "t": "scaffold Next 16 + Tailwind v4 + TS", "s": "done", "commit": "b171f3f" },
-        { "id": "P0-2", "t": "โทเคน Navy & White + verify-contrast ผ่าน 58 คู่ สองโหมด", "s": "done", "commit": "b171f3f" },
-        { "id": "P0-3", "t": "IBM Plex Sans Thai + next-themes (class strategy)", "s": "done", "commit": "b171f3f" },
-        { "id": "P0-4", "t": "allowedDevOrigins + header sw.js + vercel.json sin1", "s": "done", "commit": "b171f3f" },
-        { "id": "P0-5", "t": "npm run gate (typegen+tsc / contrast / build)", "s": "done", "commit": "b171f3f" },
-        { "id": "P0-6", "t": "docs/test-plan/P0.md — acceptance matrix", "s": "todo" },
-        { "id": "P0-7", "t": "Supabase clients 4 ตัว (browser/server/admin/middleware)", "s": "todo" },
-        { "id": "P0-8", "t": "src/proxy.ts + matcher ยกเว้น /api/*, /sw.js, /manifest.webmanifest", "s": "todo" },
-        { "id": "P0-9", "t": "migration: profiles + enums + RLS + is_owner() + audit trigger", "s": "todo" },
-        { "id": "P0-10", "t": "หน้า login อีเมล + PIN (rate-limited) · คุกกี้ผูกกับ response", "s": "todo" },
-        { "id": "P0-11", "t": "shell: sidebar เดสก์ท็อป ↔ bottom nav มือถือ 5 ช่อง", "s": "todo" }
+        {
+          "id": "P0-1",
+          "t": "scaffold Next 16 + Tailwind v4 + TS",
+          "s": "done",
+          "commit": "b171f3f"
+        },
+        {
+          "id": "P0-2",
+          "t": "โทเคน Navy & White + verify-contrast ผ่าน 58 คู่ สองโหมด",
+          "s": "done",
+          "commit": "b171f3f"
+        },
+        {
+          "id": "P0-3",
+          "t": "IBM Plex Sans Thai + next-themes (class strategy)",
+          "s": "done",
+          "commit": "b171f3f"
+        },
+        {
+          "id": "P0-4",
+          "t": "allowedDevOrigins + header sw.js + vercel.json sin1",
+          "s": "done",
+          "commit": "b171f3f"
+        },
+        {
+          "id": "P0-5",
+          "t": "npm run gate (typegen+tsc / contrast / build)",
+          "s": "done",
+          "commit": "b171f3f"
+        },
+        {
+          "id": "P0-6",
+          "t": "docs/test-plan/P0.md — acceptance matrix",
+          "s": "done"
+        },
+        {
+          "id": "P0-7",
+          "t": "Supabase clients 4 ตัว (browser/server/admin/middleware)",
+          "s": "todo"
+        },
+        {
+          "id": "P0-8",
+          "t": "src/proxy.ts + matcher ยกเว้น /api/*, /sw.js, /manifest.webmanifest",
+          "s": "todo"
+        },
+        {
+          "id": "P0-9",
+          "t": "migration: profiles + enums + RLS + is_owner() + audit trigger",
+          "s": "todo"
+        },
+        {
+          "id": "P0-10",
+          "t": "หน้า login อีเมล + PIN (rate-limited) · คุกกี้ผูกกับ response",
+          "s": "todo"
+        },
+        {
+          "id": "P0-11",
+          "t": "shell: sidebar เดสก์ท็อป ↔ bottom nav มือถือ 5 ช่อง",
+          "s": "todo"
+        }
       ]
     },
-    { "id": "P0.5", "title": "แบรนด์ + จัดการผู้ใช้", "status": "todo", "tasks": [] },
-    { "id": "P1", "title": "ไซต์ + ภาพรวม 3 แถบ", "status": "todo", "tasks": [] },
-    { "id": "P2", "title": "รายรับ-รายจ่าย + R2", "status": "todo", "tasks": [] },
-    { "id": "P3", "title": "อนุมัติ + แจ้งเตือนในแอป", "status": "todo", "tasks": [] },
-    { "id": "P4", "title": "พนักงาน + คนเข้าไซต์", "status": "todo", "tasks": [] },
-    { "id": "P5", "title": "เบิกล่วงหน้า + รอบจ่าย", "status": "todo", "tasks": [] },
-    { "id": "P6", "title": "Audit log", "status": "todo", "tasks": [] },
-    { "id": "P7", "title": "PWA + web push", "status": "todo", "tasks": [] },
-    { "id": "P8", "title": "seed/reset + ตรวจรับ", "status": "todo", "tasks": [] }
+    {
+      "id": "P0.5",
+      "title": "แบรนด์ + จัดการผู้ใช้",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P1",
+      "title": "ไซต์ + ภาพรวม 3 แถบ",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P2",
+      "title": "รายรับ-รายจ่าย + R2",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P3",
+      "title": "อนุมัติ + แจ้งเตือนในแอป",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P4",
+      "title": "พนักงาน + คนเข้าไซต์",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P5",
+      "title": "เบิกล่วงหน้า + รอบจ่าย",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P6",
+      "title": "Audit log",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P7",
+      "title": "PWA + web push",
+      "status": "todo",
+      "tasks": []
+    },
+    {
+      "id": "P8",
+      "title": "seed/reset + ตรวจรับ",
+      "status": "todo",
+      "tasks": []
+    }
   ],
   "rulings": [
     {

@@ -83,7 +83,8 @@ export default async function OverviewPage() {
       {
         contract: asNullableNumber(m.contract_amount),
         income: asNullableNumber(m.income_approved),
-        cost: Number(m.cost_approved),
+        cost: Number(m.cost_total),
+        wage: Number(m.cost_wage),
       },
     ]),
   )
@@ -174,7 +175,7 @@ export default async function OverviewPage() {
             label="ต้นทุนที่จ่ายจริง"
             value={fmtBaht(activeCost)}
             icon={TrendingDown}
-            hint="เฉพาะรายการที่อนุมัติแล้ว"
+            hint="รายจ่ายที่อนุมัติแล้ว + ค่าแรง"
           />
           <Metric
             label="กำไรคงเหลือ"
@@ -285,8 +286,9 @@ export default async function OverviewPage() {
       )}
 
       <p className="mt-5 rounded-lg border border-line-soft bg-surface-2 px-4 py-3 text-sm text-muted-token">
-        ต้นทุนตอนนี้นับจาก <span className="font-medium text-ink-2">รายจ่ายที่อนุมัติแล้ว</span> เท่านั้น
-        — <span className="font-medium text-ink-2">ค่าแรงจากการลงชื่อคนเข้าไซต์</span> จะถูกบวกเข้ามาในเฟส P4
+        ต้นทุนนับจาก <span className="font-medium text-ink-2">รายจ่ายที่อนุมัติแล้ว</span> บวกกับ{' '}
+        <span className="font-medium text-ink-2">ค่าแรงจากการลงชื่อคนเข้าไซต์</span> ซึ่งเกิดขึ้นทันทีที่ติ๊ก
+        — การเบิกล่วงหน้าและการปิดรอบจ่าย (เฟส P5) เป็นเงินสดออก ไม่ถูกนับเป็นต้นทุนซ้ำอีกรอบ
       </p>
     </>
   )

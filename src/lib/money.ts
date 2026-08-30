@@ -20,19 +20,24 @@ export type SiteMoney = {
   /** `null` = ไม่มีสิทธิ์เห็น · `0` = ยังไม่ได้ตั้งค่างาน — คนละเรื่องกัน */
   contract: number | null
   income: number | null
+  /** รายจ่ายที่อนุมัติแล้ว + ค่าแรงที่เกิดขึ้นแล้ว */
   cost: number
+  /** ค่าแรงส่วนเดียว — ไว้บอกที่มาของตัวเลข ไม่ใช่ยอดแยกที่ต้องบวกเพิ่ม */
+  wage?: number
 }
 
 export type MoneyBars =
   /** คนเรียกไม่มีสิทธิ์เห็นค่างาน/รายรับ → ไม่มีแถบ ไม่มีเปอร์เซ็นต์ ไม่มีกำไร */
-  | { kind: 'hidden'; cost: number }
+  | { kind: 'hidden'; cost: number; wage: number }
   /** มีสิทธิ์เห็น แต่ยังไม่ได้ตั้งค่างาน → บอกตรง ๆ ห้ามหารด้วยศูนย์ */
-  | { kind: 'no-contract'; income: number; cost: number }
+  | { kind: 'no-contract'; income: number; cost: number; wage: number }
   | {
       kind: 'ok'
       contract: number
       income: number
       cost: number
+      /** ส่วนที่มาจากค่าแรง — รวมอยู่ใน `cost` แล้ว ไม่ใช่ยอดที่ต้องบวกเพิ่ม */
+      wage: number
       /** เปอร์เซ็นต์จริงที่เอาไปแสดง — เกิน 100 ได้ และต้องเห็นว่าเกิน */
       paidPercent: number
       costPercent: number
@@ -51,11 +56,15 @@ export function moneyBars(m: SiteMoney): MoneyBars {
   // ค่างานหรือรายรับเป็น null แม้ค่าเดียว = ไม่มีสิทธิ์เห็นภาพเงินของไซต์นี้
   // (RPC คืน null ทั้งคู่พร้อมกันเสมอ · เช็คทั้งสองเพื่อไม่ให้บั๊กฝั่ง SQL
   //  กลายเป็น NaN บนหน้าจอ)
-  if (m.contract === null || m.income === null) return { kind: 'hidden', cost: m.cost }
+  const wage = m.wage ?? 0
+
+  if (m.contract === null || m.income === null) {
+    return { kind: 'hidden', cost: m.cost, wage }
+  }
 
   // 🔴 ค่างาน 0 คือตัวหารเป็นศูนย์ · ปล่อยผ่านจะได้ `Infinity%` หรือ `NaN%`
   // ซึ่งเรนเดอร์ออกมาเป็นข้อความจริง ๆ บนหน้าจอโดยไม่มี error ที่ไหนเลย
-  if (m.contract <= 0) return { kind: 'no-contract', income: m.income, cost: m.cost }
+  if (m.contract <= 0) return { kind: 'no-contract', income: m.income, cost: m.cost, wage }
 
   const paidPercent = pct(m.income, m.contract)
   const costPercent = pct(m.cost, m.contract)
@@ -65,6 +74,7 @@ export function moneyBars(m: SiteMoney): MoneyBars {
     contract: m.contract,
     income: m.income,
     cost: m.cost,
+    wage,
     paidPercent,
     costPercent,
     paidWidth: clamp(paidPercent),

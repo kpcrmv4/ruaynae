@@ -700,12 +700,15 @@ export type Database = {
     }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      site_day_wage: { Args: { p_on: string; p_site: string }; Returns: number }
       site_money: {
         Args: { p_site?: string }
         Returns: {
           contract_amount: number
-          cost_approved: number
+          cost_expense: number
           cost_pending: number
+          cost_total: number
+          cost_wage: number
           income_approved: number
           income_pending: number
           site_id: string

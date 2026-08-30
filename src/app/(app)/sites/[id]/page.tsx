@@ -78,7 +78,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         return {
           contract: asNullableNumber(row?.contract_amount),
           income: asNullableNumber(row?.income_approved),
-          cost: Number(row?.cost_approved ?? 0),
+          cost: Number(row?.cost_total ?? 0),
+          wage: Number(row?.cost_wage ?? 0),
         }
       }),
   ])
@@ -169,8 +170,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
 
         <p className="mt-3 border-t border-line-soft pt-3 text-xs text-muted-token">
-          ต้นทุนนับจากรายจ่ายที่อนุมัติแล้วเท่านั้น — ค่าแรงจากการลงชื่อคนเข้าไซต์
-          จะถูกบวกเข้ามาในเฟส P4
+          ต้นทุนนับจากรายจ่ายที่อนุมัติแล้ว บวกค่าแรงจากการลงชื่อคนเข้าไซต์
+          ซึ่งเกิดขึ้นทันทีที่ติ๊ก ไม่ต้องรออนุมัติ
         </p>
       </section>
 

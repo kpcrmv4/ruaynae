@@ -19,8 +19,13 @@ export function MoneyBars({ bars }: { bars: Bars }) {
   // บอกทั้งยอดและเปอร์เซ็นต์เมื่อไหร่ ก็เท่ากับบอกค่างานไปด้วย
   if (bars.kind === 'hidden') {
     return (
-      <div className="mt-2.5">
-        <Row label="รายจ่ายที่อนุมัติแล้ว" value={fmtBaht(bars.cost)} tone="cost" />
+      <div className="mt-2.5 space-y-1">
+        <Row label="ต้นทุนไซต์นี้" value={fmtBaht(bars.cost)} tone="cost" />
+        {bars.wage > 0 && (
+          <p className="text-xs text-muted-token">
+            รวมค่าแรง <span className="tnum">{fmtBaht(bars.wage)}</span> อยู่ในนั้นแล้ว
+          </p>
+        )}
       </div>
     )
   }
@@ -51,6 +56,13 @@ export function MoneyBars({ bars }: { bars: Bars }) {
         width={bars.costWidth}
         tone="cost"
       />
+      {/* บอกที่มาของตัวเลข ไม่ใช่ยอดแยกที่ต้องเอาไปบวกเพิ่ม —
+          คนอ่านต้องรู้ว่าค่าแรงรวมอยู่ในนั้นแล้ว ไม่งั้นจะบวกซ้ำในหัว */}
+      {bars.wage > 0 && (
+        <p className="text-xs text-muted-token">
+          รวมค่าแรงจากการลงชื่อเข้าไซต์ <span className="tnum">{fmtBaht(bars.wage)}</span> อยู่ในนั้นแล้ว
+        </p>
+      )}
     </div>
   )
 }

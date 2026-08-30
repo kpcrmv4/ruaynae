@@ -144,7 +144,11 @@ console.log('\n── P0-UI · กฎที่ตรวจจากซอร์�
 // อ่านไฟล์ .ts/.tsx ทั้งหมดใน src แล้วตัดคอมเมนต์ออก
 // 🔴 ถ้าไม่ตัด กฎจะถูก "คอมเมนต์ที่อธิบายกฎ" ทำให้ผลเพี้ยน —
 // เจอมาแล้วรอบนี้: บรรทัด "ใช้ dialog ของ radix ไม่ใช่ window.prompt" ทำให้ grep แดง
-const srcFiles = sh('git ls-files "src/**/*.ts" "src/**/*.tsx"').out.trim().split('\n').filter(Boolean)
+// 🔴 กรองเฉพาะไฟล์ที่ยังอยู่จริง — `git ls-files` ยังลิสต์ไฟล์ที่เพิ่งลบ
+// แต่ยังไม่ commit · ไม่กรองแล้วชุดตรวจทั้งชุดจะล้มด้วย ENOENT กลางคัน
+// ระหว่างรีแฟกเตอร์ ซึ่งอ่านเหมือน "แอปพัง" ทั้งที่แค่ยังไม่ได้ commit
+const srcFiles = sh('git ls-files "src/**/*.ts" "src/**/*.tsx"').out.trim().split('\n')
+  .filter((f) => f && existsSync(f))
 const srcClean = srcFiles.map((f) => ({ f, code: stripComments(readFileSync(f, 'utf8')) }))
 
 {

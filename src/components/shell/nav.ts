@@ -43,7 +43,15 @@ export const NAV: NavGroup[] = [
     heading: 'คนและค่าแรง',
     items: [
       { href: '/attendance', label: 'คนเข้าไซต์', sub: 'ลงชื่อรายวัน', icon: CalendarDays },
-      { href: '/employees', label: 'พนักงาน', sub: 'ค่าแรง ค้างจ่าย เบิก', icon: Users },
+      // เจ้าของเท่านั้น — เบิกและรอบจ่ายเป็นเรื่องเงิน หัวหน้าไซต์ไม่เกี่ยว
+      // (คำสั่งเจ้าของ 31 ส.ค. 2569) · CRUD คนงานอยู่ที่ /settings/users
+      {
+        href: '/payroll',
+        label: 'ค่าแรงและรอบจ่าย',
+        sub: 'ค้างจ่าย เบิก ปิดรอบ',
+        icon: Users,
+        ownerOnly: true,
+      },
     ],
   },
   {

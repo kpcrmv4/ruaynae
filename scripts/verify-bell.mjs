@@ -238,8 +238,15 @@ try {
         if (status !== 'SUBSCRIBED') await sb.removeChannel(ch)
       }
       if (status === 'SUBSCRIBED') {
-        await mk(6700, 'ค่าทรายทดสอบ realtime')
-        for (let i = 0; i < 20 && !got; i++) await new Promise((r) => setTimeout(r, 250))
+        // 🔴 `SUBSCRIBED` แปลว่า "ฝั่งเราได้รับตอบรับแล้ว" ไม่ได้แปลว่า
+        // ฝั่งเซิร์ฟเวอร์พร้อมส่งให้แล้ว · ยิงทันทีแล้วบางครั้งข้อความแรกหาย
+        // — แถวนี้เคยแดงสลับเขียวเพราะเหตุนี้ · หน่วงสักครู่ แล้วถ้ายังไม่มา
+        // ลองยิงอีกครั้ง · ถ้า broadcast พังจริง จะไม่มาทั้งสองครั้ง แถวก็ยังแดงได้
+        for (let attempt = 0; attempt < 2 && !got; attempt++) {
+          await new Promise((r) => setTimeout(r, 750))
+          await mk(6700 + attempt, `ค่าทรายทดสอบ realtime ${attempt}`)
+          for (let i = 0; i < 24 && !got; i++) await new Promise((r) => setTimeout(r, 250))
+        }
       }
     }
     await sb.removeAllChannels()

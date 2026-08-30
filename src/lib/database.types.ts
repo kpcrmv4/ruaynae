@@ -945,6 +945,17 @@ export type Database = {
         }[]
       }
       is_owner: { Args: never; Returns: boolean }
+      payroll_balances: {
+        Args: never
+        Returns: {
+          accrued: number
+          advanced: number
+          balance: number
+          employee_id: string
+          full_name: string
+          job_title: string
+        }[]
+      }
       save_employee: {
         Args: {
           p_daily: number

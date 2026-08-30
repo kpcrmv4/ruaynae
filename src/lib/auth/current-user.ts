@@ -45,4 +45,33 @@ export const getCurrentUser = cache(async (): Promise<CurrentUser> => {
   return { id: data.id, fullName: data.full_name, role: data.role }
 })
 
+/**
+ * เหมือน `getCurrentUser` แต่คืน `null` แทนการ redirect
+ *
+ * 🔴 API route ต้องใช้ตัวนี้เสมอ
+ * `redirect()` ใน route handler จะกลายเป็น 307 ไปหน้า HTML ซึ่ง `fetch`
+ * จะตามไปแล้วได้ 200 ของหน้า login กลับมา — ฝั่ง client เห็นว่า "สำเร็จ"
+ * ทั้งที่ไม่มีอะไรเกิดขึ้น · route กลุ่ม /api ต้องตอบ JSON 401 เท่านั้น
+ */
+export const getCurrentUserOrNull = cache(async (): Promise<CurrentUser | null> => {
+  const sb = await getSupabaseServer()
+
+  const { data: auth, error: aErr } = await sb.auth.getUser()
+  if (aErr || !auth.user) return null
+
+  const { data, error } = await sb
+    .from('profiles')
+    .select('id, full_name, role, is_active')
+    .eq('id', auth.user.id)
+    .maybeSingle()
+
+  if (error) {
+    console.error('[current-user] อ่าน profile ไม่ได้', error.message)
+    return null
+  }
+  if (!data || !data.is_active) return null
+
+  return { id: data.id, fullName: data.full_name, role: data.role }
+})
+
 export const isOwner = (u: CurrentUser) => u.role === 'owner'

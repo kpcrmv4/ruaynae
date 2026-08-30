@@ -98,8 +98,13 @@
           "s": "done"
         },
         {
+          "id": "P05-b1",
+          "t": "lib/r2.ts + /api/uploads/sign + /api/settings/branding + CORS",
+          "s": "done"
+        },
+        {
           "id": "P05-b",
-          "t": "หน้าตั้งค่าแบรนด์ (แก้ชื่อ + อัปโหลดโลโก้เข้า R2)",
+          "t": "ท่อ R2 (lib + route + CORS) เสร็จ · เหลือหน้าตั้งค่าแบรนด์",
           "s": "todo"
         },
         {

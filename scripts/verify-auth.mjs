@@ -143,6 +143,30 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
     `ซ่อนสองเมนู=${!sHtml.includes('รออนุมัติ') && !sHtml.includes('ประวัติการแก้ไข')} · เห็นคนเข้าไซต์=${sHtml.includes('คนเข้าไซต์')}`)
 }
 
+// P0-UI-13 · ทุกลิงก์ในเมนูต้องเปิดได้จริง
+// ลิงก์ที่ปลายทางเป็น 404 คือปุ่มที่ไม่มีใครทดสอบ — และไม่มีอะไรใน build จับได้
+{
+  const jarFrom = (r) => (r.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+  const jar = jarFrom(
+    await post('/api/auth/login', { email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }),
+  )
+  const { NAV, PRIMARY_ACTION, BOTTOM_NAV } = await import('../src/components/shell/nav.ts')
+  const hrefs = [
+    ...new Set([
+      ...NAV.flatMap((g) => g.items.map((i) => i.href)),
+      ...BOTTOM_NAV.map((i) => i.href),
+      PRIMARY_ACTION.href,
+    ]),
+  ]
+  const bad = []
+  for (const href of hrefs) {
+    const r = await fetch(`${BASE}${href}`, { headers: { cookie: jar }, redirect: 'manual' })
+    if (r.status !== 200) bad.push(`${href}=${r.status}`)
+  }
+  check(`P0-UI-13 ทุกลิงก์ในเมนู (${hrefs.length} เส้นทาง) เปิดได้ 200`,
+    bad.length === 0, bad.length ? bad.join(', ') : `ตรวจแล้ว ${hrefs.length} เส้นทาง`)
+}
+
 // P0-AUTH-08 + P0-API-07 · วงจรเต็ม: เข้า → /login เด้งกลับ → ออก → / เด้งไป /login
 // ต้องยิงจาก node เพราะเบราว์เซอร์ปิดสถานะของ opaque redirect ไม่ให้ JS อ่าน
 {

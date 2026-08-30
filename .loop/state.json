@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-31 (P8-a/P8-b ปิด · เหลือ P8-c)",
+  "updated": "2026-08-31 (P0–P8 ปิดครบ · verify:all 395 ผ่าน 0 ตก)",
   "note": "สถานะจริงยืนยันด้วย git log เสมอ — ถ้าไฟล์นี้ขัดกับ git ให้เชื่อ git",
   "gate": "npm run gate",
   "phases": [
@@ -283,7 +283,7 @@
     {
       "id": "P8",
       "title": "seed/reset + ตรวจรับ",
-      "status": "todo",
+      "status": "done",
       "tasks": [
         {
           "id": "P8-a",
@@ -300,7 +300,8 @@
         {
           "id": "P8-c",
           "t": "ไล่ตารางตรวจรับทุกเฟส + เช็คลิสต์ก่อน deploy + สรุปบทเรียน",
-          "s": "todo"
+          "s": "done",
+          "commit": "pending"
         }
       ]
     }

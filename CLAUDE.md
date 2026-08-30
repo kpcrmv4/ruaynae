@@ -352,20 +352,20 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 
 แต่ละเฟส **เขียน acceptance matrix ลง `docs/test-plan/<phase>.md` ก่อนเขียนโค้ด**
 
-- [ ] **P0 · ฐาน** — scaffold, โทเคน+`verify-contrast`, shell (sidebar ↔ bottom nav), ธีม, 4 Supabase clients, `proxy.ts`, login อีเมล + PIN (rate-limited), `profiles` + RLS + audit trigger
-- [ ] **P0.5 · แบรนด์ + ผู้ใช้** — `branding` + `app_settings` + `/api/branding` (ไม่ต้องล็อกอิน),
+- [x] **P0 · ฐาน** — scaffold, โทเคน+`verify-contrast`, shell (sidebar ↔ bottom nav), ธีม, 4 Supabase clients, `proxy.ts`, login อีเมล + PIN (rate-limited), `profiles` + RLS + audit trigger
+- [x] **P0.5 · แบรนด์ + ผู้ใช้** — `branding` + `app_settings` + `/api/branding` (ไม่ต้องล็อกอิน),
       หน้าตั้งค่าแบรนด์ (ชื่อ + อัปโหลดโลโก้เข้า R2), แสดงผลบนหน้า login และหัวระบบ พร้อม fallback,
       หน้า `/settings/users` ให้เจ้าของ CRUD ผู้ใช้ระบบ (แท็บคนงานมาเติมใน P4)
-- [ ] **P1 · ไซต์ + ภาพรวม** — CRUD ไซต์, `site_supervisors` มีช่วงเวลา, การ์ด 3 แถบ, ป้ายเตือนต้นทุนแซงรายรับ, หน้าไซต์
-- [ ] **P2 · รายรับ-รายจ่าย + R2** — หมวด, ฟอร์มบันทึก, ผูกไซต์/ส่วนกลาง, บีบรูป, presigned PUT/GET, `upload_intents` + sweep, `/ledger` + ค้นหา/กรอง + pagination
-- [ ] **P3 · อนุมัติ + แจ้งเตือนในแอป** — คิวอนุมัติ, ตีกลับ+เหตุผล, guard triggers, กระดิ่ง + realtime broadcast
-- [ ] **P4 · พนักงาน + คนเข้าไซต์** — CRUD คนงานเป็นแท็บที่สองใน `/settings/users` (ไม่มี login ไม่มี role),
+- [x] **P1 · ไซต์ + ภาพรวม** — CRUD ไซต์, `site_supervisors` มีช่วงเวลา, การ์ด 3 แถบ, ป้ายเตือนต้นทุนแซงรายรับ, หน้าไซต์
+- [x] **P2 · รายรับ-รายจ่าย + R2** — หมวด, ฟอร์มบันทึก, ผูกไซต์/ส่วนกลาง, บีบรูป, presigned PUT/GET, `upload_intents` + sweep, `/ledger` + ค้นหา/กรอง + pagination
+- [x] **P3 · อนุมัติ + แจ้งเตือนในแอป** — คิวอนุมัติ, ตีกลับ+เหตุผล, guard triggers, กระดิ่ง + realtime broadcast
+- [x] **P4 · พนักงาน + คนเข้าไซต์** — CRUD คนงานเป็นแท็บที่สองใน `/settings/users` (ไม่มี login ไม่มี role),
       ตั้งค่าแรง**รายคน** (รายวัน/รายเดือน + เรตของแต่ละคน), ผูก `profile_id` ได้ถ้าคนนั้นล็อกอินด้วย,
       ลงชื่อรายวัน + `wage_snapshot`, ยอดค่าแรงวันนี้, ต้นทุนไซต์ขึ้นทันที
-- [ ] **P5 · เบิก + รอบจ่าย** — `advances` + trigger เพดาน, `payroll_runs`/`payroll_lines`, ปิดรอบ, สรุปค่าแรงรายคน
-- [ ] **P6 · Audit** — หน้า `/audit` + กรอง + pagination, ตรวจว่าทุกตารางมี trigger จริง
-- [ ] **P7 · PWA + push** — manifest, SW, subscribe, ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ, badge
-- [ ] **P8 · seed/reset + ตรวจรับ** — ตาม §13 แล้วไล่ acceptance matrix ทุกเฟสให้ปิด
+- [x] **P5 · เบิก + รอบจ่าย** — `advances` + trigger เพดาน, `payroll_runs`/`payroll_lines`, ปิดรอบ, สรุปค่าแรงรายคน
+- [x] **P6 · Audit** — หน้า `/audit` + กรอง + pagination, ตรวจว่าทุกตารางมี trigger จริง
+- [x] **P7 · PWA + push** — manifest, SW, subscribe, ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ, badge
+- [x] **P8 · seed/reset + ตรวจรับ** — ตาม §13 แล้วไล่ acceptance matrix ทุกเฟสให้ปิด
 
 **เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อไซต์+เตือน · ปันส่วนเงินเดือนเข้าไซต์ตามวัน
 
@@ -418,7 +418,27 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    · ต่อ websocket ครั้งแรกได้ `CHANNEL_ERROR MissingPartition` แล้ว Realtime สร้าง
    partition ให้ 5 วันล่วงหน้า → **client ต้อง subscribe แบบมี retry** และต้องมีแถวตรวจรับ
    ที่ยืนยันว่าข้อความลงถึง `realtime.messages` จริง (`P3-DB-12`)
-6. *(เว้นไว้เติม)*
+6. **`loading.tsx` กลืนรหัสสถานะของ `notFound()` และ `redirect()`** — segment ที่มี `loading.tsx`
+   ถูกห่อด้วย Suspense แล้วคำตอบกลายเป็นสตรีมที่ **ส่งหัว 200 ออกไปแล้ว** ก่อน page จะได้ทำงาน
+   · `/sites/<uuid ที่ไม่มีอยู่>` เปลี่ยนจาก 404 เป็น 200 และหน้าเฉพาะเจ้าของ 4 หน้าเปลี่ยนจาก
+   เด้งจริงเป็น 200 พร้อมกัน โดยไม่มี error ให้เห็นเลย · **แก้:** เช็ค role ไว้ใน `layout.tsx`
+   (เรนเดอร์นอก Suspense ของ page) และใช้ route group `(list)`/`(overview)`/`(main)` กันไม่ให้
+   ขอบเขต Suspense คลุม segment ที่เป็น dynamic
+7. **`documentElement.scrollWidth` วัดการล้นไม่ได้ เพราะเชลล์ `overflow-x: clip` ตัดทิ้งไปแล้ว** —
+   ตัวเลขเป็น 0 เสมอ ต่อให้ยัด div กว้าง 3000px เข้าไป · ต้องวัด **ขอบขวาของแต่ละอิลิเมนต์**
+   เทียบความกว้างจอ · "ถูกตัดทิ้ง" แย่กว่า "เลื่อนได้" เพราะไม่มีแถบเลื่อนบอกว่ามีอะไรหายไป
+   · ที่เจอจริง: grid item ไม่มี `min-w-0` (ช่อง `1fr` = `minmax(auto,1fr)` ถูกดันด้วย min-content)
+   และ `truncate` บน `<span>` แบบ inline ซึ่ง `overflow: hidden` ไม่มีผลกับกล่อง inline
+8. **CTE ที่ `insert` แล้วอ่านกลับในคำสั่งเดียวกันมองไม่เห็นแถวของตัวเอง** — ทุกส่วนของคำสั่ง
+   เห็น snapshot เดียวกัน · seed จึงผ่านตลอดบนฐานที่เคย seed แล้ว และพังครั้งแรกบนฐานที่ล้างใหม่
+   ซึ่งคือสภาพเครื่องลูกค้าตอนติดตั้ง · แยกเป็นสองคำสั่ง: เขียนให้จบ แล้วค่อยอ่าน
+9. **สคริปต์ตรวจต้องคืนฐานข้อมูลให้เหมือนตอนที่เจอ ใน `finally`** — และล้างเฉพาะเมื่อ
+   **ตอนเริ่มมันว่างจริง** เท่านั้น · ตัวที่ปล่อยข้อมูลค้างไว้ทำให้สคริปต์อื่นแดง 31 แถวพร้อมกัน
+   ส่วนตัวที่ล้างแบบไม่มีเงื่อนไขคือสคริปต์ที่ลบข้อมูลลูกค้าได้ในวันที่มีคนรันผิดเครื่อง
+10. **แถวที่ค้าง `☐` แปลว่า "ไม่เคยถูกตรวจ" ไม่ใช่ "ตรวจแล้วรอติ๊ก"** — ปิด P0 โดยเหลือ 18 แถว
+   แล้วเดินหน้าต่ออีกแปดเฟส · ตอนไล่ปิด พบว่าหนึ่งแถวอธิบายฟอร์มเปลี่ยนรหัสผ่านที่
+   **ไม่เคยถูกสร้างเลย** · ห้ามปิดเฟสโดยเหลือ `☐` — ถ้าปิดไม่ได้ให้เปลี่ยนเป็น `👤` หรือ `⚠️`
+   ซึ่งบังคับให้เขียนเหตุผล แล้ว "ยังไม่ได้เขียนโค้ด" จะโผล่ตอนนั้นแทนที่จะโผล่แปดเฟสให้หลัง
 
 ## 18. ตัวแปรสภาพแวดล้อม
 

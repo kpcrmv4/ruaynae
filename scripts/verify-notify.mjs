@@ -93,11 +93,14 @@ const countFor = async (userId, extra = '') => {
   )
   return Number(/\/(\d+)$/.exec(r.headers.get('content-range') ?? '')?.[1] ?? -1)
 }
-/** แจ้งเตือนที่มียอดเงินก้อนนี้อยู่ในข้อความ — ผูกกลับไปหารายการที่สร้างได้ */
-const byMoney = async (userId, money, kind) => {
+/**
+ * แจ้งเตือนของรายการนี้ — ผูกด้วย `txn_id` ไม่ใช่จับสตริงยอดเงินในข้อความ
+ * สองรายการยอดเท่ากันมีได้ทุกวัน ตัวตรวจที่จับสตริงจะสับสนทันทีที่เกิดขึ้น
+ */
+const byTxn = async (userId, txnId, kind) => {
   const r = await asService(
-    `/notifications?select=id,kind,title,body,link,read_at&user_id=eq.${userId}` +
-    `&body=like.*${encodeURIComponent(money)}*` + (kind ? `&kind=eq.${kind}` : ''))
+    `/notifications?select=id,kind,title,body,link,read_at,txn_id&user_id=eq.${userId}` +
+    `&txn_id=eq.${txnId}` + (kind ? `&kind=eq.${kind}` : ''))
   return r.body ?? []
 }
 
@@ -130,7 +133,7 @@ try {
     const before = await countFor(owner.id)
     const { row } = await mkTxn(supTok, 11111, 'ค่าปูนทดสอบแจ้งเตือน')
     const after = await countFor(owner.id)
-    const notes = await byMoney(owner.id, '11,111', 'txn_pending')
+    const notes = await byTxn(owner.id, row.id, 'txn_pending')
     check('P3-DB-01 หัวหน้าไซต์คีย์รายจ่าย → เจ้าของได้แจ้งเตือน txn_pending 1 ใบ ลิงก์ /approvals',
       Boolean(row) && after - before === 1 && notes.length === 1
       && notes[0].link === '/approvals' && notes[0].title.includes('รออนุมัติ'),
@@ -160,7 +163,7 @@ try {
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ status: 'approved' }),
     })
-    const notes = await byMoney(sup1.id, '11,111', 'txn_approved')
+    const notes = await byTxn(sup1.id, made[0], 'txn_approved')
     const afterO = await countFor(owner.id)
     check('P3-DB-03 เจ้าของอนุมัติ → คนคีย์ได้ txn_approved 1 ใบ · เจ้าของไม่ได้แจ้งเตือนตัวเอง',
       r.status === 200 && notes.length === 1 && afterO === beforeO,
@@ -172,7 +175,7 @@ try {
     await db(ownerTok, `/transactions?id=eq.${made[0]}`, {
       method: 'PATCH', body: JSON.stringify({ status: 'approved' }),
     })
-    const notes = await byMoney(sup1.id, '11,111', 'txn_approved')
+    const notes = await byTxn(sup1.id, made[0], 'txn_approved')
     check('P3-DB-15 อนุมัติรายการเดิมซ้ำ → แจ้งเตือน txn_approved ของรายการนั้นยังมีใบเดียว',
       notes.length === 1, `${notes.length} ใบ`)
   }
@@ -185,7 +188,7 @@ try {
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({ status: 'rejected', rejected_reason: REASON }),
     })
-    const notes = await byMoney(sup1.id, '33,333', 'txn_rejected')
+    const notes = await byTxn(sup1.id, made[2], 'txn_rejected')
     check('P3-DB-04 เจ้าของตีกลับ → คนคีย์ได้ txn_rejected ที่ body มีเหตุผลจริง ไม่ใช่ข้อความลอย ๆ',
       r.status === 200 && notes.length === 1 && (notes[0]?.body ?? '').includes(REASON),
       `${r.status} · body=${(notes[0]?.body ?? '').slice(0, 40)}`)
@@ -290,6 +293,18 @@ try {
       hasList && hasUnread, `list=${hasList} unread=${hasUnread}`)
   }
 
+  // ── P3-DB-18 · ลบรายการ → แจ้งเตือนของรายการนั้นหายตาม ────────────
+  // แจ้งเตือนที่ชี้ไปหาของที่ถูกลบไปแล้วคือกระดิ่งที่โกหก — กดแล้วไม่เจออะไร
+  {
+    const { row } = await mkTxn(supTok, 55555, 'ค่าทรายทดสอบลบแล้วแจ้งเตือนต้องหาย')
+    const before = await byTxn(owner.id, row.id, null)
+    await db(supTok, `/transactions?id=eq.${row.id}`, { method: 'DELETE' })
+    const after = await byTxn(owner.id, row.id, null)
+    check('P3-DB-18 ลบรายการที่ยังไม่อนุมัติ → แจ้งเตือนของรายการนั้นหายตามไปด้วย',
+      before.length === 1 && after.length === 0,
+      `ก่อนลบ ${before.length} ใบ → หลังลบ ${after.length} ใบ`)
+  }
+
   // ── P3-DB-17 · audit trigger ──────────────────────────────────────
   {
     const { rows } = await sql(
@@ -309,7 +324,9 @@ try {
     await sql(`delete from public.sites where id = '${siteId}'`)
   }
   await sql(`delete from public.transactions where note = 'ค่าน้ำมันเจ้าของคีย์เอง'`)
-  await sql(`delete from public.notifications where created_at >= '${since}'`)
+  // แจ้งเตือนหายไปเองกับ `on delete cascade` ของ `txn_id` — เหลือแค่ใบที่ไม่ผูก
+  // รายการใด ซึ่งมีได้เฉพาะตอน red-test ที่เปิด insert policy ทิ้งไว้
+  await sql(`delete from public.notifications where txn_id is null and created_at >= '${since}'`)
   console.log('  (ลบข้อมูลทดสอบแล้ว)')
 }
 

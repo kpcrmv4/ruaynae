@@ -199,6 +199,7 @@ export type Database = {
           link: string | null
           read_at: string | null
           title: string
+          txn_id: string | null
           user_id: string
         }
         Insert: {
@@ -209,6 +210,7 @@ export type Database = {
           link?: string | null
           read_at?: string | null
           title: string
+          txn_id?: string | null
           user_id: string
         }
         Update: {
@@ -219,9 +221,17 @@ export type Database = {
           link?: string | null
           read_at?: string | null
           title?: string
+          txn_id?: string | null
           user_id?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "notifications_txn_id_fkey"
+            columns: ["txn_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "notifications_user_id_fkey"
             columns: ["user_id"]

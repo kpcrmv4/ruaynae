@@ -6,7 +6,10 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDate, fmtDateLong, todayInBangkok } from '@/lib/format'
 import { SITE_STATUS_LABEL, SITE_STATUS_TONE, timeProgress } from '@/lib/sites'
+import { asNullableNumber, moneyBars } from '@/lib/money'
 import { Badge } from '@/components/ui/badge'
+import { Metric, MetricBar } from '@/components/ui/metric'
+import { MoneyBars, OverrunBadge } from '@/components/sites/money-bars'
 import { SiteDetailActions } from './site-detail-client'
 
 export const metadata = { title: 'รายละเอียดไซต์งาน' }
@@ -36,7 +39,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
 
   const isOwner = me.role === 'owner'
 
-  const [{ data: crew }, { data: milestones }, people, contractAmount] = await Promise.all([
+  const [{ data: crew }, { data: milestones }, people, money] = await Promise.all([
     sb
       .from('site_supervisors')
       .select('id, effective_from, effective_to, profiles(id, full_name)')
@@ -64,24 +67,26 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             return data ?? []
           })
       : Promise.resolve([]),
-    // ค่างานอยู่ตารางที่หัวหน้าไซต์อ่านไม่ได้ · `null` แปลว่า "ไม่มีสิทธิ์เห็น"
-    // ซึ่งไม่เหมือน 0 ที่แปลว่า "ยังไม่ได้ตั้ง" — สองอย่างนี้ห้ามปนกัน
-    isOwner
-      ? sb
-          .from('site_finance')
-          .select('contract_amount')
-          .eq('site_id', id)
-          .maybeSingle()
-          .then(({ data, error: fErr }) => {
-            if (fErr) console.error('[sites] อ่านค่างานไม่ได้', fErr.message)
-            return data ? Number(data.contract_amount) : 0
-          })
-      : Promise.resolve<number | null>(null),
+    // ยอดเงินของไซต์นี้ · RPC เป็น `security invoker` จึงคืน `null` ให้หัวหน้าไซต์
+    // เอง — `null` แปลว่า "ไม่มีสิทธิ์เห็น" ซึ่งไม่เหมือน 0 ที่แปลว่า
+    // "ยังไม่ได้ตั้ง" — สองอย่างนี้ห้ามปนกัน
+    sb
+      .rpc('site_money', { p_site: id })
+      .then(({ data, error: fErr }) => {
+        if (fErr) console.error('[sites] อ่านยอดเงินไม่ได้', fErr.message)
+        const row = data?.[0]
+        return {
+          contract: asNullableNumber(row?.contract_amount),
+          income: asNullableNumber(row?.income_approved),
+          cost: Number(row?.cost_approved ?? 0),
+        }
+      }),
   ])
 
   const today = todayInBangkok()
   const progress = timeProgress(site.start_date, site.end_date, today)
   const plannedTotal = (milestones ?? []).reduce((sum, m) => sum + Number(m.planned_amount), 0)
+  const bars = moneyBars(money)
 
   return (
     <>
@@ -108,7 +113,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         {isOwner && (
           <SiteDetailActions
             site={site}
-            contractAmount={contractAmount ?? 0}
+            contractAmount={money.contract ?? 0}
             crew={crew ?? []}
             milestones={milestones ?? []}
             people={people}
@@ -116,13 +121,13 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
       </div>
 
-      {/* ── ความคืบหน้าตามเวลา ─────────────────────────────────────────
-          แถบ "เก็บเงินแล้ว" และ "ต้นทุน" ต้องรอ transactions (P2) กับ
-          attendance (P4) · แสดงแถบที่เป็น 0 ทุกช่องตอนนี้ไม่ได้บอกอะไรเลย
-          นอกจากทำให้คนเชื่อว่าตัวเลขถูกคำนวณแล้ว */}
+      {/* ── ความคืบหน้า — สามแถบ (DESIGN.md §5.1) ─────────────────────
+          เวลา · เก็บเงินแล้ว · ต้นทุนที่จ่ายจริง
+          หัวหน้าไซต์เห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ เพราะเปอร์เซ็นต์
+          ต้องหารด้วยค่างาน ซึ่งเป็นความลับจากเขา */}
       <section className="panel mb-4 p-4">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
-          <h2 className="text-sm font-semibold text-ink-2">ความคืบหน้าตามเวลา</h2>
+          <h2 className="text-sm font-semibold text-ink-2">ความคืบหน้า</h2>
           {progress.kind === 'ok' && (
             <span className="text-sm tnum text-muted-token">
               {progress.elapsedDays} / {progress.totalDays} วัน ·{' '}
@@ -155,24 +160,43 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           </>
         )}
 
+        <MoneyBars bars={bars} />
+
+        {bars.kind === 'ok' && bars.overrun && (
+          <div className="mt-3">
+            <OverrunBadge />
+          </div>
+        )}
+
         <p className="mt-3 border-t border-line-soft pt-3 text-xs text-muted-token">
-          แถบ &quot;เก็บเงินแล้ว&quot; และ &quot;ต้นทุน&quot; จะขึ้นเมื่อเริ่มบันทึกรายรับ-รายจ่าย (เฟส P2)
-          และลงชื่อคนเข้าไซต์ (เฟส P4)
+          ต้นทุนนับจากรายจ่ายที่อนุมัติแล้วเท่านั้น — ค่าแรงจากการลงชื่อคนเข้าไซต์
+          จะถูกบวกเข้ามาในเฟส P4
         </p>
       </section>
+
+      {/* ── ตัวเลขเงินสี่ตัว — เจ้าของเท่านั้น ─────────────────────────
+          `hidden` = ไม่มีสิทธิ์เห็น → ไม่วาดอะไรเลย ดีกว่าวาด ฿0 ให้เข้าใจผิด */}
+      {bars.kind !== 'hidden' && (
+        <MetricBar>
+          <Metric
+            label="ค่างานตามสัญญา"
+            value={bars.kind === 'ok' ? fmtBaht(bars.contract) : 'ยังไม่ได้ตั้ง'}
+          />
+          <Metric label="เก็บเงินแล้ว" value={fmtBaht(bars.income)} tone="done" />
+          <Metric label="ต้นทุนที่จ่ายจริง" value={fmtBaht(bars.cost)} />
+          <Metric
+            label="กำไรคงเหลือ (ประมาณ)"
+            value={bars.kind === 'ok' ? fmtBaht(bars.profit) : '—'}
+            tone={bars.kind === 'ok' && bars.profit < 0 ? 'urgent' : 'default'}
+            hint={bars.kind === 'ok' ? 'ค่างาน − ต้นทุนที่เกิดขึ้นแล้ว' : 'ต้องตั้งค่างานก่อน'}
+          />
+        </MetricBar>
+      )}
 
       {/* ── ข้อมูลสัญญา ────────────────────────────────────────────── */}
       <section className="panel mb-4">
         <div className="panel-head">ข้อมูลสัญญา</div>
         <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
-          {contractAmount !== null && (
-            <div>
-              <dt className="text-xs font-medium text-muted-token">ค่างานตามสัญญา</dt>
-              <dd className="mt-0.5 text-xl font-bold tnum text-ink">
-                {contractAmount > 0 ? fmtBaht(contractAmount) : 'ยังไม่ได้ตั้งค่างาน'}
-              </dd>
-            </div>
-          )}
           <div>
             <dt className="text-xs font-medium text-muted-token">ช่วงเวลางาน</dt>
             <dd className="mt-0.5 flex items-center gap-1.5 text-base text-ink">

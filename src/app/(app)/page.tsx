@@ -1,12 +1,23 @@
 import Link from 'next/link'
-import { AlertTriangle, CalendarClock, HardHat, Plus, Wallet } from 'lucide-react'
+import {
+  AlertTriangle,
+  CalendarClock,
+  ClipboardCheck,
+  Coins,
+  HardHat,
+  Plus,
+  TrendingDown,
+  Wallet,
+} from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
 import { SITE_STATUS_LABEL, SITE_STATUS_TONE, timeProgress } from '@/lib/sites'
+import { asNullableNumber, moneyBars } from '@/lib/money'
 import { Badge } from '@/components/ui/badge'
 import { Metric, MetricBar } from '@/components/ui/metric'
 import { EmptyState } from '@/components/ui/states'
+import { MoneyBars, OverrunBadge, ProfitChip } from '@/components/sites/money-bars'
 
 export const metadata = { title: 'ภาพรวม' }
 
@@ -23,8 +34,7 @@ export default async function OverviewPage() {
   // และไม่มีการดึงแถวมานับใน JS ซึ่งจะเพี้ยนเงียบ ๆ ที่ 1,000 แถว
   const isOwner = me.role === 'owner'
 
-  const [{ data: summary, error: sErr }, { data: sites, error: lErr }, financeRows] =
-    await Promise.all([
+  const [{ data: summary, error: sErr }, { data: sites, error: lErr }] = await Promise.all([
     sb.rpc('site_overview', { p_on: today }),
     sb
       .from('sites')
@@ -33,22 +43,23 @@ export default async function OverviewPage() {
       // ไซต์ที่ใกล้ครบกำหนดที่สุดอยู่บนสุด · ไซต์ที่ยังไม่ตั้งวันจบไปท้ายสุด
       .order('end_date', { ascending: true, nullsFirst: false })
       .range(0, TOP_SITES - 1),
-    // ค่างานอยู่ตาราง `site_finance` ที่หัวหน้าไซต์อ่านไม่ได้เลย
-    isOwner
-      ? sb
-          .from('site_finance')
-          .select('site_id, contract_amount')
-          .order('site_id', { ascending: true })
-          .range(0, TOP_SITES - 1)
-          .then(({ data, error: fErr }) => {
-            if (fErr) console.error('[overview] อ่านค่างานไม่ได้', fErr.message)
-            return data ?? []
-          })
-      : Promise.resolve([]),
   ])
 
-  if (sErr || lErr) {
-    console.error('[overview] โหลดภาพรวมไม่ได้', sErr?.message ?? lErr?.message)
+  const rows = sites ?? []
+  const ids = rows.map((s) => s.id)
+
+  // ยอดเงินของไซต์ที่จะแสดงจริงเท่านั้น — ขอบเขตผูกกับลิสต์ข้างบน
+  // ไม่ใช่ยิงทีละไซต์ (N+1) และไม่ใช่ดึงมาทั้งฐานแล้วค่อยตัดใน JS
+  const { data: money, error: mErr } = ids.length
+    ? await sb
+        .rpc('site_money', {})
+        .in('site_id', ids)
+        .order('site_id', { ascending: true })
+        .range(0, ids.length - 1)
+    : { data: [], error: null }
+
+  if (sErr || lErr || mErr) {
+    console.error('[overview] โหลดภาพรวมไม่ได้', sErr?.message ?? lErr?.message ?? mErr?.message)
     return (
       <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
         <p className="text-sm text-urgent">โหลดภาพรวมไม่สำเร็จ</p>
@@ -57,11 +68,25 @@ export default async function OverviewPage() {
     )
   }
 
-  const s = summary?.[0] ?? {
-    total_count: 0, active_count: 0, active_contract: 0, due_soon_count: 0, overdue_count: 0,
-  }
-  const contractOf = new Map(financeRows.map((f) => [f.site_id, Number(f.contract_amount)]))
-  const rows = sites ?? []
+  const s = summary?.[0]
+  // 🔴 ชนิดที่ Supabase สร้างให้บอกว่าคอลัมน์พวกนี้ไม่มีวันเป็น null
+  // แต่ RPC คืน null จริงเมื่อไม่มีสิทธิ์เห็น — แปลงก่อนใช้เสมอ
+  const activeContract = asNullableNumber(s?.active_contract)
+  const activeIncome = asNullableNumber(s?.active_income)
+  const activeCost = Number(s?.active_cost ?? 0)
+  const pendingCount = Number(s?.pending_count ?? 0)
+  const pendingTotal = Number(s?.pending_total ?? 0)
+
+  const moneyOf = new Map(
+    (money ?? []).map((m) => [
+      m.site_id,
+      {
+        contract: asNullableNumber(m.contract_amount),
+        income: asNullableNumber(m.income_approved),
+        cost: Number(m.cost_approved),
+      },
+    ]),
+  )
 
   return (
     <>
@@ -83,43 +108,83 @@ export default async function OverviewPage() {
       <MetricBar>
         <Metric
           label="กำลังก่อสร้าง"
-          value={s.active_count}
+          value={Number(s?.active_count ?? 0)}
           unit="ไซต์"
           icon={HardHat}
           href="/sites?status=active"
-          hint={s.total_count > s.active_count ? `จากทั้งหมด ${s.total_count} ไซต์` : undefined}
+          hint={
+            Number(s?.total_count ?? 0) > Number(s?.active_count ?? 0)
+              ? `จากทั้งหมด ${s?.total_count} ไซต์`
+              : undefined
+          }
         />
-        {/* ค่างานตามสัญญาเป็นตัวเลขเดียวที่มีจริงในเฟสนี้ — ยอดเก็บเงินและต้นทุน
-            ต้องรอ P2/P4 · การ์ดที่โชว์ ฿0 ตอนนี้จะอ่านเหมือน "ยังไม่เก็บเงินได้เลย"
-            ทั้งที่ความจริงคือ "ระบบยังไม่รู้จักรายรับ" ซึ่งคนละเรื่องกัน */}
-        {/* 🔴 RPC คืน `null` ไม่ใช่ 0 เมื่อคนเรียกไม่มีสิทธิ์เห็นตัวเลข
-            การ์ดจึงหายไปทั้งใบสำหรับหัวหน้าไซต์ · ถ้าคืน 0 มาแทน หน้าจอจะวาด ฿0
-            อย่างมั่นใจ แล้วคนอ่านจะเชื่อว่านั่นคือคำตอบ */}
-        {s.active_contract !== null && (
-          <Metric
-            label="ค่างานที่รับไว้"
-            value={fmtBaht(Number(s.active_contract))}
-            icon={Wallet}
-            hint="ตามสัญญาของไซต์ที่กำลังทำ"
-          />
-        )}
         <Metric
           label="ใกล้ครบกำหนด"
-          value={s.due_soon_count}
+          value={Number(s?.due_soon_count ?? 0)}
           unit="ไซต์"
           icon={CalendarClock}
-          tone={s.due_soon_count > 0 ? 'progress' : 'default'}
+          tone={Number(s?.due_soon_count ?? 0) > 0 ? 'progress' : 'default'}
           hint="เหลือไม่ถึง 30 วัน"
         />
         <Metric
           label="เลยกำหนดแล้ว"
-          value={s.overdue_count}
+          value={Number(s?.overdue_count ?? 0)}
           unit="ไซต์"
           icon={AlertTriangle}
-          tone={s.overdue_count > 0 ? 'urgent' : 'default'}
-          hint={s.overdue_count > 0 ? 'ต้องเลื่อนกำหนดหรือปิดงาน' : 'ทุกไซต์ยังอยู่ในกำหนด'}
+          tone={Number(s?.overdue_count ?? 0) > 0 ? 'urgent' : 'default'}
+          hint={Number(s?.overdue_count ?? 0) > 0 ? 'ต้องเลื่อนกำหนดหรือปิดงาน' : 'ทุกไซต์ยังอยู่ในกำหนด'}
+        />
+        {/* 🔴 ยอดรออนุมัติมีการ์ดของตัวเอง ไม่ใช่หายไปเฉย ๆ (DESIGN.md §5.3)
+            ตัวเลขบนแถบเงินข้างล่างนับเฉพาะ approved — ถ้าไม่โชว์ยอดค้างไว้ตรงนี้
+            เงินที่คีย์แล้วแต่ยังไม่อนุมัติจะเหมือนไม่เคยถูกบันทึก */}
+        <Metric
+          label="รออนุมัติ"
+          value={pendingCount}
+          unit="รายการ"
+          icon={ClipboardCheck}
+          tone={pendingCount > 0 ? 'progress' : 'default'}
+          href="/ledger?status=pending"
+          hint={pendingCount > 0 ? `รวม ${fmtBaht(pendingTotal)}` : 'ไม่มีรายการค้าง'}
         />
       </MetricBar>
+
+      {/* ── แถบเงิน — เจ้าของเท่านั้น ────────────────────────────────
+          ค่างานและรายรับอยู่ตารางที่หัวหน้าไซต์อ่านไม่ได้ · RPC จึงคืน null
+          ไม่ใช่ 0 · แถบทั้งแถบหายไปแทนที่จะวาด ฿0 ให้คนเข้าใจผิด */}
+      {activeContract !== null && activeIncome !== null && (
+        <MetricBar>
+          <Metric
+            label="ค่างานที่รับไว้"
+            value={fmtBaht(activeContract)}
+            icon={Wallet}
+            hint="ตามสัญญาของไซต์ที่กำลังทำ"
+          />
+          <Metric
+            label="เก็บเงินแล้ว"
+            value={fmtBaht(activeIncome)}
+            icon={Coins}
+            tone="done"
+            hint={
+              activeContract > 0
+                ? `${Math.round((activeIncome / activeContract) * 100)}% ของค่างาน`
+                : 'ยังไม่ได้ตั้งค่างาน'
+            }
+          />
+          <Metric
+            label="ต้นทุนที่จ่ายจริง"
+            value={fmtBaht(activeCost)}
+            icon={TrendingDown}
+            hint="เฉพาะรายการที่อนุมัติแล้ว"
+          />
+          <Metric
+            label="กำไรคงเหลือ"
+            value={fmtBaht(activeContract - activeCost)}
+            icon={Wallet}
+            tone={activeContract - activeCost < 0 ? 'urgent' : 'default'}
+            hint="ค่างาน − ต้นทุนที่เกิดขึ้นแล้ว"
+          />
+        </MetricBar>
+      )}
 
       <div className="sec-head">
         ไซต์ที่กำลังก่อสร้าง
@@ -150,6 +215,9 @@ export default async function OverviewPage() {
           {rows.map((site, i) => {
             const p = timeProgress(site.start_date, site.end_date, today)
             const late = p.kind === 'ok' && p.daysLeft < 0
+            const bars = moneyBars(
+              moneyOf.get(site.id) ?? { contract: null, income: null, cost: 0 },
+            )
             return (
               <Link
                 key={site.id}
@@ -163,6 +231,14 @@ export default async function OverviewPage() {
                     <div className="truncate text-base font-semibold text-ink">{site.name}</div>
                     <div className="truncate text-sm text-muted-token">
                       {site.client_name ?? 'ยังไม่ได้ระบุลูกค้า'}
+                      {bars.kind === 'ok' && (
+                        <>
+                          {' · ค่างาน '}
+                          <span className="tnum font-medium text-ink-2">
+                            {fmtBaht(bars.contract)}
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                   <Badge tone={late ? 'urgent' : SITE_STATUS_TONE[site.status]} dot>
@@ -170,8 +246,6 @@ export default async function OverviewPage() {
                   </Badge>
                 </div>
 
-                {/* แถบเวลาเท่านั้นในเฟสนี้ · แถบเก็บเงินและต้นทุนจะมาต่อกันตรงนี้
-                    ตอน P2/P4 — วาดแถบที่เป็น 0 ไว้ก่อนคือการบอกว่าคำนวณแล้ว */}
                 <div className="mt-3">
                   {p.kind === 'unset' ? (
                     <p className="text-sm text-muted-token">ยังไม่ได้ตั้งช่วงเวลา</p>
@@ -195,14 +269,13 @@ export default async function OverviewPage() {
                   )}
                 </div>
 
-                {isOwner && (
-                  <div className="mt-3 border-t border-line-soft pt-2 text-sm tnum text-muted-token">
-                    ค่างาน{' '}
-                    <span className="font-semibold text-ink">
-                      {(contractOf.get(site.id) ?? 0) > 0
-                        ? fmtBaht(contractOf.get(site.id))
-                        : 'ยังไม่ได้ตั้ง'}
-                    </span>
+                {/* แถบเก็บเงิน + ต้นทุน · หัวหน้าไซต์เห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ */}
+                <MoneyBars bars={bars} />
+
+                {bars.kind === 'ok' && (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-2.5">
+                    <ProfitChip profit={bars.profit} />
+                    {bars.overrun && <OverrunBadge />}
                   </div>
                 )}
               </Link>
@@ -212,10 +285,8 @@ export default async function OverviewPage() {
       )}
 
       <p className="mt-5 rounded-lg border border-line-soft bg-surface-2 px-4 py-3 text-sm text-muted-token">
-        แถบ <span className="font-medium text-ink-2">เก็บเงินแล้ว</span> และ{' '}
-        <span className="font-medium text-ink-2">ต้นทุน</span> รวมถึงกำไรคงเหลือ
-        จะขึ้นเมื่อเริ่มบันทึกรายรับ-รายจ่าย (เฟส P2) และลงชื่อคนเข้าไซต์ (เฟส P4)
-        — ตอนนี้ระบบยังไม่มีข้อมูลพวกนั้น จึงยังไม่แสดงตัวเลขที่คำนวณไม่ได้
+        ต้นทุนตอนนี้นับจาก <span className="font-medium text-ink-2">รายจ่ายที่อนุมัติแล้ว</span> เท่านั้น
+        — <span className="font-medium text-ink-2">ค่าแรงจากการลงชื่อคนเข้าไซต์</span> จะถูกบวกเข้ามาในเฟส P4
       </p>
     </>
   )

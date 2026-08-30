@@ -525,13 +525,28 @@ export type Database = {
     }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      site_money: {
+        Args: { p_site?: string }
+        Returns: {
+          contract_amount: number
+          cost_approved: number
+          cost_pending: number
+          income_approved: number
+          income_pending: number
+          site_id: string
+        }[]
+      }
       site_overview: {
         Args: { p_on: string }
         Returns: {
           active_contract: number
+          active_cost: number
           active_count: number
+          active_income: number
           due_soon_count: number
           overdue_count: number
+          pending_count: number
+          pending_total: number
           total_count: number
         }[]
       }

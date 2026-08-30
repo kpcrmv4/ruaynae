@@ -31,6 +31,29 @@ const post = (path, body, headers = {}) =>
     body: JSON.stringify(body ?? {}),
   })
 
+/**
+ * ล้างประวัติการล็อกอินที่ล้มเหลว
+ *
+ * 🔴 สคริปต์นี้ยิง PIN ผิดโดยตั้งใจหลายครั้ง (P0-AUTH-04 · P0-AUTH-05)
+ * รันซ้ำติด ๆ กันโดยไม่ล้าง = รอบถัดไปโดน 429 ตั้งแต่แถวแรก แล้วแถวที่
+ * "ล็อกอินถูกต้อง" จะตกทั้งที่โค้ดไม่ได้เสีย · ที่แย่กว่าคือหน้าที่ต้องล็อกอิน
+ * จะเด้งไป `/login` แล้วตัวตรวจที่อ่าน HTML จะเข้าใจว่าเป็นหน้าแอป
+ */
+const clearAttempts = () =>
+  fetch(
+    `https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/database/query`,
+    {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ query: 'delete from public.login_attempts' }),
+    },
+  ).catch(() => {})
+
+await clearAttempts()
+
 /** มีคุกกี้ session ของ Supabase ถูกตั้งกลับมาไหม */
 const hasAuthCookie = (r) =>
   (r.headers.getSetCookie?.() ?? []).some((c) => /^sb-[^=]*auth-token/.test(c))
@@ -121,6 +144,9 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
 // ตรวจที่ HTML ที่เซิร์ฟเวอร์เรนเดอร์ — เป็นความจริงที่รันซ้ำได้โดยไม่ต้องมีเบราว์เซอร์
 // ⚠️ นี่คือการ "ซ่อนเมนู" ไม่ใช่การควบคุมสิทธิ์ · สิทธิ์จริงพิสูจน์ที่ verify-rls.mjs
 {
+  // แถวข้างบนยิง PIN ผิดไปหลายครั้ง — ล้างก่อน ไม่งั้นบล็อกนี้จะอ่านหน้า login
+  await clearAttempts()
+
   const jarFrom = (r) => (r.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
   const ownerJar = jarFrom(
     await post('/api/auth/login', { email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }),
@@ -131,16 +157,24 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
   const oHtml = await html(ownerJar)
   const sHtml = await html(supJar)
 
-  check('P0-UI-04 เจ้าของเห็นเมนู "รออนุมัติ" และ "ประวัติการแก้ไข"',
-    oHtml.includes('รออนุมัติ') && oHtml.includes('ประวัติการแก้ไข'),
-    `รออนุมัติ=${oHtml.includes('รออนุมัติ')} ประวัติ=${oHtml.includes('ประวัติการแก้ไข')}`)
+  // 🔴 "เมนู" คือ **ลิงก์** ไม่ใช่คำ · ยึดกับ `href` ของเมนูนั้น ไม่ใช่ป้ายที่คนอ่าน
+  // คำว่า "รออนุมัติ" ไปโผล่ที่การ์ดสรุปบนหน้าภาพรวมด้วย (ซึ่งหัวหน้าไซต์
+  // เห็นได้ตามสิทธิ์ เพราะเป็นยอดของตัวเอง) ตัวตรวจที่หาแค่คำจึงแดงทั้งที่เมนูถูกซ่อนแล้ว
+  const ownerMenus = ['href="/approvals"', 'href="/audit"']
+  check('P0-UI-04 เจ้าของเห็นเมนู "รออนุมัติ" (/approvals) และ "ประวัติการแก้ไข" (/audit)',
+    ownerMenus.every((m) => oHtml.includes(m)),
+    ownerMenus.map((m) => `${m}=${oHtml.includes(m)}`).join(' '))
 
   // ฝั่งลบต้องยึดกับ landmark ที่ต้อง**มี**อยู่บนหน้าเดียวกัน
   // ไม่งั้น "ไม่เจอ" อาจแปลว่าหน้าไม่ได้เรนเดอร์เลย ซึ่งผ่านเหมือนกันแต่ไม่ได้พิสูจน์อะไร
-  check('P0-UI-04b หัวหน้าไซต์ไม่เห็นสองเมนูนั้น แต่เห็น "คนเข้าไซต์" บนหน้าเดียวกัน',
-    !sHtml.includes('รออนุมัติ') && !sHtml.includes('ประวัติการแก้ไข') &&
-      sHtml.includes('คนเข้าไซต์') && sHtml.includes('bg-sidebar'),
-    `ซ่อนสองเมนู=${!sHtml.includes('รออนุมัติ') && !sHtml.includes('ประวัติการแก้ไข')} · เห็นคนเข้าไซต์=${sHtml.includes('คนเข้าไซต์')}`)
+  // landmark ต้องเป็นสิ่งที่มี **เฉพาะตอนล็อกอินแล้ว** — เคยใช้ `bg-sidebar`
+  // ซึ่งหน้า login ก็มี (กรอบโลโก้ใช้โทเคนเดียวกัน) การถูกเด้งไป /login
+  // จึงอ่านเหมือน "หน้าแอปเรนเดอร์แล้ว" ได้เต็ม ๆ
+  const hidden = ownerMenus.every((m) => !sHtml.includes(m))
+  const landmark = sHtml.includes('href="/attendance"') && sHtml.includes('href="/ledger"')
+  check('P0-UI-04b หัวหน้าไซต์ไม่มีลิงก์สองเมนูนั้น แต่มีลิงก์ "คนเข้าไซต์" บนหน้าเดียวกัน',
+    hidden && landmark,
+    `ซ่อนสองเมนู=${hidden} · เห็นเมนูที่ควรเห็น=${landmark}`)
 }
 
 // P05-BRAND-01/02 · ชื่อบริษัทมาจากฐานข้อมูล และมีค่าสำรองเมื่อยังไม่ได้ตั้ง

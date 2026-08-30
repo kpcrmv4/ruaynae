@@ -8,7 +8,7 @@ import type { Role } from '@/lib/auth/current-user'
 import { IMAGE, MAX_ATTACHMENTS } from '@/lib/constants'
 import { fmtBaht } from '@/lib/format'
 import {
-  INCOME_KINDS, INCOME_KIND_LABEL, PAY_METHODS, PAY_METHOD_LABEL,
+  INCOME_KINDS, INCOME_KIND_LABEL, PAY_METHODS, PAY_METHOD_LABEL, txnError,
   type IncomeKind, type PayMethod, type TxnKind,
 } from '@/lib/transactions'
 
@@ -16,30 +16,8 @@ type Site = { id: string; name: string }
 type Slip = { objectKey: string; thumbKey: string; preview: string; size: number }
 type Category = { id: string; name: string; kind: TxnKind }
 
-const MESSAGES: Record<string, string> = {
-  UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
-  FORBIDDEN: 'ไม่มีสิทธิ์ทำรายการนี้',
-  INCOME_FORBIDDEN: 'หัวหน้าไซต์บันทึกรายรับไม่ได้ — เจ้าของเป็นคนบันทึกเอง',
-  SITE_REQUIRED: 'กรุณาเลือกไซต์งาน',
-  KIND_INVALID: 'ชนิดรายการไม่ถูกต้อง',
-  CATEGORY_REQUIRED: 'กรุณาเลือกหมวด',
-  CATEGORY_KIND_MISMATCH: 'หมวดที่เลือกไม่ตรงกับชนิดรายการ',
-  AMOUNT_INVALID: 'จำนวนเงินต้องมากกว่า 0',
-  DATE_REQUIRED: 'กรุณาเลือกวันที่',
-  DATE_INVALID: 'รูปแบบวันที่ไม่ถูกต้อง',
-  DATE_BUDDHIST_ERA: 'ปีที่กรอกเป็น พ.ศ. — ระบบเก็บเป็น ค.ศ. กรุณาเลือกวันจากปฏิทิน',
-  DATE_FUTURE: 'บันทึกรายการของวันในอนาคตไม่ได้',
-  INCOME_KIND_REQUIRED: 'กรุณาเลือกประเภทของรายรับ',
-  INSTALLMENT_INVALID: 'เลขงวดต้องเป็นจำนวนเต็มตั้งแต่ 1 ขึ้นไป',
-  CREATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
-  UNSUPPORTED_TYPE: 'รองรับเฉพาะไฟล์รูปภาพ',
-  FILE_TOO_LARGE: 'ไฟล์ใหญ่เกินไป ลองถ่ายใหม่หรือเลือกรูปที่เล็กกว่า',
-  TOO_MANY_ATTACHMENTS: 'แนบรูปได้ไม่เกินจำนวนที่กำหนดต่อรายการ',
-  INTENT_NOT_FOUND: 'สลิปหมดอายุแล้ว กรุณาแนบใหม่',
-  FILE_NOT_UPLOADED: 'อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่',
-  ATTACH_FAILED: 'บันทึกรายการแล้ว แต่แนบสลิปไม่สำเร็จ',
-}
-const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
+const fail = txnError
+
 
 const CENTRAL = '__central__'
 

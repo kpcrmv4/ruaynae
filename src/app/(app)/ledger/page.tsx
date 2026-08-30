@@ -64,7 +64,7 @@ export default async function LedgerPage({
   let listQuery = sb
     .from('transactions')
     .select(`
-      id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no,
+      id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no, rejected_reason,
       site_id, sites(name), categories(name),
       attachments(id)
     `)
@@ -243,6 +243,15 @@ export default async function LedgerPage({
                     {t.installment_no && ` ${t.installment_no}`}
                     {t.note && ` · ${t.note}`}
                   </div>
+                  {/* 🔴 เหตุผลที่ตีกลับต้องอยู่ตรงนี้ ไม่ใช่อยู่แค่ในกระดิ่ง
+                      กระดิ่งถูกกดอ่านแล้วก็หายไป แต่คนที่ต้องแก้จะกลับมาดู
+                      ที่รายการ — ป้าย "ตีกลับ" ที่ไม่บอกว่าเพราะอะไร
+                      คือการส่งงานคืนโดยไม่บอกว่าต้องแก้อะไร */}
+                  {t.status === 'rejected' && t.rejected_reason && (
+                    <div className="mt-1 text-sm text-urgent">
+                      เหตุผลที่ตีกลับ: {t.rejected_reason}
+                    </div>
+                  )}
                 </div>
 
                 <div className="flex flex-col items-end gap-1">

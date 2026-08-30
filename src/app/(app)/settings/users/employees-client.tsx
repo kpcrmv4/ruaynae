@@ -1,0 +1,336 @@
+'use client'
+
+import { HardHat, Loader2, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { useState } from 'react'
+import { toast } from 'sonner'
+import { fmtBaht } from '@/lib/format'
+import {
+  WAGE_TYPES, WAGE_TYPE_LABEL, employeeError, type WageType,
+} from '@/lib/employees'
+import { Badge } from '@/components/ui/badge'
+import { EmptyState } from '@/components/ui/states'
+
+export type EmployeeRow = {
+  id: string
+  full_name: string
+  job_title: string | null
+  wage_type: WageType
+  daily_rate: number | null
+  monthly_salary: number | null
+  default_site_id: string | null
+  is_active: boolean
+  profile_id: string | null
+}
+
+type Site = { id: string; name: string }
+type Person = { id: string; full_name: string }
+
+const EMPTY = {
+  fullName: '',
+  jobTitle: '',
+  wageType: 'daily' as WageType,
+  dailyRate: '',
+  monthlySalary: '',
+  defaultSiteId: '',
+  profileId: '',
+}
+
+export function EmployeesClient({
+  employees,
+  sites,
+  people,
+}: {
+  employees: EmployeeRow[]
+  sites: Site[]
+  people: Person[]
+}) {
+  const router = useRouter()
+  const [busy, setBusy] = useState<string | null>(null)
+  const [editing, setEditing] = useState<string | null>(null)
+  const [adding, setAdding] = useState(false)
+  const [form, setForm] = useState(EMPTY)
+  const [fieldError, setFieldError] = useState('')
+
+  const set = <K extends keyof typeof EMPTY>(k: K, v: (typeof EMPTY)[K]) =>
+    setForm((f) => ({ ...f, [k]: v }))
+
+  async function send(key: string, url: string, method: 'POST' | 'PATCH', body: unknown, ok: string) {
+    // กันกดซ้ำสองชั้น: ปุ่ม disabled *และ* ธงตรงนี้
+    if (busy) return false
+    setBusy(key)
+    setFieldError('')
+    try {
+      const r = await fetch(url, {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const b = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        const msg = employeeError(b.error)
+        setFieldError(msg)
+        toast.error(msg)
+        return false
+      }
+      toast.success(ok)
+      router.refresh()
+      return true
+    } catch {
+      toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
+      return false
+    } finally {
+      setBusy(null)
+    }
+  }
+
+  function openEdit(e: EmployeeRow) {
+    setAdding(false)
+    setEditing(e.id)
+    setFieldError('')
+    setForm({
+      fullName: e.full_name,
+      jobTitle: e.job_title ?? '',
+      wageType: e.wage_type,
+      dailyRate: e.daily_rate === null ? '' : String(e.daily_rate),
+      monthlySalary: e.monthly_salary === null ? '' : String(e.monthly_salary),
+      defaultSiteId: e.default_site_id ?? '',
+      profileId: e.profile_id ?? '',
+    })
+  }
+
+  async function submit() {
+    const payload = {
+      ...form,
+      defaultSiteId: form.defaultSiteId || null,
+      profileId: form.profileId || null,
+    }
+    const done = editing
+      ? await send(editing, `/api/employees/${editing}`, 'PATCH', payload, 'บันทึกแล้ว')
+      : await send('new', '/api/employees', 'POST', payload, 'เพิ่มคนงานแล้ว')
+    if (done) {
+      setForm(EMPTY)
+      setAdding(false)
+      setEditing(null)
+    }
+  }
+
+  const isDaily = form.wageType === 'daily'
+  const formOpen = adding || editing !== null
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <h2 className="text-lg font-bold text-ink">คนงาน</h2>
+          <p className="mt-0.5 text-sm text-muted-token">
+            ทุกคนที่มีค่าแรงต้องจ่าย · <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span>{' '}
+            และไม่มี role — คนที่ล็อกอินได้อยู่แท็บผู้ใช้ระบบ
+          </p>
+        </div>
+        <button
+          onClick={() => {
+            setEditing(null)
+            setForm(EMPTY)
+            setFieldError('')
+            setAdding((v) => !v)
+          }}
+          className="btn-primary shrink-0"
+        >
+          <Plus className="size-4" />
+          เพิ่มคนงาน
+        </button>
+      </div>
+
+      {formOpen && (
+        <section className="rounded-lg border border-line bg-surface p-4">
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label htmlFor="emp-name" className="label-base">ชื่อ-นามสกุล</label>
+              <input
+                id="emp-name"
+                value={form.fullName}
+                onChange={(e) => set('fullName', e.target.value)}
+                className="input-base"
+                autoFocus
+              />
+            </div>
+            <div>
+              <label htmlFor="emp-title" className="label-base">ตำแหน่ง</label>
+              <input
+                id="emp-title"
+                value={form.jobTitle}
+                onChange={(e) => set('jobTitle', e.target.value)}
+                placeholder="เช่น ช่างปูน · กรรมกร"
+                className="input-base"
+              />
+            </div>
+
+            <div>
+              <label htmlFor="emp-wage" className="label-base">ประเภทค่าแรง</label>
+              <select
+                id="emp-wage"
+                value={form.wageType}
+                onChange={(e) => set('wageType', e.target.value as WageType)}
+                className="input-base"
+              >
+                {WAGE_TYPES.map((w) => (
+                  <option key={w} value={w}>{WAGE_TYPE_LABEL[w]}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* 🔴 โชว์ช่องเดียวตามประเภทที่เลือก · ฟอร์มที่โชว์ทั้งสองช่องพร้อมกัน
+                คือฟอร์มที่ชวนกรอกผิด แล้วเรตที่ค้างอยู่จะถูกใครสักคนอ่านไปใช้ */}
+            {isDaily ? (
+              <div>
+                <label htmlFor="emp-daily" className="label-base">ค่าแรงต่อวัน (บาท)</label>
+                <input
+                  id="emp-daily"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.dailyRate}
+                  onChange={(e) => set('dailyRate', e.target.value)}
+                  placeholder="600"
+                  className="input-base tnum"
+                />
+              </div>
+            ) : (
+              <div>
+                <label htmlFor="emp-monthly" className="label-base">เงินเดือน (บาท)</label>
+                <input
+                  id="emp-monthly"
+                  type="text"
+                  inputMode="decimal"
+                  value={form.monthlySalary}
+                  onChange={(e) => set('monthlySalary', e.target.value)}
+                  placeholder="18000"
+                  className="input-base tnum"
+                />
+              </div>
+            )}
+
+            {!isDaily && (
+              <div>
+                <label htmlFor="emp-site" className="label-base">
+                  เงินเดือนลงไซต์ประจำ
+                </label>
+                <select
+                  id="emp-site"
+                  value={form.defaultSiteId}
+                  onChange={(e) => set('defaultSiteId', e.target.value)}
+                  className="input-base"
+                >
+                  <option value="">ส่วนกลาง (ไม่ผูกไซต์)</option>
+                  {sites.map((s) => (
+                    <option key={s.id} value={s.id}>{s.name}</option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div>
+              <label htmlFor="emp-profile" className="label-base">
+                ผูกกับบัญชีผู้ใช้ (ถ้าคนนี้ล็อกอินด้วย)
+              </label>
+              <select
+                id="emp-profile"
+                value={form.profileId}
+                onChange={(e) => set('profileId', e.target.value)}
+                className="input-base"
+              >
+                <option value="">ไม่มีบัญชี — เป็นคนงานอย่างเดียว</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          {fieldError && <p className="mt-2 text-sm text-urgent">{fieldError}</p>}
+
+          <div className="mt-3 flex justify-end gap-2">
+            <button
+              onClick={() => {
+                setAdding(false)
+                setEditing(null)
+                setFieldError('')
+              }}
+              className="btn-secondary"
+            >
+              ยกเลิก
+            </button>
+            <button
+              onClick={submit}
+              disabled={busy !== null}
+              className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {busy !== null && <Loader2 className="size-4 animate-spin" />}
+              {editing ? 'บันทึกการแก้ไข' : 'เพิ่มคนงาน'}
+            </button>
+          </div>
+        </section>
+      )}
+
+      {employees.length === 0 ? (
+        <EmptyState
+          icon={HardHat}
+          message="ยังไม่มีคนงาน — เพิ่มคนแรกแล้วจะลงชื่อเข้าไซต์ได้ที่หน้าคนเข้าไซต์"
+        />
+      ) : (
+        <div className="panel">
+          {employees.map((e) => (
+            <div
+              key={e.id}
+              className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
+            >
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="truncate font-semibold text-ink">{e.full_name}</span>
+                  {!e.is_active && <Badge tone="pending">ปิดใช้งาน</Badge>}
+                  {e.profile_id && <Badge tone="info">มีบัญชีล็อกอิน</Badge>}
+                </div>
+                <div className="mt-0.5 truncate text-sm text-muted-token">
+                  {e.job_title ?? 'ยังไม่ได้ระบุตำแหน่ง'} · {WAGE_TYPE_LABEL[e.wage_type]}
+                </div>
+              </div>
+
+              <span className="shrink-0 text-sm font-semibold tnum text-ink">
+                {e.wage_type === 'daily'
+                  ? `${fmtBaht(e.daily_rate)} / วัน`
+                  : `${fmtBaht(e.monthly_salary)} / เดือน`}
+              </span>
+
+              <div className="flex shrink-0 items-center gap-1.5">
+                <button
+                  onClick={() => openEdit(e)}
+                  aria-label={`แก้ไข ${e.full_name}`}
+                  className="btn-secondary"
+                >
+                  <Pencil className="size-4" />
+                </button>
+                <button
+                  onClick={() =>
+                    send(e.id, `/api/employees/${e.id}`, 'PATCH', { isActive: !e.is_active },
+                      e.is_active ? 'ปิดใช้งานแล้ว' : 'เปิดใช้งานแล้ว')
+                  }
+                  disabled={busy !== null}
+                  aria-label={e.is_active ? `ปิดใช้งาน ${e.full_name}` : `เปิดใช้งาน ${e.full_name}`}
+                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  {busy === e.id ? (
+                    <Loader2 className="size-4 animate-spin" />
+                  ) : e.is_active ? (
+                    <UserX className="size-4" />
+                  ) : (
+                    <UserCheck className="size-4" />
+                  )}
+                </button>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}

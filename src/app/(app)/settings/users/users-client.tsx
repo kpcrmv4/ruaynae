@@ -102,7 +102,7 @@ export function UsersClient({ meId, users }: { meId: string; users: Row[] }) {
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-bold text-ink">ผู้ใช้ระบบ</h1>
           <p className="mt-0.5 text-sm text-muted-token">
-            คนที่ล็อกอินเข้าระบบได้ · คนงานที่มีแค่ค่าแรงอยู่คนละรายการ (เพิ่มในเฟส P4)
+            คนที่ล็อกอินเข้าระบบได้ · คนงานที่มีแค่ค่าแรงอยู่ที่แท็บคนงาน
           </p>
         </div>
         <button onClick={() => setAdding((v) => !v)} className="btn-primary shrink-0">

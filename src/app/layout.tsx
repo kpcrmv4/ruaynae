@@ -16,6 +16,18 @@ const plexThai = IBM_Plex_Sans_Thai({
 export const metadata: Metadata = {
   title: { default: APP_NAME, template: `%s · ${APP_NAME}` },
   description: APP_TAGLINE,
+  // manifest เป็น route แบบไดนามิก เพราะชื่อบริษัทมาจากฐานข้อมูล
+  manifest: '/manifest.webmanifest',
+  // 🔴 Safari ไม่อ่านไอคอนจาก manifest — ต้องมี apple-touch-icon เป็น PNG
+  // ไม่งั้นไอโฟนที่ติดตั้งแอปจะได้ไอคอนเปล่า โดยไม่มีอะไรฟ้อง
+  appleWebApp: { capable: true, statusBarStyle: 'default', title: APP_NAME },
+  icons: {
+    icon: [
+      { url: '/icons/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icons/icon-512.png', sizes: '512x512', type: 'image/png' },
+    ],
+    apple: [{ url: '/icons/apple-touch-icon.png', sizes: '180x180', type: 'image/png' }],
+  },
 }
 
 // color-scheme ต้องประกาศทั้งสองค่า ไม่งั้น Chrome จะบังคับ force-dark

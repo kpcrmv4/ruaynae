@@ -17,8 +17,13 @@ export const config = {
    *
    * อาการโหดตรงที่มัน **พังเฉพาะคนที่ยังไม่ล็อกอิน** ซึ่งคือทุกคนที่เพิ่งเข้าเว็บ
    * ส่วนตอน dev เราล็อกอินอยู่ตลอดเลยไม่มีวันเห็น · build เขียว console สะอาด
+   *
+   * 🔴 `offline.html` ก็ต้องยกเว้นด้วย — service worker แคชมันตอน `install`
+   * ซึ่งเกิดขึ้นได้ตอนยังไม่ล็อกอิน · โดน 307 เมื่อไหร่ SW จะแคช **หน้า login**
+   * ไว้ในชื่อ "หน้าออฟไลน์" แล้วผู้ใช้ที่เน็ตหลุดจะเห็นหน้าล็อกอินแทนคำอธิบาย
+   * (เจอตอน P7 — แถว P7-INF-06 ตอบ 307)
    */
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|manifest\\.webmanifest|icons/|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)',
+    '/((?!_next/static|_next/image|favicon.ico|sw\\.js|offline\\.html|manifest\\.webmanifest|icons/|.*\\.(?:png|jpg|jpeg|svg|webp|ico)$).*)',
   ],
 }

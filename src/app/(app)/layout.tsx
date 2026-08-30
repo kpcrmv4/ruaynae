@@ -1,4 +1,5 @@
 import { AppHeader } from '@/components/shell/app-header'
+import { PwaRegister } from '@/components/shell/pwa-register'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { Sidebar } from '@/components/shell/sidebar'
 import { getCurrentUser } from '@/lib/auth/current-user'
@@ -41,6 +42,8 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
 
   return (
     <div className="flex min-h-svh">
+      {/* ลงทะเบียน service worker + ตั้งตัวเลขบนไอคอนแอป · ไม่มี UI */}
+      <PwaRegister unread={count ?? 0} />
       <Sidebar
         role={user.role}
         userName={user.fullName}

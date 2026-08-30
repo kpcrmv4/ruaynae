@@ -441,6 +441,7 @@ export type Database = {
           id: string
           kind: Database["public"]["Enums"]["notification_kind"]
           link: string | null
+          pushed_at: string | null
           read_at: string | null
           title: string
           txn_id: string | null
@@ -452,6 +453,7 @@ export type Database = {
           id?: string
           kind: Database["public"]["Enums"]["notification_kind"]
           link?: string | null
+          pushed_at?: string | null
           read_at?: string | null
           title: string
           txn_id?: string | null
@@ -463,6 +465,7 @@ export type Database = {
           id?: string
           kind?: Database["public"]["Enums"]["notification_kind"]
           link?: string | null
+          pushed_at?: string | null
           read_at?: string | null
           title?: string
           txn_id?: string | null
@@ -622,6 +625,47 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          last_ok_at: string | null
+          p256dh: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          last_ok_at?: string | null
+          p256dh?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "push_subscriptions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       site_finance: {
         Row: {

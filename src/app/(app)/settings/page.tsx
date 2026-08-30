@@ -1,6 +1,7 @@
 import { ChevronRight, Lock, Tags, Users } from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
+import { PushToggle } from './push-client'
 import { getBranding } from '@/lib/branding'
 import { BrandingForm } from './branding-form'
 
@@ -63,9 +64,13 @@ export default async function SettingsPage() {
         </Link>
       )}
 
+      {/* คีย์สาธารณะของ VAPID ถูกฝังใน JavaScript ตามการออกแบบ —
+          มันเป็นคีย์สาธารณะ ไม่ใช่ความลับ · คีย์ส่วนตัวอยู่ฝั่งเซิร์ฟเวอร์เท่านั้น */}
+      <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''} />
+
       <section className="rounded-lg border border-line bg-surface px-4 py-6 text-center">
         <p className="text-sm text-muted-token">
-          ส่วนแจ้งเตือนและพื้นที่เก็บรูป จะเพิ่มในเฟสถัดไป
+          ส่วนพื้นที่เก็บรูปจะเพิ่มในเฟสถัดไป
         </p>
       </section>
     </div>

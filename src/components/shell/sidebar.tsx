@@ -4,7 +4,6 @@ import { HardHat } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { navFor, type Role } from '@/components/shell/nav'
-import { APP_NAME } from '@/lib/constants'
 
 /**
  * sidebar เดสก์ท็อป — แผงกรมท่าเข้ม ไม่ใช่สีแบรนด์
@@ -15,10 +14,12 @@ export function Sidebar({
   role,
   userName,
   roleLabel,
+  companyName,
 }: {
   role: Role
   userName: string
   roleLabel: string
+  companyName: string
 }) {
   // 🔴 คำนวณเมนูในฝั่ง client เอง ห้ามรับเป็น prop จาก Server Component
   // เพราะ icon เป็นคอมโพเนนต์ (ฟังก์ชัน) ซึ่งข้ามเส้น server→client ไม่ได้
@@ -35,7 +36,7 @@ export function Sidebar({
           <HardHat className="size-5" strokeWidth={1.8} />
         </span>
         <span className="min-w-0">
-          <span className="block truncate text-sm font-bold text-sidebar-title">{APP_NAME}</span>
+          <span className="block truncate text-sm font-bold text-sidebar-title">{companyName}</span>
           <span className="block truncate text-xs text-sidebar-fg-dim">ระบบรายรับ-รายจ่ายโปรเจ็ค</span>
         </span>
       </div>

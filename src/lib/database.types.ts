@@ -14,6 +14,36 @@ export type Database = {
   }
   public: {
     Tables: {
+      app_settings: {
+        Row: {
+          address: string | null
+          id: boolean
+          signatory_name: string | null
+          signatory_title: string | null
+          slip_retention_years: number | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          id?: boolean
+          signatory_name?: string | null
+          signatory_title?: string | null
+          slip_retention_years?: number | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          id?: boolean
+          signatory_name?: string | null
+          signatory_title?: string | null
+          slip_retention_years?: number | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -44,6 +74,27 @@ export type Database = {
           id?: number
           row_id?: string | null
           table_name?: string
+        }
+        Relationships: []
+      }
+      branding: {
+        Row: {
+          company_name: string
+          id: boolean
+          logo_object_key: string | null
+          updated_at: string
+        }
+        Insert: {
+          company_name?: string
+          id?: boolean
+          logo_object_key?: string | null
+          updated_at?: string
+        }
+        Update: {
+          company_name?: string
+          id?: boolean
+          logo_object_key?: string | null
+          updated_at?: string
         }
         Relationships: []
       }

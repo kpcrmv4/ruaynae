@@ -143,6 +143,45 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
     `ซ่อนสองเมนู=${!sHtml.includes('รออนุมัติ') && !sHtml.includes('ประวัติการแก้ไข')} · เห็นคนเข้าไซต์=${sHtml.includes('คนเข้าไซต์')}`)
 }
 
+// P05-BRAND-01/02 · ชื่อบริษัทมาจากฐานข้อมูล และมีค่าสำรองเมื่อยังไม่ได้ตั้ง
+// ทดสอบสองทาง — ตั้งชื่อแล้วต้องขึ้น · ล้างชื่อแล้วต้องกลับไปใช้ค่าสำรอง
+// ทดสอบแค่ทางเดียวไม่ได้พิสูจน์ว่า fallback ทำงาน มันอาจแค่บังเอิญมีชื่ออยู่แล้ว
+{
+  const sql = async (q) => {
+    const r = await fetch(
+      `https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/database/query`,
+      {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ query: q }),
+      },
+    )
+    if (!r.ok) throw new Error(await r.text())
+    return r.json()
+  }
+  const [{ company_name: original }] = await sql('select company_name from public.branding')
+  const probe = 'บริษัททดสอบ-' + Date.now()
+
+  try {
+    await sql(`update public.branding set company_name = '${probe}' where id`)
+    const withName = await (await fetch(`${BASE}/login`)).text()
+    check('P05-BRAND-01 ชื่อบริษัทจากฐานข้อมูลขึ้นบนหน้าล็อกอิน (ตอนยังไม่ล็อกอิน)',
+      withName.includes(probe), `พบชื่อที่ตั้งไว้: ${withName.includes(probe)}`)
+
+    await sql("update public.branding set company_name = '' where id")
+    const empty = await (await fetch(`${BASE}/login`)).text()
+    check('P05-BRAND-02 ยังไม่ได้ตั้งชื่อ → ใช้ค่าสำรอง ไม่ใช่ช่องว่าง',
+      !empty.includes(probe) && empty.includes('ระบบจัดการโปรเจ็คงานรับเหมา'),
+      `ชื่อเดิมหายไป: ${!empty.includes(probe)} · มีค่าสำรอง: ${empty.includes('ระบบจัดการโปรเจ็คงานรับเหมา')}`)
+  } finally {
+    // คืนค่าเดิมเสมอ — probe ที่ล้มกลางทางต้องไม่ทิ้ง fixture ที่ถูกแก้ไว้ให้รอบหน้า
+    await sql(`update public.branding set company_name = '${original.replace(/'/g, "''")}' where id`)
+  }
+}
+
 // P0-UI-13 · ทุกลิงก์ในเมนูต้องเปิดได้จริง
 // ลิงก์ที่ปลายทางเป็น 404 คือปุ่มที่ไม่มีใครทดสอบ — และไม่มีอะไรใน build จับได้
 {

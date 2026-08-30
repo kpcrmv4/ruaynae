@@ -190,6 +190,47 @@ export type Database = {
         }
         Relationships: []
       }
+      notifications: {
+        Row: {
+          body: string | null
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          link: string | null
+          read_at: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind: Database["public"]["Enums"]["notification_kind"]
+          link?: string | null
+          read_at?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          body?: string | null
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["notification_kind"]
+          link?: string | null
+          read_at?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -557,6 +598,7 @@ export type Database = {
     }
     Enums: {
       income_kind: "deposit" | "installment" | "variation_order" | "other"
+      notification_kind: "txn_pending" | "txn_approved" | "txn_rejected"
       pay_method: "cash" | "transfer"
       site_status: "planning" | "active" | "paused" | "done" | "cancelled"
       txn_kind: "income" | "expense"
@@ -690,6 +732,7 @@ export const Constants = {
   public: {
     Enums: {
       income_kind: ["deposit", "installment", "variation_order", "other"],
+      notification_kind: ["txn_pending", "txn_approved", "txn_rejected"],
       pay_method: ["cash", "transfer"],
       site_status: ["planning", "active", "paused", "done", "cancelled"],
       txn_kind: ["income", "expense"],

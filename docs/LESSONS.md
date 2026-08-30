@@ -456,3 +456,24 @@
      ไม่ใช่พึ่งตัวรันรวมล้างให้ระหว่างสคริปต์ — ไม่งั้นมันจะรันเดี่ยวไม่ได้
      และคนจะเลิกรันเดี่ยวตอนที่ต้องการดีบักที่สุด
 - **เจ้าของกฎ:** `kp-e2e-playwright-real-db`
+
+## `realtime.send()` กลืน error ทุกชนิด — broadcast หายทั้งระบบโดยไม่มีใครรู้
+
+- **อาการที่คนจะรายงาน:** "แจ้งเตือนไม่เด้ง" ทั้งที่ข้อมูลในตารางถูกต้องครบทุกแถว
+- **สาเหตุจริง:** ตัวฟังก์ชัน `realtime.send()` ห่อ `INSERT INTO realtime.messages`
+  ไว้ใน `BEGIN … EXCEPTION WHEN OTHERS THEN RAISE WARNING` — **ทุก** ความล้มเหลว
+  จึงกลายเป็น warning ที่ไม่มีใครเห็น · บนโปรเจ็คที่ยังไม่เคยใช้ Realtime เลย
+  `realtime.messages` ยังไม่มี partition สักวัน insert จึงล้มทุกครั้ง
+  แล้ว trigger ก็ commit ต่อไปตามปกติ
+- **หลักฐาน:** `select prosrc from pg_proc` เห็น exception handler ชัด ๆ ·
+  ยิง insert ตรง ๆ ได้ `23514: no partition of relation "messages" found for row` ·
+  ต่อ websocket ครั้งแรกได้ `CHANNEL_ERROR MissingPartition` แล้ว Realtime
+  สร้าง partition ให้ 5 วันล่วงหน้า หลังจากนั้นทุกอย่างทำงานทันที
+- **กฎกันซ้ำ:** สองข้อ
+  1. ต้องมีแถวตรวจรับที่ยืนยันว่า **ข้อความลงถึง `realtime.messages` จริง**
+     ไม่ใช่แค่ "trigger ถูกสร้างแล้ว" — เพราะ trigger ที่ทำงานสำเร็จกับ
+     trigger ที่ส่งข้อความไม่ออกหน้าตาเหมือนกันเป๊ะ
+  2. ฝั่ง client ต้อง **subscribe แบบมี retry** ไม่ยอมแพ้ที่ `CHANNEL_ERROR`
+     ครั้งแรก — ครั้งแรกของโปรเจ็คใหม่ (และของทุกวันที่ partition ขาด) จะพลาดเสมอ
+     แล้วครั้งถัดไปจะสำเร็จ
+- **เจ้าของกฎ:** `supabase-rls-schema`

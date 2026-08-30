@@ -82,6 +82,73 @@ export type Database = {
           },
         ]
       }
+      attendance: {
+        Row: {
+          amount: number | null
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          id: string
+          note: string | null
+          ot_amount: number
+          site_id: string
+          updated_at: string
+          wage_snapshot: number
+          work_date: string
+          work_units: number
+        }
+        Insert: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          id?: string
+          note?: string | null
+          ot_amount?: number
+          site_id: string
+          updated_at?: string
+          wage_snapshot?: number
+          work_date: string
+          work_units?: number
+        }
+        Update: {
+          amount?: number | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          id?: string
+          note?: string | null
+          ot_amount?: number
+          site_id?: string
+          updated_at?: string
+          wage_snapshot?: number
+          work_date?: string
+          work_units?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       audit_log: {
         Row: {
           action: string
@@ -162,6 +229,63 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      employees: {
+        Row: {
+          created_at: string
+          daily_rate: number | null
+          default_site_id: string | null
+          full_name: string
+          id: string
+          is_active: boolean
+          job_title: string | null
+          monthly_salary: number | null
+          profile_id: string | null
+          updated_at: string
+          wage_type: Database["public"]["Enums"]["wage_type"]
+        }
+        Insert: {
+          created_at?: string
+          daily_rate?: number | null
+          default_site_id?: string | null
+          full_name: string
+          id?: string
+          is_active?: boolean
+          job_title?: string | null
+          monthly_salary?: number | null
+          profile_id?: string | null
+          updated_at?: string
+          wage_type?: Database["public"]["Enums"]["wage_type"]
+        }
+        Update: {
+          created_at?: string
+          daily_rate?: number | null
+          default_site_id?: string | null
+          full_name?: string
+          id?: string
+          is_active?: boolean
+          job_title?: string | null
+          monthly_salary?: number | null
+          profile_id?: string | null
+          updated_at?: string
+          wage_type?: Database["public"]["Enums"]["wage_type"]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_default_site_id_fkey"
+            columns: ["default_site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       login_attempts: {
         Row: {
@@ -614,6 +738,7 @@ export type Database = {
       txn_kind: "income" | "expense"
       txn_status: "pending" | "approved" | "rejected"
       user_role: "owner" | "site_supervisor"
+      wage_type: "daily" | "monthly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -748,6 +873,7 @@ export const Constants = {
       txn_kind: ["income", "expense"],
       txn_status: ["pending", "approved", "rejected"],
       user_role: ["owner", "site_supervisor"],
+      wage_type: ["daily", "monthly"],
     },
   },
 } as const

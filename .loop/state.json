@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-31 (P6 ปิดเฟส)",
+  "updated": "2026-08-31 (P7 ปิดเฟส · เหลือ P8)",
   "note": "สถานะจริงยืนยันด้วย git log เสมอ — ถ้าไฟล์นี้ขัดกับ git ให้เชื่อ git",
   "gate": "npm run gate",
   "phases": [
@@ -271,17 +271,12 @@
     {
       "id": "P7",
       "title": "PWA + web push",
-      "status": "todo",
+      "status": "done",
       "tasks": [
         {
           "id": "P7-a",
-          "t": "ตารางตรวจรับ P7 + manifest + service worker + /api/branding",
-          "s": "todo"
-        },
-        {
-          "id": "P7-b",
-          "t": "push subscribe + ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ + badge",
-          "s": "todo"
+          "t": "manifest + sw + ไอคอน + push + badge + /api/branding",
+          "s": "done"
         }
       ]
     },

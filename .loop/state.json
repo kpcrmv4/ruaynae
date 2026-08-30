@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-31 (P5 ปิดเฟส · 3280426)",
+  "updated": "2026-08-31 (P6 ปิดเฟส)",
   "note": "สถานะจริงยืนยันด้วย git log เสมอ — ถ้าไฟล์นี้ขัดกับ git ให้เชื่อ git",
   "gate": "npm run gate",
   "phases": [
@@ -259,12 +259,12 @@
     {
       "id": "P6",
       "title": "Audit log",
-      "status": "todo",
+      "status": "done",
       "tasks": [
         {
           "id": "P6-a",
-          "t": "ตารางตรวจรับ P6 + หน้า /audit + กรอง + keyset pagination",
-          "s": "todo"
+          "t": "ตารางตรวจรับ P6 + หน้า /audit + กรอง + keyset",
+          "s": "done"
         }
       ]
     },

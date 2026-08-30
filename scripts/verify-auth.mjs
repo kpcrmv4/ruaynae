@@ -117,6 +117,32 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
   check(`${id} ${path} ไม่ถูก redirect ไป /login`, r.status !== 307, `${r.status}`)
 }
 
+// P0-UI-04 · shell แสดงเมนูตาม role
+// ตรวจที่ HTML ที่เซิร์ฟเวอร์เรนเดอร์ — เป็นความจริงที่รันซ้ำได้โดยไม่ต้องมีเบราว์เซอร์
+// ⚠️ นี่คือการ "ซ่อนเมนู" ไม่ใช่การควบคุมสิทธิ์ · สิทธิ์จริงพิสูจน์ที่ verify-rls.mjs
+{
+  const jarFrom = (r) => (r.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+  const ownerJar = jarFrom(
+    await post('/api/auth/login', { email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }),
+  )
+  const supJar = jarFrom(await post('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN }))
+
+  const html = async (jar) => (await fetch(`${BASE}/`, { headers: { cookie: jar } })).text()
+  const oHtml = await html(ownerJar)
+  const sHtml = await html(supJar)
+
+  check('P0-UI-04 เจ้าของเห็นเมนู "รออนุมัติ" และ "ประวัติการแก้ไข"',
+    oHtml.includes('รออนุมัติ') && oHtml.includes('ประวัติการแก้ไข'),
+    `รออนุมัติ=${oHtml.includes('รออนุมัติ')} ประวัติ=${oHtml.includes('ประวัติการแก้ไข')}`)
+
+  // ฝั่งลบต้องยึดกับ landmark ที่ต้อง**มี**อยู่บนหน้าเดียวกัน
+  // ไม่งั้น "ไม่เจอ" อาจแปลว่าหน้าไม่ได้เรนเดอร์เลย ซึ่งผ่านเหมือนกันแต่ไม่ได้พิสูจน์อะไร
+  check('P0-UI-04b หัวหน้าไซต์ไม่เห็นสองเมนูนั้น แต่เห็น "คนเข้าไซต์" บนหน้าเดียวกัน',
+    !sHtml.includes('รออนุมัติ') && !sHtml.includes('ประวัติการแก้ไข') &&
+      sHtml.includes('คนเข้าไซต์') && sHtml.includes('bg-sidebar'),
+    `ซ่อนสองเมนู=${!sHtml.includes('รออนุมัติ') && !sHtml.includes('ประวัติการแก้ไข')} · เห็นคนเข้าไซต์=${sHtml.includes('คนเข้าไซต์')}`)
+}
+
 // P0-AUTH-08 + P0-API-07 · วงจรเต็ม: เข้า → /login เด้งกลับ → ออก → / เด้งไป /login
 // ต้องยิงจาก node เพราะเบราว์เซอร์ปิดสถานะของ opaque redirect ไม่ให้ JS อ่าน
 {

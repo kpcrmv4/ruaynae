@@ -1,6 +1,9 @@
 {
   "note": "ของที่ session นี้เปิดเอง — ปิดได้เฉพาะของในนี้",
-  "chrome_pages": [{ "id": 2, "what": "docs/design/demo.html", "opened_by": "us" }],
+  "chrome_pages": [
+    { "id": 2, "what": "docs/design/demo.html", "opened_by": "us" },
+    { "id": 5, "what": "localhost:3100 (isolatedContext=clean)", "opened_by": "us", "note": "ใช้ context สะอาดเพราะ dev chunk ถูกแคชด้วย URL คงที่" }
+  ],
   "dev_servers": [{ "port": 3100, "started_by": "us", "log": ".loop/dev.log" }],
   "not_ours": [{ "port": 3000, "pid": 22088, "note": "มีอยู่ก่อนแล้ว ห้ามฆ่า" }]
 }

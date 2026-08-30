@@ -82,8 +82,8 @@
         },
         {
           "id": "P0-11",
-          "t": "shell: sidebar เดสก์ท็อป ↔ bottom nav มือถือ 5 ช่อง",
-          "s": "todo"
+          "t": "shell: sidebar ↔ bottom nav (โครงเสร็จ · หน้า placeholder ของแต่ละเมนูอยู่ P0-11b)",
+          "s": "done"
         }
       ]
     },
@@ -183,6 +183,11 @@
       "what": "ใช้ Management API ผ่าน scripts/db.mjs แทน Supabase MCP",
       "why": "MCP ของ plugin ตอบ Invalid project ref: ${SUPABASE_PROJECT_REF} — ตัวแปรใน config ไม่ถูกแทนค่า จึงไม่ได้ผูกกับโปรเจ็คนี้ · db.mjs ตรึง ref จาก .env.local และเช็คว่าตรงกับ subdomain ใน URL ก่อนยิงทุกครั้ง",
       "cost_if_wrong": "ต่ำ — เป็นเครื่องมือ ไม่ใช่โค้ดที่ ship · ถ้าแก้ MCP ได้ทีหลังก็สลับกลับได้"
+    },
+    {
+      "what": "ตรวจ UI ที่ HTML ซึ่งเซิร์ฟเวอร์เรนเดอร์ ไม่ใช่ที่ DOM ในเบราว์เซอร์",
+      "why": "Next dev เสิร์ฟ chunk ด้วย URL คงที่ เบราว์เซอร์จึงใช้ของเก่าซ้ำและทำให้ผลการตรวจไม่น่าเชื่อถือ · SSR HTML เป็นความจริงที่รันซ้ำได้และไม่ต้องพึ่งสถานะแคช",
+      "cost_if_wrong": "ต่ำ — ยังตรวจ hydration เพิ่มด้วย Playwright ได้ที่ P8"
     }
   ],
   "blocked": [],

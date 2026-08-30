@@ -2,6 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import { redirect } from 'next/navigation'
+import { NextResponse } from 'next/server'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import type { Database } from '@/lib/database.types'
 
@@ -75,3 +76,18 @@ export const getCurrentUserOrNull = cache(async (): Promise<CurrentUser | null> 
 })
 
 export const isOwner = (u: CurrentUser) => u.role === 'owner'
+
+/**
+ * ด่านของ API route ที่เฉพาะเจ้าของเรียกได้ — คืน `Response` ที่ต้องส่งกลับ
+ * หรือ `null` ถ้าผ่าน
+ *
+ * เขียนแบบ "คืนค่าที่ต้อง return" ไม่ใช่ "โยน error" เพราะ route handler ต้อง
+ * ตอบ JSON เสมอ · และรวมไว้ที่เดียวเพราะทุกครั้งที่ก๊อปเงื่อนไขนี้ไปวางใน
+ * route ใหม่ คือโอกาสที่ route นั้นจะเช็คแค่ว่าล็อกอินแล้วแต่ลืมเช็ค role
+ */
+export const denyUnlessOwner = async (): Promise<NextResponse | null> => {
+  const me = await getCurrentUserOrNull()
+  if (!me) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
+  if (me.role !== 'owner') return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+  return null
+}

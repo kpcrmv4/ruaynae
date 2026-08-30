@@ -86,6 +86,54 @@ export function parseAmount(raw: unknown): AmountCheck {
 
 export const MAX_NAME = 120
 
+const DAY_MS = 86_400_000
+
+export type TimeProgress =
+  /** ยังไม่ได้ตั้งวันเริ่มหรือวันจบ — ต่างจาก 0% ซึ่งอ่านเหมือน "ตั้งแล้วแต่ยังไม่เริ่ม" */
+  | { kind: 'unset' }
+  | { kind: 'ok'; percent: number; elapsedDays: number; totalDays: number; daysLeft: number }
+
+/**
+ * ความคืบหน้าตามเวลา — วันที่ผ่านไปเทียบกับช่วงงานทั้งหมด
+ *
+ * นับแบบ **รวมทั้งวันเริ่มและวันจบ** เพราะคนไทยพูดว่า "งาน 1–31 มี.ค. คือ 31 วัน"
+ * ไม่ใช่ 30 · ผลต่างของวันที่ล้วน ๆ ได้ 30 ซึ่งจะทำให้ทุกแถบคลาดไปหนึ่งวัน
+ *
+ * 🔴 `today` ต้องเป็น "วันนี้ตามเวลาไทย" ที่คำนวณมาแล้ว (`todayInBangkok()`)
+ * ห้ามให้ฟังก์ชันนี้เรียก `new Date()` เอง — บนเซิร์ฟเวอร์ UTC ตอนสามทุ่มครึ่ง
+ * ของไทยจะกลายเป็นพรุ่งนี้ และแถบจะเดินเร็วไปหนึ่งวันทุกคืน
+ */
+export function timeProgress(
+  startDate: string | null,
+  endDate: string | null,
+  today: string,
+): TimeProgress {
+  if (!startDate || !endDate) return { kind: 'unset' }
+
+  const start = Date.parse(`${startDate}T00:00:00Z`)
+  const end = Date.parse(`${endDate}T00:00:00Z`)
+  const now = Date.parse(`${today}T00:00:00Z`)
+  if (Number.isNaN(start) || Number.isNaN(end) || Number.isNaN(now)) return { kind: 'unset' }
+
+  const totalDays = Math.round((end - start) / DAY_MS) + 1
+  if (totalDays <= 0) return { kind: 'unset' }
+
+  const rawElapsed = Math.round((now - start) / DAY_MS) + 1
+  // หนีบทั้งสองด้าน: ก่อนเริ่มงานต้องเป็น 0 ไม่ใช่ค่าติดลบ · เลยกำหนดแล้ว
+  // ต้องเป็น 100 ไม่ใช่ 140 — แถบที่ยาวเกินกรอบอ่านเหมือนหน้าจอพัง
+  const elapsedDays = Math.min(Math.max(rawElapsed, 0), totalDays)
+  const percent = Math.round((elapsedDays / totalDays) * 100)
+
+  return {
+    kind: 'ok',
+    percent,
+    elapsedDays,
+    totalDays,
+    // เลยกำหนดแล้วให้เป็นค่าติดลบ เพื่อให้หน้าจอบอกได้ว่า "เลยมาแล้วกี่วัน"
+    daysLeft: Math.round((end - now) / DAY_MS),
+  }
+}
+
 export type SiteFields = {
   name: string
   client_name: string | null

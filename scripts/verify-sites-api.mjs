@@ -259,6 +259,303 @@ try {
   console.log(`  (ลบไซต์ทดสอบ ${created.length} ไซต์แล้ว)`)
 }
 
+console.log('\n── P1 · หน้ารายละเอียดไซต์ · แก้ไข · หัวหน้าไซต์ · งวดเงิน ──')
+
+const created2 = []
+try {
+  const mk = async (body) => {
+    const r = await req('POST', '/api/sites', body, { cookie: ownerJar })
+    const b = await r.json()
+    created2.push(b.site.id)
+    return b.site.id
+  }
+  const mineId = await mk({
+    name: 'ทดสอบ ไซต์ที่มีรายละเอียด', contractAmount: 3000000,
+    startDate: '2026-03-01', endDate: '2026-08-31', clientName: 'คุณสมชาย',
+  })
+  const othersId = await mk({ name: 'ทดสอบ ไซต์ของคนอื่น' })
+
+  // ── P1-API-01 · ทุก endpoint ตอนไม่ล็อกอินต้องเป็น 401 JSON ─────────
+  // ครบทั้ง 6 คู่ method×path ไม่ใช่แค่ตัวแรก — endpoint ที่ลืมด่านมักเป็น
+  // ตัวที่เพิ่มทีหลัง ซึ่งก็คือตัวที่ไม่มีใครนึกถึงตอนเขียนตัวตรวจ
+  {
+    const calls = [
+      ['POST', '/api/sites', { name: 'x' }],
+      ['PATCH', `/api/sites/${mineId}`, { name: 'x' }],
+      ['POST', `/api/sites/${mineId}/supervisors`, { profileId: sup1.id }],
+      ['DELETE', `/api/sites/${mineId}/supervisors?assignment=${mineId}`, undefined],
+      ['POST', `/api/sites/${mineId}/milestones`, { name: 'x' }],
+      ['DELETE', `/api/sites/${mineId}/milestones?milestone=${mineId}`, undefined],
+    ]
+    const bad = []
+    for (const [m, path, body] of calls) {
+      const r = await req(m, path, body)
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.status !== 401 || !ct.includes('application/json')) {
+        bad.push(`${m} ${path.split('?')[0]} → ${r.status}`)
+      }
+    }
+    check('P1-API-01 ทุก endpoint (6 คู่ method×path) ตอนไม่ล็อกอิน → 401 JSON',
+      bad.length === 0, bad.length ? bad.join(' · ') : '6/6')
+  }
+
+  // ── P1-API-03 · PATCH ไซต์ที่ไม่มีอยู่ ────────────────────────────
+  {
+    const r = await req('PATCH', '/api/sites/00000000-0000-0000-0000-000000000000',
+      { name: 'ไม่มีไซต์นี้' }, { cookie: ownerJar })
+    const b = await r.json().catch(() => ({}))
+    check('P1-API-03 PATCH ไซต์ที่ไม่มีอยู่ → 404 NOT_FOUND',
+      r.status === 404 && b.error === 'NOT_FOUND', `${r.status} ${b.error}`)
+  }
+
+  // ── P1-API-10 · หัวหน้าไซต์แก้ไซต์ไม่ได้ · ค่าเดิมไม่เปลี่ยน ───────
+  {
+    const r = await req('PATCH', `/api/sites/${mineId}`,
+      { name: 'ชื่อที่ไม่ควรถูกเขียน', contractAmount: 1 }, { cookie: supJar })
+    const b = await r.json().catch(() => ({}))
+    const { rows } = await sql(
+      `select name, contract_amount::float8 as amount from public.sites where id='${mineId}'`)
+    check('P1-API-10 หัวหน้าไซต์ PATCH ไซต์ → 403 · ชื่อและค่างานไม่เปลี่ยน',
+      r.status === 403 && b.error === 'FORBIDDEN'
+      && rows[0].name === 'ทดสอบ ไซต์ที่มีรายละเอียด' && rows[0].amount === 3000000,
+      `${r.status} ${b.error} · ${rows[0].name} ${rows[0].amount}`)
+  }
+
+  // ── P1-API-11 · เจ้าของแก้ได้จริง ────────────────────────────────
+  // ครึ่งบวกของแถวข้างบน — ถ้าไม่มี "403" อาจแปลว่า endpoint พังสำหรับทุกคน
+  {
+    const r = await req('PATCH', `/api/sites/${mineId}`, {
+      name: 'ทดสอบ ไซต์ที่แก้ชื่อแล้ว', contractAmount: 3500000,
+      startDate: '2026-03-01', endDate: '2026-09-30', status: 'paused',
+      clientName: 'คุณสมชาย', clientPhone: '0891112222', address: 'ซอยทดสอบ 5',
+    }, { cookie: ownerJar })
+    const { rows } = await sql(
+      `select name, status::text as status, contract_amount::float8 as amount,
+              end_date::text as ed, client_phone, address from public.sites where id='${mineId}'`)
+    const a = rows[0]
+    check('P1-API-11 เจ้าของ PATCH → 200 · ทุกคอลัมน์ถูกเขียนจริง',
+      r.status === 200 && a.name === 'ทดสอบ ไซต์ที่แก้ชื่อแล้ว' && a.status === 'paused'
+      && a.amount === 3500000 && a.ed === '2026-09-30'
+      && a.client_phone === '0891112222' && a.address === 'ซอยทดสอบ 5',
+      `${r.status} · ${a.status} ${a.amount} ${a.ed}`)
+  }
+
+  // ── P1-API-06 · มอบหมายทับช่วงเวลาเดิม → 409 OVERLAP ─────────────
+  {
+    const first = await req('POST', `/api/sites/${mineId}/supervisors`,
+      { profileId: sup1.id, effectiveFrom: '2026-03-01' }, { cookie: ownerJar })
+    const before = (await sql(
+      `select count(*)::int as n from public.site_supervisors where profile_id='${sup1.id}'`)).rows[0].n
+    const dup = await req('POST', `/api/sites/${othersId}/supervisors`,
+      { profileId: sup1.id, effectiveFrom: '2026-06-01' }, { cookie: ownerJar })
+    const dupBody = await dup.json().catch(() => ({}))
+    const after = (await sql(
+      `select count(*)::int as n from public.site_supervisors where profile_id='${sup1.id}'`)).rows[0].n
+    check('P1-API-06 มอบหมายทับช่วงเดิม → 409 OVERLAP · ไม่มีแถวใหม่',
+      first.status === 201 && dup.status === 409 && dupBody.error === 'OVERLAP' && after === before,
+      `แรก ${first.status} · ซ้ำ ${dup.status} ${dupBody.error} · ${before}→${after}`)
+  }
+
+  // ── P1-UI-04 · หัวหน้าไซต์เปิดไซต์ที่ไม่ได้ดูแล → 404 ────────────
+  // 🔴 หน้าเปล่าที่ตอบ 200 อ่านเหมือนระบบพัง และยังยืนยันให้ด้วยว่าไซต์นี้มีจริง
+  // ต้องรันตรงนี้ — ก่อน P1-API-12 ย้าย sup1 ไปไซต์อื่น
+  {
+    const mine = await fetch(`${BASE}/sites/${mineId}`, { headers: { cookie: supJar } })
+    const other = await fetch(`${BASE}/sites/${othersId}`, { headers: { cookie: supJar } })
+    check('P1-UI-04 หัวหน้าไซต์เปิดไซต์ที่ดูแลได้ 200 · ไซต์ที่ไม่ได้ดูแลได้ 404',
+      mine.status === 200 && other.status === 404, `ของตัวเอง ${mine.status} · ของคนอื่น ${other.status}`)
+  }
+
+  // ── P1-API-12 · ช่วงที่ต่อกันพอดีต้องมอบหมายได้ผ่าน API ด้วย ──────
+  // ฐานข้อมูลยอมแล้ว (P1-DB-08) แต่ถ้าชั้น API ดันไปตรวจซ้ำแบบผิด ๆ
+  // ผู้ใช้จะยังทำไม่ได้อยู่ดี — กฎที่ถูกที่ชั้นล่างแต่ผิดที่ชั้นบนก็ยังผิด
+  {
+    await sql(`update public.site_supervisors set effective_to = '2026-05-31'
+               where site_id='${mineId}' and profile_id='${sup1.id}'`)
+    const r = await req('POST', `/api/sites/${othersId}/supervisors`,
+      { profileId: sup1.id, effectiveFrom: '2026-06-01', effectiveTo: '2026-12-31' },
+      { cookie: ownerJar })
+    const b = await r.json().catch(() => ({}))
+    check('P1-API-12 ช่วงที่ต่อกันพอดี (จบ 31 พ.ค. เริ่ม 1 มิ.ย.) มอบหมายได้ → 201',
+      r.status === 201 && Boolean(b.assignment?.id), `${r.status} ${b.error ?? ''}`)
+  }
+
+  // ── P1-API-13 · งวดเงิน: เว้นเลขงวดแล้วระบบต่อท้ายให้ · ซ้ำ → 409 ──
+  {
+    const a = await req('POST', `/api/sites/${mineId}/milestones`,
+      { name: 'งวดที่ 1 — วางฐานราก', plannedAmount: '1,000,000', plannedDate: '2026-04-15' },
+      { cookie: ownerJar })
+    const ab = await a.json().catch(() => ({}))
+    const b2 = await req('POST', `/api/sites/${mineId}/milestones`,
+      { name: 'งวดที่ 2 — ขึ้นโครง', plannedAmount: 900000 }, { cookie: ownerJar })
+    const bb = await b2.json().catch(() => ({}))
+    const dup = await req('POST', `/api/sites/${mineId}/milestones`,
+      { name: 'งวดซ้ำ', seq: 1 }, { cookie: ownerJar })
+    const db2 = await dup.json().catch(() => ({}))
+    const { rows } = await sql(
+      `select count(*)::int as n, sum(planned_amount)::float8 as total
+       from public.site_milestones where site_id='${mineId}'`)
+    check('P1-API-13 เว้นเลขงวด → ได้ 1 แล้ว 2 · เลขซ้ำ → 409 SEQ_TAKEN · เหลือ 2 งวด',
+      ab.milestone?.seq === 1 && bb.milestone?.seq === 2
+      && dup.status === 409 && db2.error === 'SEQ_TAKEN'
+      && rows[0].n === 2 && rows[0].total === 1900000,
+      `งวด ${ab.milestone?.seq}/${bb.milestone?.seq} · ซ้ำ ${dup.status} · ${rows[0].n} งวด รวม ${rows[0].total}`)
+  }
+
+  // ── P1-CALC-06 · "วันนี้" ต้องเป็นวันไทย ไม่ใช่วัน UTC ──────────────
+  // ไซต์ที่เริ่มและจบ "วันนี้ตามเวลาไทย" ต้องอ่านได้ว่าเหลือ 0 วัน
+  // 🔴 ตัดสินได้เฉพาะช่วง 17:00–23:59 UTC (= 00:00–06:59 ของวันถัดไปตามเวลาไทย)
+  // ซึ่งเป็นช่วงเดียวที่สองเขตเวลาอยู่คนละวัน · นอกช่วงนั้นสองแบบให้คำตอบ
+  // เหมือนกัน แถวนี้จึงแยกไม่ออกและต้องตอบว่าตัดสินไม่ได้ ไม่ใช่ตอบว่าผ่าน
+  {
+    const bkkToday = new Intl.DateTimeFormat('en-CA', {
+      timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit',
+    }).format(new Date())
+    const hourUtc = new Date().getUTCHours()
+
+    const oneDayId = await mk({
+      name: 'ทดสอบ ไซต์วันเดียว', startDate: bkkToday, endDate: bkkToday,
+    })
+    const html = await page(`/sites/${oneDayId}`, ownerJar)
+    const ok = html.includes('เหลืออีก 0 วัน') && html.includes('100%')
+
+    if (hourUtc < 17) {
+      check('P1-CALC-06 "วันนี้" ผูกกับ Asia/Bangkok ไม่ใช่ UTC', 'skip',
+        `ตอนนี้ ${hourUtc}:xx UTC — สองเขตเวลายังเป็นวันเดียวกัน จึงแยกไม่ออก (หน้าแสดงถูก: ${ok})`)
+    } else {
+      check('P1-CALC-06 "วันนี้" ผูกกับ Asia/Bangkok ไม่ใช่ UTC', ok,
+        `UTC ${new Date().toISOString().slice(0, 10)} · ไทย ${bkkToday} → เหลือ 0 วัน: ${ok}`)
+    }
+  }
+
+  // ── P1-UI-12 · หน้ารายละเอียดแสดงของที่บันทึกไว้จริง ─────────────
+  {
+    const html = await page(`/sites/${mineId}`, ownerJar)
+    const want = ['ทดสอบ ไซต์ที่แก้ชื่อแล้ว', 'หยุดชั่วคราว', '3,500,000',
+      'งวดที่ 1 — วางฐานราก', env.SEED_SUPERVISOR1_NAME, '0891112222']
+    const missing = want.filter((w) => !html.includes(w))
+    check('P1-UI-12 หน้ารายละเอียดแสดงชื่อ · สถานะไทย · ค่างาน · งวด · หัวหน้าไซต์ · เบอร์',
+      missing.length === 0, missing.length ? `ขาด: ${missing.join(', ')}` : '6/6')
+  }
+
+  // ── P1-CALC-05 · ค่างาน 0 ต้องไม่หารด้วยศูนย์ ────────────────────
+  // `othersId` ถูกสร้างโดยไม่ใส่ค่างาน → contract_amount = 0
+  // ครึ่งบวก: ไซต์ที่ตั้งค่างานแล้วต้องแสดงตัวเลข ไม่ใช่ข้อความเดียวกัน
+  {
+    const zero = await page(`/sites/${othersId}`, ownerJar)
+    const some = await page(`/sites/${mineId}`, ownerJar)
+    const noNaN = !/NaN|Infinity/.test(zero)
+    check('P1-CALC-05 ค่างาน 0 → "ยังไม่ได้ตั้งค่างาน" ไม่มี NaN/Infinity · ไซต์ที่ตั้งแล้วโชว์ตัวเลข',
+      zero.includes('ยังไม่ได้ตั้งค่างาน') && noNaN
+      && some.includes('3,500,000') && !some.includes('ยังไม่ได้ตั้งค่างาน'),
+      `ค่างาน 0: ข้อความถูก=${zero.includes('ยังไม่ได้ตั้งค่างาน')} ไม่มี NaN=${noNaN}`)
+  }
+} finally {
+  for (const id of created2) await sql(`delete from public.sites where id = '${id}'`)
+  console.log(`  (ลบไซต์ทดสอบชุดที่สอง ${created2.length} ไซต์แล้ว)`)
+}
+
+// ── P1-CALC · แถบเวลา — ตรรกะบริสุทธิ์ ไม่ต้องมีฐานข้อมูล ────────────
+console.log('\n── P1-CALC · แถบความคืบหน้าตามเวลา ────────────────────────')
+{
+  const { timeProgress } = await import('../src/lib/sites.ts')
+  const pct = (s, e, t) => {
+    const r = timeProgress(s, e, t)
+    return r.kind === 'ok' ? r.percent : r.kind
+  }
+
+  // 1 มี.ค. – 31 ส.ค. = 184 วัน (นับรวมสองปลาย) · วันที่ 30 ส.ค. คือวันที่ 183
+  const r = timeProgress('2026-03-01', '2026-08-31', '2026-08-30')
+  check('P1-CALC-01 ช่วง 1 มี.ค.–31 ส.ค. · วันนี้ 30 ส.ค. → 183/184 วัน = 99%',
+    r.kind === 'ok' && r.totalDays === 184 && r.elapsedDays === 183 && r.percent === 99,
+    r.kind === 'ok' ? `${r.elapsedDays}/${r.totalDays} = ${r.percent}%` : r.kind)
+
+  check('P1-CALC-02 วันนี้อยู่ก่อนวันเริ่ม → 0% ไม่ใช่ค่าติดลบ',
+    pct('2026-03-01', '2026-08-31', '2026-01-15') === 0,
+    `${pct('2026-03-01', '2026-08-31', '2026-01-15')}%`)
+
+  check('P1-CALC-03 วันนี้อยู่หลังวันจบ → 100% ไม่เกิน 100',
+    pct('2026-03-01', '2026-08-31', '2027-01-15') === 100,
+    `${pct('2026-03-01', '2026-08-31', '2027-01-15')}%`)
+
+  check('P1-CALC-04 ไม่ได้ตั้งวันเริ่มหรือวันจบ → unset (ไม่ใช่ 0% ที่อ่านเหมือนยังไม่เริ่ม)',
+    pct(null, '2026-08-31', '2026-08-30') === 'unset'
+    && pct('2026-03-01', null, '2026-08-30') === 'unset'
+    && pct(null, null, '2026-08-30') === 'unset', 'ทั้ง 3 กรณี')
+
+  // 🔴 วันเดียวกันต้องได้ 100% ไม่ใช่หารด้วยศูนย์
+  const one = timeProgress('2026-05-05', '2026-05-05', '2026-05-05')
+  check('P1-CALC-05b งานวันเดียว (เริ่มและจบวันเดียวกัน) → 1/1 วัน = 100% ไม่ใช่ NaN',
+    one.kind === 'ok' && one.totalDays === 1 && one.percent === 100,
+    one.kind === 'ok' ? `${one.elapsedDays}/${one.totalDays} = ${one.percent}%` : one.kind)
+
+  // 🔴 กฎที่แดงได้ทุกเวลา — ต่างจาก P1-CALC-06 ที่ตัดสินได้แค่บางช่วงของวัน
+  // `new Date().toISOString().slice(0,10)` คือวิธีหา "วันนี้" ที่ผิดตั้งแต่
+  // 7 โมงเช้าเวลาไทยของทุกวันบนเซิร์ฟเวอร์ UTC และไม่มีอะไรฟ้อง
+  {
+    const { readFileSync, readdirSync } = await import('node:fs')
+    const { join } = await import('node:path')
+    const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+      e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)])
+    const offenders = walk('src').filter((f) => /\.tsx?$/.test(f)).filter((f) => {
+      const bare = readFileSync(f, 'utf8')
+        .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+      return /toISOString\(\)\s*\.\s*slice\(\s*0\s*,\s*10\s*\)/.test(bare)
+        || /toISOString\(\)\s*\.\s*split\(/.test(bare)
+    })
+    check('P1-CALC-06b ไม่มีที่ไหนหา "วันนี้" ด้วย toISOString() (ซึ่งเป็นวัน UTC)',
+      offenders.length === 0, offenders.length ? offenders.join(', ') : 'ตรวจซอร์สทั้ง src/ แล้ว')
+  }
+}
+
+// ── P1-DB-12 · ทุกคอลัมน์ที่ไม่ใช่ generated ต้องมีโค้ดเขียน ──────────
+// คอลัมน์ที่ schema มีให้แต่ไม่มีใครเขียนลงไป คือฟีเจอร์ที่ออกแบบไว้แล้วไม่ได้สร้าง
+// — `tsc` เขียว หน้าจอปกติ และไม่มีอะไรบอกเลยว่ามันว่างอยู่ตลอดกาล
+{
+  const { readFileSync, readdirSync } = await import('node:fs')
+  const { join } = await import('node:path')
+  const walk = (d) => readdirSync(d, { withFileTypes: true }).flatMap((e) =>
+    e.isDirectory() ? walk(join(d, e.name)) : [join(d, e.name)])
+  const src = walk('src').filter((f) => /\.tsx?$/.test(f))
+    .map((f) => readFileSync(f, 'utf8'))
+    .join('\n')
+    // ตัดคอมเมนต์ก่อน — คอมเมนต์ที่อธิบายคอลัมน์จะทำให้ผ่านโดยไม่มีใครเขียนจริง
+    .replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '')
+    // 🔴 แล้วตัด **สตริง** ทิ้งด้วย — `.select('id, seq, planned_amount, planned_date')`
+    // ทำให้ทุกคอลัมน์ในลิสต์ดูเหมือนถูกเขียน ทั้งที่มันคือการ *อ่าน*
+    // (จับได้ตอน red-test: ลบ `planned_date` ออกจาก payload แล้วแถวยังเขียว)
+    .replace(/'[^'\n]*'/g, "''").replace(/"[^"\n]*"/g, '""').replace(/`[^`]*`/g, '``')
+
+  const COLUMNS = [
+    'name', 'client_name', 'client_phone', 'address', 'contract_amount',
+    'start_date', 'end_date', 'status',
+    'effective_from', 'effective_to',
+    'seq', 'planned_amount', 'planned_date',
+  ]
+
+  // 🔴 `client_name: string | null` ในนิยาม type ก็แมตช์ `client_name:` เหมือนกัน
+  // ปล่อยไว้แถวนี้จะเขียวเพราะ "มีคนประกาศชนิดของคอลัมน์" ไม่ใช่เพราะมีคนเขียนค่า
+  // จึงต้องตัดรูปแบบที่ตามด้วยคำที่เป็นชนิดข้อมูลออก และยอมรับรูปย่อ (`name,`) ด้วย
+  // 🔴 `:\s*(?!string)` ใช้ไม่ได้ — `\s*` ถอยกลับไปแมตช์ศูนย์ตัวได้ แล้ว lookahead
+  // จะไปตรวจที่ตัวเว้นวรรค ซึ่งไม่ใช่ `string` จึงผ่านตลอด · ต้อง **จับค่า**
+  // ที่อยู่หลังโคลอนออกมาเทียบตรง ๆ (เจอตอน red-test: ลบ payload ออกแล้วยังเขียว)
+  const TYPE_WORDS = new Set([
+    'string', 'number', 'boolean', 'unknown', 'null', 'Date', 'SiteStatus', 'ReactNode',
+  ])
+  const writes = (c) => {
+    const re = new RegExp(`\\b${c}\\s*(?:(,)|:\\s*([^\\s,;}]+))`, 'g')
+    let m
+    while ((m = re.exec(src)) !== null) {
+      if (m[1]) return true                                  // รูปย่อ `name,`
+      if (!TYPE_WORDS.has(m[2])) return true                 // `name: <ค่าจริง>`
+    }
+    return false
+  }
+  const orphans = COLUMNS.filter((c) => !writes(c))
+  check('P1-DB-12 ทุกคอลัมน์ของ P1 มีโค้ดที่เขียนค่าลงไปจริง',
+    orphans.length === 0, orphans.length ? `ไม่มีใครเขียน: ${orphans.join(', ')}` : `${COLUMNS.length} คอลัมน์`)
+}
+
 console.log('\n══════════════════════════════════════════════')
 const pass = results.filter((r) => r.ok === true).length
 const skip = results.filter((r) => r.ok === 'skip').length

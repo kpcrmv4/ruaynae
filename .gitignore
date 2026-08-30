@@ -1,0 +1,36 @@
+# ── ความลับ — ต้องอยู่บนสุด ────────────────────────────────────────
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# ── Node / Next ─────────────────────────────────────────────────────
+node_modules/
+.next/
+out/
+build/
+dist/
+*.tsbuildinfo
+next-env.d.ts
+
+# ── เครื่องมือ ──────────────────────────────────────────────────────
+.vercel/
+.turbo/
+coverage/
+playwright-report/
+test-results/
+.supabase/
+
+# ── ระบบปฏิบัติการ / บรรณาธิการ ─────────────────────────────────────
+.DS_Store
+Thumbs.db
+*.log
+npm-debug.log*
+.idea/
+.vscode/*
+!.vscode/extensions.json
+
+# แคชของเครื่องมือ
+.impeccable/
+.loop/tmp/

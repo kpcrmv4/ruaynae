@@ -1,0 +1,7 @@
+# เก็บ LF ใน working tree เสมอ — CRLF ทำให้สคริปต์หลายบรรทัดและ patch พังบน Windows
+* text=auto eol=lf
+*.png binary
+*.jpg binary
+*.webp binary
+*.pdf binary
+*.ttf binary

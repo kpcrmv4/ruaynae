@@ -74,6 +74,21 @@
   ส่งอีเมลจากโดเมนเรา และรอ policy ที่เขียนว่า `authenticated` เฉย ๆ สักอันเพื่อกลายเป็นรู
 - **เจ้าของกฎ:** `nextjs-supabase-ssr-auth`
 
+## Supabase MCP เชื่อมต่อได้ แต่ชี้ไปที่ project ref ชื่อ `${SUPABASE_PROJECT_REF}`
+
+- **สาเหตุจริง:** ไฟล์ config ของ MCP server เขียน `${SUPABASE_PROJECT_REF}` ไว้เป็น placeholder
+  แต่ไม่มีอะไรแทนค่าให้ · ตัว MCP เลยรับสตริงนั้นมาตรง ๆ เป็นชื่อโปรเจ็ค
+  **เครื่องมือตอบสนองเป็นปกติทุกอย่าง** — ไม่ crash ไม่แจ้งว่าตั้งค่าผิด
+- **หลักฐาน:** `get_project_url` คืน `https://${SUPABASE_PROJECT_REF}.supabase.co`
+  (ควรเป็น `https://zvzaepnyxihyzheihwhz.supabase.co`) · `list_tables` คืน
+  `Invalid project ref: ${SUPABASE_PROJECT_REF}`
+- **กฎกันซ้ำ:** ก่อนแตะฐานข้อมูลทุกครั้ง เทียบ `get_project_url` กับ
+  `NEXT_PUBLIC_SUPABASE_URL` ใน `.env.local` — **เทียบค่าจริง ไม่ใช่ดูว่าเครื่องมือตอบกลับมาไหม**
+  · และเตรียมทางสำรองที่ยิง Management API ตรงเสมอ โดยให้ `.env.local` **ชนะ**
+  ตัวแปรของเชลล์ (เชลล์อาจถือ token ของโปรเจ็คอื่นอยู่ → ได้ 403 ที่หาสาเหตุยากมาก)
+  · ที่อันตรายกว่าคือถ้า placeholder ดันไปตรงกับ ref จริงของโปรเจ็คอื่น จะเขียนผิดฐานข้อมูลเงียบ ๆ
+- **เจ้าของกฎ:** `setup-supabase-mcp` (ตัวที่เขียน config) · `supabase-rls-schema` (ขั้นตอน verify-then-apply)
+
 ## รายงานว่า "tsc เขียว" ทั้งที่ tsc แดง
 
 - **สาเหตุจริง:** ต่อ `| tail -20` ท้ายคำสั่ง · ใน bash exit code ของ pipeline คือของ

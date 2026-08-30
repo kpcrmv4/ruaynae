@@ -60,8 +60,25 @@
         },
         {
           "id": "P0-10",
-          "t": "หน้า login อีเมล + PIN (rate-limited) · คุกกี้ผูกกับ response",
-          "s": "todo"
+          "t": "หน้า login + API routes (แบ่ง 3 ก้อน)",
+          "s": "doing",
+          "sub": [
+            {
+              "id": "P0-10a",
+              "t": "ตาราง login_attempts + seed ผู้ใช้ + verify-rls",
+              "s": "done"
+            },
+            {
+              "id": "P0-10b",
+              "t": "API routes: login / pin / logout / demo",
+              "s": "todo"
+            },
+            {
+              "id": "P0-10c",
+              "t": "หน้า /login (แป้น PIN + แท็บอีเมล)",
+              "s": "todo"
+            }
+          ]
         },
         {
           "id": "P0-11",

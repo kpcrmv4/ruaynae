@@ -280,6 +280,15 @@
            disabled:pointer-events-none disabled:opacity-50;
   }
 
+  /* แป้นตัวเลขของหน้าล็อกอิน — ปุ่มต้องใหญ่พอสำหรับนิ้วโป้งกลางไซต์
+     44px คือขั้นต่ำที่แตะไม่พลาด ตรงนี้ให้ใหญ่กว่านั้นเพราะเป็นงานหลักของหน้า */
+  .keypad-key {
+    @apply flex items-center justify-center rounded-md border border-line-strong bg-surface
+           py-3.5 text-xl font-semibold text-ink transition-colors duration-100
+           hover:border-brand hover:bg-brand-tint active:scale-[.97]
+           disabled:pointer-events-none disabled:opacity-40;
+  }
+
   .input-base {
     @apply w-full rounded-md border border-line-strong bg-surface px-3 py-2.5 text-base text-ink
            transition-colors duration-150 placeholder:text-muted-token focus:border-brand

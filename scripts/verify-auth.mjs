@@ -117,6 +117,32 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
   check(`${id} ${path} ไม่ถูก redirect ไป /login`, r.status !== 307, `${r.status}`)
 }
 
+// P0-AUTH-08 + P0-API-07 · วงจรเต็ม: เข้า → /login เด้งกลับ → ออก → / เด้งไป /login
+// ต้องยิงจาก node เพราะเบราว์เซอร์ปิดสถานะของ opaque redirect ไม่ให้ JS อ่าน
+{
+  const login = await post('/api/auth/login', {
+    email: env.SEED_OWNER_EMAIL,
+    password: env.SEED_OWNER_PASSWORD,
+  })
+  // เก็บเฉพาะ name=value ไม่เอา attribute ต่อท้าย
+  const jar = (login.headers.getSetCookie?.() ?? [])
+    .map((c) => c.split(';')[0])
+    .join('; ')
+
+  const atLogin = await fetch(`${BASE}/login`, { redirect: 'manual', headers: { cookie: jar } })
+  check('P0-API-07 ล็อกอินแล้วเปิด /login → 307 กลับ / (ไม่วนซ้ำ)',
+    atLogin.status === 307 && new URL(atLogin.headers.get('location'), BASE).pathname === '/',
+    `${atLogin.status} → ${atLogin.headers.get('location')}`)
+
+  const out = await post('/api/auth/logout', {}, { cookie: jar })
+  const outJar = (out.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+  const afterOut = await fetch(`${BASE}/`, { redirect: 'manual', headers: { cookie: outJar } })
+  check('P0-AUTH-08 ออกจากระบบ → 200 · แล้วเปิด / ได้ 307 ไป /login',
+    out.status === 200 && afterOut.status === 307 &&
+      (afterOut.headers.get('location') ?? '').includes('/login'),
+    `logout ${out.status} · / หลังออก ${afterOut.status} → ${afterOut.headers.get('location')}`)
+}
+
 // P0-AUTH-10/11 · สวิตช์ปุ่มเดโม่เป็น opt-in
 // ตรวจได้ทีละขั้วต่อการรันหนึ่งครั้ง เพราะ Next อ่าน env ตอนสตาร์ตเซิร์ฟเวอร์
 // อีกขั้วรันด้วย:  ENABLE_DEMO_LOGIN=0 npx next dev -p 3100

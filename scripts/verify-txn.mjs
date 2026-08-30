@@ -306,7 +306,7 @@ try {
       const after = await txnCount()
       if (!(re.test(msgOf(r)) && after === before)) bad.push(`${label} → ${r.status} ${msgOf(r).slice(0, 40)}`)
     }
-    check('P2-DB-12/13/14 constraint ปฏิเสธค่าที่เป็นไปไม่ได้ · ไม่มีแถวใหม่',
+    check('P2-DB-12 P2-DB-13 P2-DB-14 constraint ปฏิเสธค่าที่เป็นไปไม่ได้ · ไม่มีแถวใหม่',
       bad.length === 0, bad.length ? bad.join(' · ') : '3/3')
   }
 } finally {
@@ -321,6 +321,209 @@ try {
   await sql("delete from public.transactions where site_id is null and amount = 777")
   console.log('  (ลบข้อมูลทดสอบแล้ว)')
 }
+
+// ══════════════════════════════════════════════════════════════════════
+// P2-API / P2-UI · ฟอร์มบันทึกและ endpoint (ต้องมี dev server รันอยู่)
+// ══════════════════════════════════════════════════════════════════════
+console.log('\n── P2-API / P2-UI · ฟอร์มบันทึก ────────────────────────────')
+
+const BASE = process.argv[2] ?? 'http://localhost:3100'
+const req = (method, path, body, headers = {}) =>
+  fetch(`${BASE}${path}`, {
+    method, redirect: 'manual',
+    headers: { 'Content-Type': 'application/json', ...headers },
+    ...(body === undefined ? {} : { body: JSON.stringify(body) }),
+  })
+const jarOf = (r) => (r.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
+const page = async (path, cookie) => (await fetch(`${BASE}${path}`, { headers: { cookie } })).text()
+
+const ownerJar = jarOf(await req('POST', '/api/auth/login', {
+  email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }))
+const supJar = jarOf(await req('POST', '/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN }))
+if (!ownerJar || !supJar) throw new Error('ล็อกอินไม่สำเร็จ — dev server รันอยู่ไหม')
+
+let apiSite = null
+let apiOther = null
+const apiTxns = []
+try {
+  ;[{ id: apiSite }] = (await sql(
+    `insert into public.sites(name) values ('ทดสอบ P2API ไซต์ของหัวหน้า') returning id`)).rows
+  ;[{ id: apiOther }] = (await sql(
+    `insert into public.sites(name) values ('ทดสอบ P2API ไซต์คนอื่น') returning id`)).rows
+  await sql(`insert into public.site_supervisors(site_id, profile_id)
+             values ('${apiSite}','${sup1.id}')`)
+
+  const txnCount = async () =>
+    (await sql('select count(*)::int as n from public.transactions')).rows[0].n
+
+  const create = async (jar, over = {}) => {
+    const r = await req('POST', '/api/transactions', {
+      kind: 'expense', siteId: apiSite, categoryId: expCat.id,
+      amount: 1200, txnDate: today, payMethod: 'cash', ...over,
+    }, { cookie: jar })
+    const b = await r.json().catch(() => ({}))
+    if (b.transaction?.id) apiTxns.push(b.transaction.id)
+    return { status: r.status, body: b }
+  }
+
+  // ── P2-API-01 · ทุก endpoint ตอนไม่ล็อกอิน ────────────────────────
+  {
+    const seed = await create(ownerJar, { amount: 111 })
+    const id = seed.body.transaction?.id
+    const calls = [
+      ['POST', '/api/transactions', { kind: 'expense' }],
+      ['PATCH', `/api/transactions/${id}`, { action: 'approve' }],
+      ['DELETE', `/api/transactions/${id}`, undefined],
+    ]
+    const bad = []
+    for (const [m, path, body] of calls) {
+      const r = await req(m, path, body)
+      const ct = r.headers.get('content-type') ?? ''
+      if (r.status !== 401 || !ct.includes('application/json')) bad.push(`${m} → ${r.status}`)
+    }
+    check('P2-API-01 ทุก endpoint ตอนไม่ล็อกอิน → 401 JSON (ไม่ใช่ 307)',
+      bad.length === 0, bad.length ? bad.join(' · ') : '3/3')
+  }
+
+  // ── P2-API-02 · หัวหน้าไซต์บันทึกรายรับ ───────────────────────────
+  {
+    const before = await txnCount()
+    const r = await create(supJar, { kind: 'income', categoryId: incCat.id, incomeKind: 'deposit' })
+    const after = await txnCount()
+    check('P2-API-02 หัวหน้าไซต์ POST รายรับ → 403 INCOME_FORBIDDEN · ไม่มีแถวใหม่',
+      r.status === 403 && r.body.error === 'INCOME_FORBIDDEN' && after === before,
+      `${r.status} ${r.body.error} · ${before}→${after}`)
+  }
+
+  // ── P2-API-07 · status ที่ client ส่งมาถูกเพิกเฉย ─────────────────
+  let supTxn = null
+  {
+    const r = await create(supJar, { status: 'approved', amount: 333 })
+    supTxn = r.body.transaction?.id
+    const { rows } = await sql(
+      `select status::text as s from public.transactions where id='${supTxn}'`)
+    check('P2-API-07 หัวหน้าไซต์ส่ง status=approved มาด้วย → ถูกเพิกเฉย แถวเป็น pending',
+      r.status === 201 && rows[0].s === 'pending', `${r.status} · สถานะ ${rows[0].s}`)
+  }
+
+  // ── P2-API-03 · หัวหน้าไซต์อนุมัติผ่าน API ────────────────────────
+  {
+    const r = await req('PATCH', `/api/transactions/${supTxn}`,
+      { action: 'approve' }, { cookie: supJar })
+    const b = await r.json().catch(() => ({}))
+    const { rows } = await sql(
+      `select status::text as s from public.transactions where id='${supTxn}'`)
+    check('P2-API-03 หัวหน้าไซต์ PATCH approve → 403 · สถานะยัง pending',
+      r.status === 403 && rows[0].s === 'pending', `${r.status} ${b.error} · ${rows[0].s}`)
+  }
+
+  // ── P2-API-04 · PATCH รายการที่ไม่มีอยู่ ──────────────────────────
+  {
+    const r = await req('PATCH', '/api/transactions/00000000-0000-0000-0000-000000000000',
+      { action: 'approve' }, { cookie: ownerJar })
+    const b = await r.json().catch(() => ({}))
+    check('P2-API-04 PATCH รายการที่ไม่มีอยู่ → 404 NOT_FOUND',
+      r.status === 404 && b.error === 'NOT_FOUND', `${r.status} ${b.error}`)
+  }
+
+  // ── P2-API-05 / 06 / UI-07 · การตรวจ payload ──────────────────────
+  {
+    const cases = [
+      ['P2-API-05 ปี พ.ศ.', { txnDate: '2569-08-30' }, 'DATE_BUDDHIST_ERA'],
+      ['P2-API-06 วันในอนาคต', { txnDate: '2099-01-01' }, 'DATE_FUTURE'],
+      ['P2-UI-07 ไม่ใส่จำนวนเงิน', { amount: 0 }, 'AMOUNT_INVALID'],
+    ]
+    const bad = []
+    for (const [label, over, code] of cases) {
+      const before = await txnCount()
+      const r = await create(ownerJar, over)
+      const after = await txnCount()
+      if (!(r.status === 400 && r.body.error === code && after === before)) {
+        bad.push(`${label} → ${r.status} ${r.body.error}`)
+      }
+    }
+    check('P2-API-05 P2-API-06 P2-UI-07 payload ที่ผิดถูกปฏิเสธพร้อมรหัสเหตุผล · ไม่มีแถวใหม่',
+      bad.length === 0, bad.length ? bad.join(' · ') : '3/3')
+  }
+
+  // ── P2-API-08 · กดสองครั้งพร้อมกัน ────────────────────────────────
+  // 🔴 ยิงพร้อมกันจริง ไม่ใช่ยิงต่อกัน — การกดซ้ำที่อันตรายคือตอนที่คำขอแรก
+  // ยังไม่ตอบกลับ ซึ่งเป็นจังหวะที่ปุ่ม disabled ยังไม่ทันมีผล
+  {
+    const ref = crypto.randomUUID()
+    const before = await txnCount()
+    const body = {
+      kind: 'expense', siteId: apiSite, categoryId: expCat.id,
+      amount: 4242, txnDate: today, payMethod: 'cash', clientRef: ref,
+    }
+    const [a, b] = await Promise.all([
+      req('POST', '/api/transactions', body, { cookie: ownerJar }),
+      req('POST', '/api/transactions', body, { cookie: ownerJar }),
+    ])
+    const after = await txnCount()
+    const { rows } = await sql(
+      `select id from public.transactions where client_ref='${ref}'`)
+    for (const r of rows) apiTxns.push(r.id)
+    check('P2-API-08 ยิงบันทึกซ้ำพร้อมกันด้วย clientRef เดิม → เพิ่มแถวเดียว · ทั้งคู่ไม่ error',
+      after === before + 1 && rows.length === 1 && a.status < 400 && b.status < 400,
+      `${before}→${after} · แถวที่มี ref นี้ ${rows.length} · ${a.status}/${b.status}`)
+  }
+
+  // ── P2-UI-01 / 02 · ฟอร์มต่างกันตาม role ──────────────────────────
+  {
+    const sup = await page('/entry', supJar)
+    const own = await page('/entry', ownerJar)
+    check('P2-UI-01 P2-UI-02 หัวหน้าไซต์ไม่มีปุ่มสลับไปรายรับ · เจ้าของมีทั้งสองปุ่ม',
+      !sup.includes('aria-pressed') && sup.includes('บันทึกรายจ่าย')
+      && own.includes('aria-pressed') && own.includes('รายรับ'),
+      `หัวหน้าไซต์มีปุ่มสลับ=${sup.includes('aria-pressed')} · เจ้าของมี=${own.includes('aria-pressed')}`)
+  }
+
+  // ── P2-UI-03 / 04 · ตัวเลือกไซต์ ──────────────────────────────────
+  {
+    const sup = await page('/entry', supJar)
+    const own = await page('/entry', ownerJar)
+    check('P2-UI-03 P2-UI-04 หัวหน้าไซต์เห็นเฉพาะไซต์ตัวเองและไม่มี "ส่วนกลาง" · เจ้าของมีครบ',
+      sup.includes('ทดสอบ P2API ไซต์ของหัวหน้า')
+      && !sup.includes('ทดสอบ P2API ไซต์คนอื่น')
+      && !sup.includes('ส่วนกลาง (ไม่ผูกไซต์)')
+      && own.includes('ทดสอบ P2API ไซต์คนอื่น')
+      && own.includes('ส่วนกลาง (ไม่ผูกไซต์)'),
+      'ตรวจทั้งฝั่งมีและฝั่งไม่มี')
+  }
+
+  // ── P2-UI-05 · หมวดกรองตามชนิด ────────────────────────────────────
+  // ค่าเริ่มต้นของฟอร์มคือรายจ่าย → HTML ที่เซิร์ฟเวอร์เรนเดอร์ต้องมีแต่หมวดรายจ่าย
+  // (การสลับไปรายรับเป็นงานของเบราว์เซอร์ ตรวจที่ P8)
+  {
+    const own = await page('/entry', ownerJar)
+    // 🔴 อ่านจาก **ธาตุที่เป็นเจ้าของค่า** ไม่ใช่จากทั้งหน้า
+    // ชื่อหมวดทุกหมวดถูกส่งเป็น prop ให้คอมโพเนนต์ฝั่ง client จึงโผล่อยู่ใน
+    // payload ที่ฝังมากับ HTML ด้วยเสมอ — ตรวจทั้งหน้าจะแดงตลอดกาลทั้งที่
+    // กล่องเลือกแสดงถูกต้อง (ตกหลุมเดิมกับที่บันทึกไว้ใน LESSONS แล้วครั้งหนึ่ง)
+    const open = own.indexOf('<select id="category"')
+    const block = open === -1 ? '' : own.slice(open, own.indexOf('</select>', open))
+    const { rows: names } = await sql(
+      "select name, kind::text as k from public.categories where is_active")
+    const expNames = names.filter((n) => n.k === 'expense').map((n) => n.name)
+    const incNames = names.filter((n) => n.k === 'income').map((n) => n.name)
+    const missingExp = expNames.filter((n) => !block.includes(n))
+    const leakedInc = incNames.filter((n) => block.includes(n))
+    check('P2-UI-05 กล่องหมวดมีแต่หมวดรายจ่ายครบทุกตัว และไม่มีหมวดรายรับปนมา',
+      block !== '' && missingExp.length === 0 && leakedInc.length === 0,
+      `พบกล่อง=${block !== ''} · ขาดรายจ่าย ${missingExp.length} · รายรับปน ${leakedInc.length}`)
+  }
+} finally {
+  for (const id of apiTxns) await sql(`delete from public.transactions where id = '${id}'`)
+  for (const id of [apiSite, apiOther]) {
+    if (id) {
+      await sql(`delete from public.transactions where site_id = '${id}'`)
+      await sql(`delete from public.sites where id = '${id}'`)
+    }
+  }
+  console.log('  (ลบข้อมูลทดสอบฝั่ง API แล้ว)')
+}
+
 
 // ── P2-DB-15 · ทุกตารางเปิด RLS ────────────────────────────────────────
 {

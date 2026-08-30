@@ -332,3 +332,57 @@
   :root { color-scheme: light; }
   .no-print { display: none !important; }
 }
+
+/* ══════════════════════════════════════════════════════════════════════
+   อนิเมชั่น — DESIGN.md §8
+   150–380ms · เฉพาะ transform/opacity · เส้นโค้งเดียวทั้งระบบ
+   `will-change` ไม่ต้องใส่: transform/opacity ขึ้น compositor อยู่แล้ว
+   ใส่ไปกลับกินหน่วยความจำ GPU ต่อทุกแถวในลิสต์
+   ══════════════════════════════════════════════════════════════════════ */
+@theme inline {
+  --ease-out-quart: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@keyframes kp-fade-in { from { opacity: 0 } to { opacity: 1 } }
+
+/* โมดัล: ขึ้นมา 8px พร้อมย่อเล็กน้อย — ไม่ใช่เด้ง
+   translate ต้องคง -50% ทั้งสองแกนไว้ ไม่งั้นกล่องจะกระโดดออกจากกลางจอ */
+@keyframes kp-pop-in {
+  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)) scale(0.98) }
+  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+}
+
+/* แถวในลิสต์และการ์ดสรุป — ไล่ขึ้นมาทีละใบ */
+@keyframes kp-rise-in {
+  from { opacity: 0; transform: translateY(6px) }
+  to   { opacity: 1; transform: none }
+}
+
+/* แถบความคืบหน้า — วิ่งจากซ้าย ต้องคู่กับ transform-origin: left */
+@keyframes kp-grow-x {
+  from { transform: scaleX(0) }
+  to   { transform: scaleX(1) }
+}
+
+@layer components {
+  .animate-fade-in { animation: kp-fade-in 180ms var(--ease-out-quart) both; }
+  .animate-pop-in  { animation: kp-pop-in 220ms var(--ease-out-quart) both; }
+  .animate-rise-in { animation: kp-rise-in 300ms var(--ease-out-quart) both; }
+  .animate-grow-x  { animation: kp-grow-x 380ms var(--ease-out-quart) both;
+                     transform-origin: left center; }
+}
+
+/*
+  ปิดทั้งหมดเมื่อผู้ใช้ขอ — ไม่ใช่แค่ทำให้เร็วขึ้น
+  🔴 `animation: none` ทำให้ธาตุที่พึ่ง `both` เพื่อคง state สุดท้ายหายไปเลย
+  (เช่นแถบที่ scaleX(0) ตอนเริ่ม) จึงต้องใช้ระยะเวลาสั้นมากแทน
+  ให้ค่าปลายทางถูกเขียนลงจริงโดยตาไม่ทันเห็นการเคลื่อนไหว
+*/
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+}

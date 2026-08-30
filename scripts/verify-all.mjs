@@ -24,7 +24,7 @@ const clearAttempts = async () => {
   }).catch(() => {})
 }
 
-const SCRIPTS = ['verify-p0', 'verify-rls', 'verify-auth', 'verify-r2', 'verify-users', 'verify-sites']
+const SCRIPTS = ['verify-p0', 'verify-rls', 'verify-auth', 'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api']
 
 let pass = 0
 let fail = 0

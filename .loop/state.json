@@ -1,5 +1,5 @@
 {
-  "updated": "2026-08-30 (P4-a เสร็จ · 9acc45d)",
+  "updated": "2026-08-30 (P4-b เสร็จ)",
   "note": "สถานะจริงยืนยันด้วย git log เสมอ — ถ้าไฟล์นี้ขัดกับ git ให้เชื่อ git",
   "gate": "npm run gate",
   "phases": [
@@ -227,7 +227,7 @@
         {
           "id": "P4-b",
           "t": "แท็บคนงานใน /settings/users — CRUD + ค่าแรงรายคน",
-          "s": "todo"
+          "s": "done"
         },
         {
           "id": "P4-c",

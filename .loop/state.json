@@ -46,12 +46,12 @@
         {
           "id": "P0-7",
           "t": "Supabase clients 4 ตัว (browser/server/admin/middleware)",
-          "s": "todo"
+          "s": "done"
         },
         {
           "id": "P0-8",
           "t": "src/proxy.ts + matcher ยกเว้น /api/*, /sw.js, /manifest.webmanifest",
-          "s": "todo"
+          "s": "done"
         },
         {
           "id": "P0-9",
@@ -145,6 +145,16 @@
       "what": "commit บล็อก nextjs-agent-rules ที่ next dev ต่อท้าย CLAUDE.md",
       "why": "ลบแล้ว next dev สร้างใหม่ทุกครั้ง ทำให้ git status ไม่มีวันสะอาด",
       "cost_if_wrong": "ไม่มี"
+    },
+    {
+      "what": "เปลี่ยนสวิตช์เดโม่จาก NEXT_PUBLIC_DEMO_LOGIN (opt-out) เป็น ENABLE_DEMO_LOGIN (opt-in ฝั่งเซิร์ฟเวอร์)",
+      "why": "ขั้ว opt-out ทำให้ทุก preview branch / fork / env ที่ลืมตั้งค่ากลายเป็นประตูสาธารณะเข้าแอปโดยปริยาย · ฝาแฝด NEXT_PUBLIC_ ยัง drift จาก route ได้",
+      "cost_if_wrong": "ไม่มี — ถ้าอยากเปิดเดโม่ก็แค่เพิ่มตัวแปร"
+    },
+    {
+      "what": "เก็บ PIN เป็นข้อความจริง + revoke select (pin) แทน hash แบบ deterministic",
+      "why": "เจ้าของต้องดู PIN ที่ลูกน้องลืมได้ ซึ่ง hash ทำไม่ได้ · ความไม่ซ้ำยังบังคับด้วย unique index เหมือนเดิม และรหัสผ่าน auth ยัง derive จาก pepper",
+      "cost_if_wrong": "ปานกลาง — ถ้าเปลี่ยนใจภายหลังต้อง migrate คอลัมน์และ reset PIN ทุกคน"
     }
   ],
   "blocked": [],

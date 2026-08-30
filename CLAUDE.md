@@ -76,7 +76,7 @@ create type payroll_status as enum ('open','closed');
 |---|---|---|
 | `branding` | แถวเดียว: `company_name`, `logo_object_key`, `updated_at` | **`anon` SELECT ได้** (หน้า login ต้องอ่านตอนยังไม่ล็อกอิน) · UPDATE เฉพาะ owner |
 | `app_settings` | แถวเดียว: ที่อยู่, เลขผู้เสียภาษี, ผู้ลงนาม, นโยบายเก็บรูป ฯลฯ | **owner เท่านั้น ทั้งอ่านและเขียน** |
-| `profiles` | `id → auth.users`, `full_name`, `role`, `pin_hash`, `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
+| `profiles` | `id → auth.users`, `full_name`, `role`, `pin` (ข้อความจริง + `revoke select (pin)`), `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
 | `sites` | `name`, `client_name`, `contract_amount`, `start_date`, `end_date`, `status` | owner ทั้งหมด · supervisor อ่านเฉพาะไซต์ที่ดูแล |
 | `site_supervisors` | `site_id`, `profile_id`, **`effective_from`, `effective_to`** | owner เขียน · supervisor อ่านแถวตัวเอง |
 | `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date`, `collected_txn_id` | ตามไซต์ |
@@ -269,13 +269,28 @@ Admin API ด้วย `SUPABASE_SECRET_KEY` ซึ่งไม่ได้ถ�
   ของเราได้ — กิน MAU ส่งอีเมลยืนยันจากโดเมนเรา และกลายเป็นรูทันทีถ้ามี policy ไหนเขียนว่า `authenticated`
   เฉย ๆ โดยไม่เช็ค `profiles` · **ตรวจแล้วเมื่อ 30 ส.ค. 2569 พบว่ายังเปิดอยู่ (`disable_signup: false`)**
 - **route ที่ sign-in ฝั่งเซิร์ฟเวอร์ต้องผูกคุกกี้กับ `response` object** ไม่ใช่เขียนผ่าน `cookies()` ของ `next/headers`
-- route PIN ต้อง **rate-limit ตั้งแต่วันแรก** · PIN เก็บเป็น hash + `PIN_PEPPER`
+- route PIN ต้อง **rate-limit ตั้งแต่วันแรก** (ต่อ IP *และ* ต่อบัญชีเป้าหมาย · เก็บใน
+  ตาราง `login_attempts` ไม่ใช่ map ในหน่วยความจำ เพราะ serverless มีหลาย instance)
 - ⚠️ **PIN ต้องไม่ซ้ำกันระหว่างผู้ใช้** — หน้าล็อกอินมีแต่แป้นตัวเลข ไม่ได้ถามว่าคุณคือใคร
-  ระบบจึงระบุตัวตนจาก PIN อย่างเดียว · PIN ซ้ำ = ล็อกอินแล้วได้บัญชีของคนอื่น
-  → hash แบบ **deterministic** (HMAC + `PIN_PEPPER` ไม่ใช่ bcrypt ที่ salt สุ่มทุกครั้ง)
-  แล้วใส่ **unique index** บน `pin_hash` · ตอนสร้าง/แก้ผู้ใช้ ถ้า PIN ซ้ำต้องปฏิเสธพร้อมบอกเหตุผล
-  → deterministic hash ปลอดภัยพอเพราะ **pepper อยู่ใน env ไม่ได้อยู่ในฐานข้อมูล** — ต่อให้ DB รั่ว
-  ก็ยังไล่เดา 6 หลักไม่ได้ถ้าไม่มี pepper · แต่ต้องมี rate limit เสมอ เพราะ 6 หลักมีแค่ล้านความเป็นไปได้
+  ระบบจึงระบุตัวตนจาก PIN อย่างเดียว · PIN ซ้ำ = กดแล้วเข้าไปเป็นบัญชีของคนอื่น
+
+  **วิธีเก็บ:** `profiles.pin` เก็บเป็น **ข้อความจริง** + `unique index` +
+  `revoke select (pin) on profiles from anon, authenticated` → เหลือแค่ service-role ที่อ่านได้
+  · รหัสผ่านของ `auth.users` **derive จาก PIN + `PIN_PEPPER` แบบ deterministic**
+  (`lib/pin.ts`) เพื่อให้ล็อกอินผ่าน `signInWithPassword` ปกติได้
+
+  *ทำไมไม่เก็บเป็น hash:* เจ้าของต้อง **ดู** PIN ที่ลูกน้องลืมได้ ซึ่ง hash ทำไม่ได้
+  · ที่ปลอดภัยพอเพราะคอลัมน์ถูก revoke ไว้ และ pepper อยู่ใน env ไม่ได้อยู่ในฐานข้อมูล
+  · แต่ **ต้องมี rate limit เสมอ** เพราะ 6 หลักมีแค่ล้านความเป็นไปได้
+
+  ⚠️ **ผลข้างเคียงของ column grant:** `select('*')` บน `profiles` จะพังทันที
+  ทุก query ต้องระบุคอลัมน์เอง — เก็บเป็นค่าคงที่ `PROFILE_COLS` ที่ไม่มี `pin`
+- ⚠️ **อีเมลสังเคราะห์ของบัญชี PIN ห้ามโผล่บนหน้าจอ** — คนใช้ไม่เคยพิมพ์มันและมันรับเมลไม่ได้
+  ให้แสดงชื่อคนแทน และไม่ต้องมีปุ่มเปลี่ยนอีเมลให้บัญชีแบบนี้
+- ⚠️ **ปุ่มเข้าใช้แบบเดโม่เป็น opt-in เท่านั้น** — `ENABLE_DEMO_LOGIN=1` (ฝั่งเซิร์ฟเวอร์ ห้ามมีฝาแฝด
+  `NEXT_PUBLIC_` ที่ drift จาก route ได้) · ไม่ตั้ง = route ตอบ **`404`** (ไม่ใช่ `403` ซึ่งยืนยันว่า route มีอยู่)
+  และหน้า login ไม่เรนเดอร์ปุ่ม · ขั้ว opt-in สำคัญเพราะทุกที่ที่ลืมตั้งค่าจะอยู่ในสถานะ**ปิด**
+  ถ้าใช้ขั้ว opt-out ทุก preview branch และทุก fork จะเปิดประตูสาธารณะเข้าแอปโดยปริยาย
 - `signOut` ใช้ scope `'local'`
 - **destructure `error` จากทุก call ของ Supabase** — error ที่ไม่ถูกเช็คคือการเขียนที่เงียบหายไปโดยแอปรายงานว่าสำเร็จ
 - การเปลี่ยนรหัสผ่าน/PIN ด้วยตัวเอง **ต้องถามค่าปัจจุบัน**
@@ -418,10 +433,13 @@ SEED_SUPERVISOR1_PIN=
 SEED_SUPERVISOR2_NAME=
 SEED_SUPERVISOR2_PIN=
 
-NEXT_PUBLIC_DEMO_LOGIN=1                 # 1 = โชว์ปุ่มเข้าใช้แบบเดโม่ · production ต้องเป็น 0
+ENABLE_DEMO_LOGIN=1                      # opt-in เท่านั้น · ไม่ตั้ง = route ตอบ 404 + ปุ่มไม่เรนเดอร์
+#                                          ห้ามมีฝาแฝด NEXT_PUBLIC_ (จะ drift จาก route ได้)
 ```
 
-**เช็คก่อน deploy** — `SEED_*` ทั้งหมดต้องไม่มีใน Vercel และ `NEXT_PUBLIC_DEMO_LOGIN` ต้องเป็น `0`
+**เช็คก่อน deploy** — `SEED_*` และ `ENABLE_DEMO_LOGIN` ต้อง **ไม่มีอยู่เลย** ใน Vercel
+(ขั้วเป็น opt-in: ไม่มีตัวแปร = ปิด · ถ้าใช้ขั้ว opt-out ทุก preview branch และทุก fork
+ที่ไม่ได้ตั้งค่าจะกลายเป็นประตูสาธารณะเข้าแอปโดยปริยาย)
 ให้ P8 เขียนสคริปต์ตรวจข้อนี้ ไม่ใช่จำเอา
 
 ⚠️ **ห้ามเขียนทับค่าที่มีอยู่แล้ว** — สร้าง VAPID ใหม่ = subscription ของทุกเครื่องตายหมด

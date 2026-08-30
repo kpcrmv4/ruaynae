@@ -173,8 +173,17 @@ const srcClean = srcFiles.map((f) => ({ f, code: stripComments(readFileSync(f, '
   // ต้องจับ error ในตำแหน่ง **destructure** เท่านั้น: `const { ..., error } = await`
   const usesSupabase = ({ code }) =>
     /@\/lib\/supabase\/|@supabase\//.test(code) && /\.(from|rpc)\s*\(/.test(code)
+  // ⚠️ ร่างที่สามยังแคบไป: จับแค่ `const { ... error ... } =` จึงแดงใส่
+  // `const [{ data, error: aErr }, { data, error: bErr }] = await Promise.all([...])`
+  // ซึ่งเป็นการยิงสอง query พร้อมกัน — เช็ค error ครบทั้งคู่ แต่ pattern
+  // เริ่มด้วย `[` ไม่ใช่ `{` · false positive แบบนี้อันตรายพอกับ false pass
+  // เพราะมันสอนให้คนเลิกเชื่อตัวตรวจ แล้วตัวตรวจก็ไร้ค่าตั้งแต่นั้น
+  //
+  // ยังต้องผูกกับตำแหน่ง destructure อยู่ (ข้อความระหว่าง `const` กับ `=`)
+  // ไม่ใช่ `\berror\b` ลอย ๆ ที่จะไปแมตช์ `console.error`
   const destructuresError = (code) =>
-    /const\s*\{[^}]*\berror\b[^}]*\}\s*=/.test(code)
+    [...code.matchAll(/\bconst\s*([[{][\s\S]{0,400}?)=\s*(?:await\b|\()/g)]
+      .some((m) => /\berror\b/.test(m[1]))
   const hits = srcClean.filter((x) => usesSupabase(x) && !destructuresError(x.code))
   const scanned = srcClean.filter(usesSupabase).length
   check('P0-SEC-05 ทุกไฟล์ที่ query Supabase destructure error ออกมาเช็ค',

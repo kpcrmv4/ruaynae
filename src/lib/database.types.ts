@@ -294,6 +294,16 @@ export type Database = {
     }
     Functions: {
       is_owner: { Args: never; Returns: boolean }
+      site_overview: {
+        Args: { p_on: string }
+        Returns: {
+          active_contract: number
+          active_count: number
+          due_soon_count: number
+          overdue_count: number
+          total_count: number
+        }[]
+      }
       supervises_site: {
         Args: { p_on?: string; p_site: string }
         Returns: boolean

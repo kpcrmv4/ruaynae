@@ -455,6 +455,108 @@ try {
   console.log(`  (ลบไซต์ทดสอบชุดที่สอง ${created2.length} ไซต์แล้ว)`)
 }
 
+console.log('\n── P1 · หน้าภาพรวม ────────────────────────────────────────')
+
+const created3 = []
+try {
+  const mk = async (body) => {
+    const r = await req('POST', '/api/sites', body, { cookie: ownerJar })
+    const b = await r.json()
+    created3.push(b.site.id)
+    return b.site.id
+  }
+  const today = new Intl.DateTimeFormat('en-CA', {
+    timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).format(new Date())
+  const plus = (days) => {
+    const d = new Date(`${today}T00:00:00Z`)
+    d.setUTCDate(d.getUTCDate() + days)
+    return d.toISOString().slice(0, 10)
+  }
+
+  // fixture ที่ทำให้ทุกช่องมีเลขที่ไม่ใช่ศูนย์ — ไม่งั้นทุกชั้นจะตรงกันที่ 0
+  // โดยไม่ได้พิสูจน์การนับสักครั้ง
+  const mineId = await mk({
+    name: 'ทดสอบ ภาพรวม ไซต์ของหัวหน้า', contractAmount: 1000000,
+    startDate: plus(-60), endDate: plus(10),          // ใกล้ครบกำหนด
+  })
+  await mk({
+    name: 'ทดสอบ ภาพรวม ไซต์เลยกำหนด', contractAmount: 2000000,
+    startDate: plus(-200), endDate: plus(-5),         // เลยกำหนดแล้ว
+  })
+  await mk({
+    name: 'ทดสอบ ภาพรวม ไซต์ปิดแล้ว', contractAmount: 5000000, status: 'done',
+  })
+  await sql(`insert into public.site_supervisors(site_id, profile_id)
+             values ('${mineId}','${sup1.id}')`)
+
+  const rpc = async (token) => {
+    const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/rpc/site_overview`, {
+      method: 'POST',
+      headers: {
+        apikey: env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY,
+        Authorization: `Bearer ${token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ p_on: today }),
+    })
+    return (await r.json())?.[0]
+  }
+  const ownerToken = await supabaseToken(env.SEED_OWNER_EMAIL, env.SEED_OWNER_PASSWORD)
+
+  // ── P1-DB-13 · RPC เป็น security invoker จริง ────────────────────
+  // 🔴 ถ้าเผลอเขียนเป็น definer ตัวเลขทั้งบริษัทจะหลุดไปหาหัวหน้าไซต์ทันที
+  // โดยหน้าจอดูปกติทุกอย่าง · เทียบสองฝั่งในการตรวจเดียวจึงเป็นทางเดียวที่จับได้
+  {
+    const o = await rpc(ownerToken)
+    const s = await rpc(supToken)
+    check('P1-DB-13 site_overview() เป็น security invoker — เจ้าของเห็นทุกไซต์ หัวหน้าไซต์เห็นแค่ของตัวเอง',
+      o?.active_count >= 2 && o?.overdue_count >= 1
+      && Number(s?.active_count) === 1 && Number(s?.active_contract) === 1000000
+      && Number(s?.overdue_count) === 0,
+      `เจ้าของ active=${o?.active_count} เลยกำหนด=${o?.overdue_count} · หัวหน้าไซต์ active=${s?.active_count} ค่างาน=${s?.active_contract}`)
+  }
+
+  // ── P1-UI-09 · หน้าภาพรวมของเจ้าของ ──────────────────────────────
+  {
+    const html = await page('/', ownerJar)
+    const want = ['กำลังก่อสร้าง', 'ค่างานที่รับไว้', 'ใกล้ครบกำหนด', 'เลยกำหนดแล้ว',
+      'ทดสอบ ภาพรวม ไซต์ของหัวหน้า', 'ทดสอบ ภาพรวม ไซต์เลยกำหนด']
+    const missing = want.filter((w) => !html.includes(w))
+    // ไซต์ที่ปิดแล้วต้องไม่อยู่ในรายการ "กำลังก่อสร้าง"
+    const leaked = html.includes('ทดสอบ ภาพรวม ไซต์ปิดแล้ว')
+    check('P1-UI-09 ภาพรวมของเจ้าของ: การ์ด 4 ใบ + ไซต์ที่กำลังทำ · ไซต์ที่ปิดแล้วไม่โผล่',
+      missing.length === 0 && !leaked,
+      missing.length ? `ขาด: ${missing.join(', ')}` : `4 การ์ด · ไซต์ปิดแล้วรั่ว=${leaked}`)
+  }
+
+  // ── P1-UI-10a · หัวหน้าไซต์เห็นเฉพาะของตัวเอง ────────────────────
+  {
+    const html = await page('/', supJar)
+    check('P1-UI-10a ภาพรวมของหัวหน้าไซต์: เห็นไซต์ตัวเอง · ไม่เห็นไซต์อื่น · ไม่มีตัวเลขทั้งบริษัท',
+      html.includes('ทดสอบ ภาพรวม ไซต์ของหัวหน้า')
+      && !html.includes('ทดสอบ ภาพรวม ไซต์เลยกำหนด')
+      && html.includes('ภาพรวมเฉพาะไซต์ที่คุณดูแล')
+      && !html.includes('3,000,000'),
+      'เห็นของตัวเอง ไม่เห็นของคนอื่น')
+  }
+
+  // ── P1-UI-13 · ไซต์ที่เลยกำหนดต้องขึ้นป้ายเตือน ──────────────────
+  // ครึ่งบวก: ไซต์ที่ยังอยู่ในกำหนดต้องไม่ขึ้นป้ายนี้ในหน้าเดียวกัน
+  {
+    const html = await page('/', ownerJar)
+    const overdueBlock = html.slice(html.indexOf('ทดสอบ ภาพรวม ไซต์เลยกำหนด'))
+      .slice(0, 900)
+    const okBlock = html.slice(html.indexOf('ทดสอบ ภาพรวม ไซต์ของหัวหน้า')).slice(0, 900)
+    check('P1-UI-13 ไซต์ที่เลยกำหนดขึ้นป้าย "เลยกำหนด" · ไซต์ที่ยังไม่เลยไม่ขึ้น',
+      overdueBlock.includes('เลยกำหนด') && !okBlock.includes('เลยมา'),
+      `ไซต์เลยกำหนด=${overdueBlock.includes('เลยกำหนด')} · ไซต์ปกติสะอาด=${!okBlock.includes('เลยมา')}`)
+  }
+} finally {
+  for (const id of created3) await sql(`delete from public.sites where id = '${id}'`)
+  console.log(`  (ลบไซต์ทดสอบชุดที่สาม ${created3.length} ไซต์แล้ว)`)
+}
+
 // ── P1-CALC · แถบเวลา — ตรรกะบริสุทธิ์ ไม่ต้องมีฐานข้อมูล ────────────
 console.log('\n── P1-CALC · แถบความคืบหน้าตามเวลา ────────────────────────')
 {

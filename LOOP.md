@@ -65,10 +65,15 @@
 ## 3 · Gate — ต้องเขียวก่อน mark done
 
 ```bash
-npm run gate     # = typecheck (next typegen && tsc) → verify:contrast → build
+npm run gate        # typecheck (next typegen && tsc) → verify:contrast → build
+npm run verify:all  # ตัวตรวจพฤติกรรมจริงทั้งหมด (ต้องมี dev server รันอยู่)
 ```
 
 แยกรันทีละอันได้: `npm run typecheck` · `npm run verify:contrast` · `npm run build`
+
+⚠️ **`verify:all` ล้าง `login_attempts` ระหว่างสคริปต์ให้เอง** — จำเป็น เพราะ verify-auth
+จงใจยิง PIN ผิดรัว ๆ เพื่อทดสอบ rate limit แล้วสคริปต์ถัดไปจะล็อกอินไม่ได้
+รันแยกทีละตัวโดยไม่ล้างจะเห็นแถวตกที่ไม่ใช่ความผิดของโค้ด
 
 ⚠️ **ห้ามใช้ `npx tsc --noEmit` เปล่า ๆ** — `LayoutProps` / `PageProps` เป็น type ที่ Next
 generate ตอน build ถ้า `.next/types` ยังไม่มีจะแดงทั้งที่โค้ดถูก · `npm run typecheck` มี typegen นำหน้าให้แล้ว

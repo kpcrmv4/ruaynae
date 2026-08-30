@@ -139,6 +139,58 @@ console.log('\n── P0-SEC · ความปลอดภัยระดับ
   check('P0-SEC-04 ไม่มีความลับขึ้นต้นด้วย NEXT_PUBLIC_', bad.length === 0, bad.join(', ') || 'ไม่มี')
 }
 
+console.log('\n── P0-UI · กฎที่ตรวจจากซอร์ส ───────────────────────────────')
+
+// อ่านไฟล์ .ts/.tsx ทั้งหมดใน src แล้วตัดคอมเมนต์ออก
+// 🔴 ถ้าไม่ตัด กฎจะถูก "คอมเมนต์ที่อธิบายกฎ" ทำให้ผลเพี้ยน —
+// เจอมาแล้วรอบนี้: บรรทัด "ใช้ dialog ของ radix ไม่ใช่ window.prompt" ทำให้ grep แดง
+const srcFiles = sh('git ls-files "src/**/*.ts" "src/**/*.tsx"').out.trim().split('\n').filter(Boolean)
+const srcClean = srcFiles.map((f) => ({ f, code: stripComments(readFileSync(f, 'utf8')) }))
+
+{
+  const hits = srcClean.filter(({ code }) => /\bwindow\.(alert|confirm|prompt)\s*\(|(?<![.\w])alert\s*\(/.test(code))
+  check('P0-UI-10 ไม่มี alert/confirm/prompt ของเบราว์เซอร์ในโค้ด (ใช้ sonner + radix แทน)',
+    hits.length === 0, hits.map((h) => h.f).join(', ') || `ตรวจ ${srcClean.length} ไฟล์`)
+}
+
+{
+  // emoji ในช่วง Misc Symbols/Emoticons/Transport/Supplemental — ไม่รวมสัญลักษณ์ทั่วไป
+  const EMOJI = /[\u{1F300}-\u{1FAFF}\u{2600}-\u{27BF}]/u
+  const hits = srcClean.filter(({ code }) => EMOJI.test(code))
+  check('P0-UI-09 ไม่มี emoji ในโค้ด UI (ใช้ไอคอน lucide เท่านั้น)',
+    hits.length === 0, hits.map((h) => h.f).join(', ') || `ตรวจ ${srcClean.length} ไฟล์`)
+}
+
+{
+  // ไฟล์ที่ใช้ client ของ Supabase และมี query ต้องเช็ค error ด้วย
+  // error ที่ไม่ถูกเช็คคือการเขียนที่เงียบหายไปโดยแอปรายงานว่าสำเร็จ
+  //
+  // ⚠️ ร่างแรกของกฎนี้จับแค่ `.from(` แล้วแดงใส่ `Array.from({ length })`
+  // ซึ่งไม่เกี่ยวอะไรเลย · ตัวตรวจที่แดงตอนโค้ดถูกจะถูกคนเลิกสนใจ
+  // จึงต้องผูกกับ "ไฟล์ที่ import Supabase จริง" ไม่ใช่แค่ชื่อเมธอดที่บังเอิญตรงกัน
+  // ⚠️ ร่างที่สองก็ยังพัง: ใช้ /\berror\b/ ซึ่งไปแมตช์ `console.error` ที่มีอยู่แล้ว
+  // ในไฟล์เดียวกัน ตัวตรวจจึงเขียวต่อให้ลบการเช็ค error ออกจริง ๆ
+  // ต้องจับ error ในตำแหน่ง **destructure** เท่านั้น: `const { ..., error } = await`
+  const usesSupabase = ({ code }) =>
+    /@\/lib\/supabase\/|@supabase\//.test(code) && /\.(from|rpc)\s*\(/.test(code)
+  const destructuresError = (code) =>
+    /const\s*\{[^}]*\berror\b[^}]*\}\s*=/.test(code)
+  const hits = srcClean.filter((x) => usesSupabase(x) && !destructuresError(x.code))
+  const scanned = srcClean.filter(usesSupabase).length
+  check('P0-SEC-05 ทุกไฟล์ที่ query Supabase destructure error ออกมาเช็ค',
+    hits.length === 0 && scanned > 0,
+    hits.map((h) => h.f).join(', ') || `ตรวจไฟล์ที่ query จริง ${scanned} ไฟล์`)
+}
+
+{
+  // secret key ห้ามโผล่ในไฟล์ที่มี 'use client'
+  const hits = srcClean.filter(
+    ({ code }) => /['"]use client['"]/.test(code) && /SUPABASE_SECRET_KEY|R2_SECRET/.test(code),
+  )
+  check('P0-SEC-03 ไม่มีคีย์ลับในไฟล์ที่เป็น client component',
+    hits.length === 0, hits.map((h) => h.f).join(', ') || 'ผ่านทุกไฟล์')
+}
+
 console.log('\n── P0-DB · schema · RLS · audit ────────────────────────────')
 
 const sql = async (q) => {

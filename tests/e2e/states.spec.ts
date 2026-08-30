@@ -250,3 +250,74 @@ test.describe('P8-E2E-07 · loading.tsx ต้องไม่กลืนสถ�
     expect(res.status()).toBe(404)
   })
 })
+
+/**
+ * แถว P0 ที่ต้องอ่านค่าจากเบราว์เซอร์จริง — ค้าง `☐` มาตั้งแต่เฟสแรก
+ * เพราะไม่มีสคริปต์ไหนเปิดหน้าเว็บจริงจนกระทั่ง P8
+ */
+test.describe('P0-UI · ธีมและฟอนต์', () => {
+  const read = (page: Page) =>
+    page.evaluate(() => ({
+      dark: document.documentElement.classList.contains('dark'),
+      bg: getComputedStyle(document.body).backgroundColor,
+      stored: localStorage.getItem('theme'),
+    }))
+
+  /**
+   * 🔴 ต้อง **กดจริงอย่างน้อยหนึ่งครั้ง** — `next-themes` เขียน localStorage
+   * เฉพาะตอนที่ผู้ใช้เลือกเอง · ถ้าเครื่องตั้งเป็นโหมดสว่างอยู่แล้วแล้วเรา
+   * "เห็นว่าตรงแล้วเลยไม่กด" ค่าใน localStorage จะเป็น null และแถวจะแดง
+   * ทั้งที่ธีมถูกต้อง — คนละเรื่องกันระหว่าง "ตอนนี้สว่าง" กับ "ผู้ใช้เลือกสว่าง"
+   */
+  const setTheme = async (page: Page, want: 'dark' | 'light') => {
+    await page.goto('/')
+    await ready(page)
+    const toggle = page.getByRole('button', { name: /เปลี่ยนเป็นโหมด/ })
+    for (let i = 0; i < 4; i++) {
+      const s = await read(page)
+      if (s.dark === (want === 'dark') && s.stored !== null) return
+      await toggle.click()
+      await page.waitForTimeout(300)
+    }
+  }
+
+  test('P0-UI-05 โหมดมืด: html มีคลาส dark · พื้นหลัง rgb(11, 16, 23) · จำไว้ใน localStorage', async ({ page }) => {
+    await setTheme(page, 'dark')
+    const s = await read(page)
+    expect(s.dark).toBe(true)
+    expect(s.bg).toBe('rgb(11, 16, 23)')
+    expect(s.stored).toBe('dark')
+  })
+
+  test('P0-UI-06 โหมดสว่าง: html ไม่มีคลาส dark · พื้นหลัง rgb(242, 245, 250) · จำไว้ใน localStorage', async ({ page }) => {
+    await setTheme(page, 'light')
+    const s = await read(page)
+    expect(s.dark).toBe(false)
+    expect(s.bg).toBe('rgb(242, 245, 250)')
+    expect(s.stored).toBe('light')
+  })
+
+  test('P0-UI-08 IBM Plex Sans Thai โหลดจริง — ตัวหนา 20px ใช้ได้', async ({ page }) => {
+    await page.goto('/')
+    await ready(page)
+    await page.evaluate(() => document.fonts.ready)
+    expect(await page.evaluate(() => document.fonts.check('600 20px "IBM Plex Sans Thai"'))).toBe(true)
+  })
+
+  test('P0-UI-12 กดสลับธีมแล้วคลาสเปลี่ยนภายใน 500ms และ console ไม่มี error', async ({ page }) => {
+    const errors: string[] = []
+    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()) })
+    page.on('pageerror', (e) => errors.push(e.message))
+
+    await page.goto('/')
+    await ready(page)
+    const before = await read(page)
+
+    const t0 = Date.now()
+    await page.getByRole('button', { name: /เปลี่ยนเป็นโหมด/ }).click()
+    await expect.poll(async () => (await read(page)).dark, { timeout: 500 }).toBe(!before.dark)
+    expect(Date.now() - t0).toBeLessThan(500)
+
+    expect(errors, `console error: ${errors.join(' | ')}`).toEqual([])
+  })
+})

@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/current-user'
 import { PushToggle } from '../push-client'
 import { getBranding } from '@/lib/branding'
 import { BrandingForm } from '../branding-form'
+import { PasswordForm } from '../password-form'
 
 export const metadata = { title: 'ตั้งค่า' }
 
@@ -35,6 +36,21 @@ export default async function SettingsPage() {
           </p>
         )}
       </section>
+
+      {/* บัญชี PIN ไม่มีรหัสผ่านให้เปลี่ยน — และไม่ควรมีปุ่มที่กดแล้วได้ 403
+          กลับมา (§15: ทุก endpoint ต้องมีปุ่มที่เรียกมันจริง และ role ที่
+          อนุญาตต้องตรงกับที่ปุ่มนั้นอยู่) */}
+      {isOwner && (
+        <section className="rounded-lg border border-line bg-surface">
+          <div className="border-b border-line-soft px-4 py-3">
+            <h2 className="text-sm font-semibold text-ink">รหัสผ่านของคุณ</h2>
+            <p className="mt-0.5 text-xs text-muted-token">
+              ต้องกรอกรหัสปัจจุบันด้วย — เซสชันที่เปิดค้างอยู่ไม่ถือว่ารู้รหัส
+            </p>
+          </div>
+          <PasswordForm />
+        </section>
+      )}
 
       {isOwner && (
         <Link

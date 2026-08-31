@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getBranding } from '@/lib/branding'
+import { getBranding, shortName } from '@/lib/branding'
 
 export const runtime = 'nodejs'
 // ชื่อบริษัทเปลี่ยนได้ — manifest ที่แคชไว้จะโชว์ชื่อเก่าบนหน้าจอโฮมตลอดไป
@@ -16,7 +16,7 @@ export async function GET() {
   return NextResponse.json(
     {
       name: b.companyName,
-      short_name: b.companyName.slice(0, 12),
+      short_name: shortName(b.companyName),
       description: 'ระบบบันทึกรายรับ-รายจ่ายงานรับเหมาก่อสร้าง',
       lang: 'th',
       dir: 'ltr',

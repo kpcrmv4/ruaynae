@@ -25,7 +25,13 @@ export function AppHeader({
   return (
     <header className="sticky top-0 z-30 flex items-center gap-2 border-b border-line bg-canvas/90 px-4 py-2.5 backdrop-blur lg:px-6">
       <div className="flex min-w-0 items-center gap-2 lg:hidden">
-        <span className="flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm bg-sidebar text-white">
+        {/* พื้นขาวเมื่อมีโลโก้ · กรมท่าเมื่อยังไม่มี — เหตุผลเดียวกับหน้าล็อกอิน:
+            โลโก้พื้นขาวบนกล่องเข้มอ่านออกเป็นรูปที่โหลดพัง ไม่ใช่แบรนด์ */}
+        <span
+          className={`flex size-7 shrink-0 items-center justify-center overflow-hidden rounded-sm ${
+            logoUrl ? 'border border-line bg-white' : 'bg-sidebar text-white'
+          }`}
+        >
           {logoUrl ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img src={logoUrl} alt="" className="size-full object-contain" />

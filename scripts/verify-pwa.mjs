@@ -103,6 +103,18 @@ console.log('\n── P7 · PWA + web push ────────────�
   check('P7-INF-03 ชื่อในไฟล์ manifest = ชื่อบริษัทในฐานข้อมูล ไม่ใช่ค่าคงที่ในโค้ด',
     typeof j.name === 'string' && j.name === real && j.display === 'standalone',
     `manifest="${j.name}" · ฐานข้อมูล="${real}"`)
+
+  // 🔴 ป้ายใต้ไอคอนบนหน้าจอโฮม — `slice(0, 12)` ตรง ๆ ทำให้
+  // "บริษัท คอสซี่ คอนสตรัคชั่น จำกัด" กลายเป็น "บริษัท คอสซี" คือเสียที่ไป
+  // กับคำว่า "บริษัท" แล้วตัดคาคำ · ต้องไม่ขึ้นต้นด้วยคำนำหน้าทางกฎหมาย
+  // และต้องไม่ตัดกลางคำ (คำสุดท้ายที่เหลือต้องเป็นคำเต็มของชื่อจริง)
+  const short = typeof j.short_name === 'string' ? j.short_name : ''
+  const startsWithLegalPrefix = /^(บริษัท|บมจ|หจก|ห้าง|ร้าน)\b/u.test(short)
+  const wholeWords = short.length > 0
+    && short.split(/\s+/).every((w) => real.split(/\s+/).includes(w))
+  check('P7-INF-03b short_name ของ manifest ไม่ขึ้นต้นด้วย "บริษัท" และไม่ตัดคาคำ',
+    short.length > 0 && short.length <= 12 && !startsWithLegalPrefix && wholeWords,
+    `short_name="${short}" (${short.length} ตัว) จาก "${real}"`)
 }
 
 // ── P7-INF-05 · ไอคอนเป็น PNG จริง ──────────────────────────────────

@@ -2,7 +2,7 @@ import 'server-only'
 
 import { cache } from 'react'
 import { createClient } from '@supabase/supabase-js'
-import { APP_NAME } from '@/lib/constants'
+import { SYSTEM_NAME } from '@/lib/constants'
 import type { Database } from '@/lib/database.types'
 import { presignGet } from '@/lib/r2'
 
@@ -13,8 +13,49 @@ export type Branding = {
   logoUrl: string | null
 }
 
-/** ค่าสำรองตอนยังไม่ได้ตั้งค่า หรือตอนอ่านฐานข้อมูลไม่ได้ */
-const FALLBACK: Branding = { companyName: APP_NAME, logoObjectKey: null, logoUrl: null }
+/** ยาวสุดที่ป้ายใต้ไอคอนบนหน้าจอโฮมจะแสดงได้ก่อนโดนตัดด้วย … */
+const SHORT_NAME_MAX = 12
+
+/**
+ * ชื่อสั้นสำหรับป้ายใต้ไอคอนแอป
+ *
+ * 🔴 `companyName.slice(0, 12)` ตรง ๆ ใช้ไม่ได้กับชื่อบริษัทไทย —
+ * `บริษัท คอสซี่ คอนสตรัคชั่น จำกัด` จะกลายเป็น **`บริษัท คอสซี`**
+ * คือเสีย 7 ตัวแรกไปกับคำว่า "บริษัท " ที่ไม่ได้บอกว่าเป็นบริษัทไหนเลย
+ * แล้วตัดคาคำพอดี · ป้ายนี้คือสิ่งที่คนเห็นบนหน้าจอโฮมทุกวัน
+ *
+ * ตัดคำนำหน้า/ต่อท้ายที่เป็นรูปแบบทางกฎหมายออกก่อน แล้วค่อยหยิบทีละคำ
+ * เท่าที่ยังไม่เกินความยาว — ตัดคาคำอ่านยากกว่าชื่อที่สั้นกว่าหนึ่งคำ
+ */
+export function shortName(companyName: string): string {
+  const core = companyName
+    .replace(/^\s*(บริษัท|บมจ\.?|หจก\.?|ห้างหุ้นส่วน(จำกัด|สามัญ)?|ห้าง|ร้าน)\s*/u, '')
+    .replace(/\s*(จำกัด)?\s*\((มหาชน)\)\s*$/u, '')
+    .replace(/\s*จำกัด\s*$/u, '')
+    .trim()
+
+  const source = core || companyName.trim()
+  if (source.length <= SHORT_NAME_MAX) return source
+
+  const words = source.split(/\s+/)
+  let out = ''
+  for (const w of words) {
+    const next = out ? `${out} ${w}` : w
+    if (next.length > SHORT_NAME_MAX) break
+    out = next
+  }
+  // คำเดียวที่ยาวเกินเพดาน — ไม่มีทางเลือกอื่นนอกจากตัด
+  return out || source.slice(0, SHORT_NAME_MAX)
+}
+
+/**
+ * ค่าสำรองตอนยังไม่ได้ตั้งค่า หรือตอนอ่านฐานข้อมูลไม่ได้
+ *
+ * ใช้ **ชื่อระบบ** เป็นตัวสำรอง ไม่ใช่ชื่อบริษัทจริง — หน้าล็อกอินที่โหลด
+ * ฐานข้อมูลไม่ได้ต้องยังใช้งานได้ แต่ต้องไม่โกหกว่าเป็นบริษัทไหน
+ * · ชื่อบริษัทจริงอยู่ใน `branding.company_name` ที่เดียว (CLAUDE.md §5)
+ */
+const FALLBACK: Branding = { companyName: SYSTEM_NAME, logoObjectKey: null, logoUrl: null }
 
 /**
  * ชื่อบริษัทและโลโก้

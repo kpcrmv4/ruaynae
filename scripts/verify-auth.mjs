@@ -207,9 +207,16 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
 
     await sql("update public.branding set company_name = '' where id")
     const empty = await (await fetch(`${BASE}/login`)).text()
-    check('P05-BRAND-02 ยังไม่ได้ตั้งชื่อ → ใช้ค่าสำรอง ไม่ใช่ช่องว่าง',
-      !empty.includes(probe) && empty.includes('ระบบจัดการโปรเจ็คงานรับเหมา'),
-      `ชื่อเดิมหายไป: ${!empty.includes(probe)} · มีค่าสำรอง: ${empty.includes('ระบบจัดการโปรเจ็คงานรับเหมา')}`)
+    // 🔴 อ่านค่าสำรองจากไฟล์ที่นิยามมันจริง ๆ ห้ามพิมพ์ซ้ำไว้ในตัวตรวจ —
+    // ตอนเปลี่ยนชื่อระบบ ตัวตรวจที่ถือสำเนาของตัวเองจะแดงทั้งที่แอปถูก
+    // และคนอ่านจะเสียเวลาไล่หาบั๊กที่ไม่มีอยู่ (เกิดมาแล้วรอบหนึ่ง)
+    const constants = readFileSync('src/lib/constants.ts', 'utf8')
+    const fallback = constants.match(/export const SYSTEM_NAME = '([^']+)'/)?.[1]
+    if (!fallback) throw new Error('อ่าน SYSTEM_NAME จาก src/lib/constants.ts ไม่ได้')
+
+    check('P05-BRAND-02 ยังไม่ได้ตั้งชื่อ → ใช้ค่าสำรอง (ชื่อระบบ) ไม่ใช่ช่องว่าง',
+      !empty.includes(probe) && empty.includes(fallback),
+      `ชื่อเดิมหายไป: ${!empty.includes(probe)} · มีค่าสำรอง "${fallback}": ${empty.includes(fallback)}`)
   } finally {
     // คืนค่าเดิมเสมอ — probe ที่ล้มกลางทางต้องไม่ทิ้ง fixture ที่ถูกแก้ไว้ให้รอบหน้า
     await sql(`update public.branding set company_name = '${original.replace(/'/g, "''")}' where id`)

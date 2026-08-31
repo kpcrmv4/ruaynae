@@ -19,10 +19,18 @@ export default async function LoginPage() {
         <div className="mb-6 text-center">
           {/* ชื่อมาจากตาราง branding ซึ่ง anon อ่านได้ — หน้านี้ทำงานตอนยังไม่ล็อกอิน
               อ่านไม่ได้จะได้ค่าสำรองแทน หน้าล็อกอินห้ามพังเพราะโหลดชื่อบริษัทไม่ได้ */}
-          <span className="mx-auto mb-3 flex size-14 items-center justify-center overflow-hidden rounded-lg bg-sidebar text-white">
+          {/* 🔴 พื้นของกล่องขึ้นกับว่ามีโลโก้ไหม ไม่ใช่สีเดียวตายตัว —
+              พื้นกรมท่ามีไว้ให้ไอคอนหมวกสีขาวตอนยังไม่ได้ตั้งโลโก้ · โลโก้จริง
+              ของบริษัทไทยเกือบทั้งหมดมาเป็น PNG พื้นขาว วางบนกรมท่าแล้วจะเห็น
+              เป็น **แผ่นขาวกลางกล่องเข้ม** ซึ่งดูเหมือนรูปโหลดพัง */}
+          <span
+            className={`mx-auto mb-3 flex size-14 items-center justify-center overflow-hidden rounded-lg ${
+              branding.logoUrl ? 'border border-line bg-white' : 'bg-sidebar text-white'
+            }`}
+          >
             {branding.logoUrl ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={branding.logoUrl} alt="" className="size-full object-contain" />
+              <img src={branding.logoUrl} alt="" className="size-full object-contain p-1" />
             ) : (
               <HardHat className="size-8" strokeWidth={1.6} />
             )}

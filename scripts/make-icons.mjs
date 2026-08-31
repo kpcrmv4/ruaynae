@@ -88,9 +88,12 @@ function png(size) {
   ])
 }
 
-mkdirSync('public/icons', { recursive: true })
+// รับโฟลเดอร์ปลายทางได้ เพื่อให้ตัวตรวจสร้างชุดเทียบไว้ที่อื่นได้
+// โดยไม่ทับไอคอนจริงที่ใช้งานอยู่ (P8-SHIP-09b)
+const OUT = process.argv[2] ?? 'public/icons'
+mkdirSync(OUT, { recursive: true })
 for (const size of [192, 512, 180]) {
   const name = size === 180 ? 'apple-touch-icon.png' : `icon-${size}.png`
-  writeFileSync(`public/icons/${name}`, png(size))
-  console.log(`  ✅ public/icons/${name} (${size}×${size})`)
+  writeFileSync(`${OUT}/${name}`, png(size))
+  console.log(`  ✅ ${OUT}/${name} (${size}×${size})`)
 }

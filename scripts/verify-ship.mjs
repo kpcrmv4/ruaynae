@@ -9,7 +9,9 @@
  * (เช่น ปุ่มเดโม่ต้องเปิดไว้) · แถวพวกนั้นรายงานเป็น `⚠️` และไม่ทำให้สคริปต์แดง
  * แต่จะขึ้นเป็นรายการที่ต้องทำก่อนส่งมอบทุกครั้งที่รัน
  */
-import { readFileSync, existsSync, readdirSync } from 'node:fs'
+import { readFileSync, existsSync, readdirSync, mkdtempSync, rmSync } from 'node:fs'
+import { join } from 'node:path'
+import { tmpdir } from 'node:os'
 import { execSync } from 'node:child_process'
 
 const BASE = process.argv[2] ?? 'http://localhost:3100'
@@ -326,8 +328,30 @@ console.log('\n── P8-SHIP · เช็คลิสต์ก่อนส่�
   } else {
     check('P8-SHIP-09 VAPID_SUBJECT ตั้งเป็นอีเมลจริงแล้ว', true, subject)
   }
-  warn('P8-SHIP-09b ไอคอนแอปยังเป็นรูปหมวกนิรภัยที่ระบบวาดเอง',
-    'เปลี่ยนเป็นโลโก้จริงเมื่อเจ้าของส่งไฟล์มา (scripts/make-icons.mjs)')
+  // 🔴 เดิมบรรทัดนี้เป็น `warn()` ลอย ๆ ที่เตือนทุกครั้งไม่ว่าอะไรจะเกิดขึ้น —
+  // เตือนไปเรื่อย ๆ แม้เปลี่ยนไอคอนจริงไปแล้ว · คำเตือนที่ไม่มีวันหายคือ
+  // คำเตือนที่คนจะเลิกอ่าน แล้ววันที่มันหมายความว่าอะไรจริง ๆ ก็ไม่มีใครเห็น
+  //
+  // ตัวตรวจจริง: สร้างไอคอนสำรองชุดใหม่ลงโฟลเดอร์ชั่วคราว แล้วเทียบไบต์
+  // ตรงกัน = ยังเป็นรูปที่ระบบวาดเอง · ต่างกัน = เป็นไฟล์ที่เจ้าของส่งมา
+  const tmp = mkdtempSync(join(tmpdir(), 'icons-'))
+  try {
+    sh(`node scripts/make-icons.mjs "${tmp}"`)
+    const same = ['icon-192.png', 'icon-512.png', 'apple-touch-icon.png'].filter((n) => {
+      const a = join('public/icons', n)
+      const b = join(tmp, n)
+      return existsSync(a) && existsSync(b) && readFileSync(a).equals(readFileSync(b))
+    })
+    if (same.length > 0) {
+      warn('P8-SHIP-09b ไอคอนแอปยังเป็นรูปหมวกนิรภัยที่ระบบวาดเอง',
+        `${same.join(', ')} — เปลี่ยนเป็นโลโก้จริงเมื่อเจ้าของส่งไฟล์มา`)
+    } else {
+      check('P8-SHIP-09b ไอคอนแอปเป็นไฟล์จริงของเจ้าของ ไม่ใช่รูปที่ระบบวาดเอง',
+        true, 'ทั้งสามไฟล์ต่างจากตัวสำรองที่ make-icons.mjs สร้าง')
+    }
+  } finally {
+    rmSync(tmp, { recursive: true, force: true })
+  }
 }
 
 console.log('\n══════════════════════════════════════════════')

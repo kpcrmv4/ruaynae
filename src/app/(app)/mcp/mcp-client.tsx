@@ -9,6 +9,7 @@ import {
   Copy,
   Info,
   KeyRound,
+  Layers,
   Loader2,
   Plus,
   Smartphone,
@@ -53,6 +54,9 @@ export function McpClient({
   const [label, setLabel] = useState('')
   const [busy, setBusy] = useState<string | null>(null)
   const [copied, setCopied] = useState(false)
+  /** เปิดกล่องยืนยันเพิกถอนของแถวไหนอยู่ — คุมเองแทนปล่อยให้ Dialog.Close ปิดทันที
+   * ที่กด เพื่อให้กล่องยังอยู่ระหว่างรอผล DELETE และปิดเฉพาะตอนสำเร็จเท่านั้น */
+  const [openRevokeId, setOpenRevokeId] = useState<string | null>(null)
   /**
    * 🔴 คีย์เต็มอยู่ใน state ตัวนี้เท่านั้น และไม่ถูกเก็บที่ไหนอีกเลย
    * ปิดหน้าหรือรีเฟรชแล้วหายถาวร — ตั้งใจให้เป็นแบบนั้น
@@ -103,6 +107,7 @@ export function McpClient({
         return
       }
       toast.success('เพิกถอนคีย์แล้ว — เครื่องที่ใช้คีย์นี้จะเชื่อมต่อไม่ได้ทันที')
+      setOpenRevokeId(null)
       router.refresh()
     } catch {
       toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
@@ -202,11 +207,21 @@ export function McpClient({
                 </span>
               </span>
 
-              {/* ห้าม confirm() — CLAUDE.md §15 บังคับ radix สำหรับการยืนยัน */}
-              <Dialog.Root>
+              {/* ห้าม confirm() — CLAUDE.md §15 บังคับ radix สำหรับการยืนยัน
+                  🔴 คุม open เอง แล้วปิดเฉพาะตอนสำเร็จ — เดิม Dialog.Close ครอบปุ่ม
+                  ยืนยันทำให้กล่องหายทันทีที่กด ก่อน DELETE จะเสร็จ ความล้มเหลวเลย
+                  โผล่เป็น toast หลังกล่องปิดไปแล้ว ซึ่งงงสำหรับคนที่ไม่ชำนาญคอม
+                  (แพตเทิร์นเดียวกับ approvals-client.tsx / sites-client.tsx) */}
+              <Dialog.Root
+                open={openRevokeId === k.id}
+                onOpenChange={(v) => {
+                  if (busy) return
+                  setOpenRevokeId(v ? k.id : null)
+                }}
+              >
                 <Dialog.Trigger asChild>
                   <button type="button" disabled={busy !== null} className="btn-danger shrink-0">
-                    {busy === k.id ? <Loader2 className="size-4 animate-spin" /> : <Trash2 className="size-4" />}
+                    <Trash2 className="size-4" />
                     เพิกถอน
                   </button>
                 </Dialog.Trigger>
@@ -221,14 +236,22 @@ export function McpClient({
                       ถ้าต้องการใช้อีกต้องออกคีย์ใบใหม่
                     </Dialog.Description>
                     <div className="mt-4 flex justify-end gap-2">
-                      <Dialog.Close asChild>
-                        <button type="button" className="btn-secondary">ยกเลิก</button>
+                      <Dialog.Close disabled={busy !== null} className="btn-secondary">
+                        ยกเลิก
                       </Dialog.Close>
-                      <Dialog.Close asChild>
-                        <button type="button" onClick={() => revoke(k.id)} className="btn-danger">
-                          เพิกถอน
-                        </button>
-                      </Dialog.Close>
+                      <button
+                        type="button"
+                        onClick={() => revoke(k.id)}
+                        disabled={busy !== null}
+                        className="btn-danger disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {busy === k.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Trash2 className="size-4" />
+                        )}
+                        เพิกถอน
+                      </button>
                     </div>
                   </Dialog.Content>
                 </Dialog.Portal>
@@ -250,6 +273,16 @@ export function McpClient({
               <span className="font-bold text-ink">แอปมือถือเพิ่มการเชื่อมต่อเองไม่ได้</span> —
               ต้องเปิด <span className="font-mono">claude.ai</span> บนคอมพิวเตอร์หรือเบราว์เซอร์ก่อน
               ทำขั้นตอนนี้ครั้งเดียวที่นั่น แล้วมันจะซิงก์ลงแอปมือถือให้เองโดยไม่ต้องทำซ้ำ
+            </p>
+          </div>
+
+          <div className="flex gap-3 rounded-lg border border-line bg-surface-2 p-3">
+            <Layers className="size-5 shrink-0 text-muted-token" strokeWidth={1.8} />
+            <p className="text-sm leading-6 text-ink-2">
+              <span className="font-semibold text-ink">แผนฟรีเพิ่มได้ 1 ตัว:</span>{' '}
+              ไม่ใช่ฟีเจอร์ที่ต้องเสียเงินถึงจะใช้ได้ — แผนฟรีของ Claude เพิ่ม custom connector
+              ได้ 1 ตัว ถ้ามีตัวเดิมอยู่แล้วต้องลบทิ้งก่อนถึงจะเพิ่มใหม่ได้
+              ส่วนแผนเสียเงิน (Pro ขึ้นไป) เพิ่มได้หลายตัวพร้อมกัน
             </p>
           </div>
 

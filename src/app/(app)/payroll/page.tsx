@@ -1,23 +1,34 @@
+import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { Wallet } from 'lucide-react'
+import { CalendarDays, Wallet } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, todayInBangkok } from '@/lib/format'
+import { daysInRange, parsePeriod, periodOptions } from '@/lib/reports'
 import { Metric, MetricBar } from '@/components/ui/metric'
 import { EmptyState } from '@/components/ui/states'
 import { PayrollBoard } from './payroll-client'
+import { WorkGrid } from './work-grid'
 
 export const metadata = { title: 'ค่าแรงและรอบจ่าย' }
 
-export default async function PayrollPage() {
-  const me = await getCurrentUser()
+type Search = { tab?: string; p?: string }
+
+export default async function PayrollPage({ searchParams }: { searchParams: Promise<Search> }) {
+  const [me, sp] = await Promise.all([getCurrentUser(), searchParams])
+  // สองมุมมองสลับกันได้ · สถานะอยู่บน URL เหมือนหน้าอื่นทั้งแอป — แชร์ลิงก์ได้
+  const tab = sp.tab === 'grid' ? 'grid' : 'balances'
   // ซ่อนเมนูอย่างเดียวไม่พอ — คนพิมพ์ URL ตรงได้ ต้องกันที่หน้าเองด้วย
   // เบิกและรอบจ่ายเป็นเรื่องเงินทั้งหมด · หัวหน้าไซต์ไม่เกี่ยว
   if (me.role !== 'owner') redirect('/')
 
   const sb = await getSupabaseServer()
   const today = todayInBangkok()
+  // ตารางการทำงานยึด "เดือน" เสมอ — ค่าเริ่มต้นคือเดือนปัจจุบัน
+  const period = parsePeriod(sp.p ?? '', today)
+  const month = period.mode === 'month' ? period : parsePeriod(today.slice(0, 7), today)
+  const monthDays = daysInRange(month.from, month.to)
 
   const [{ data: balances, error: bErr }, { data: runs, error: rErr }, { data: sites }, { data: openAdvances }] =
     await Promise.all([
@@ -37,8 +48,32 @@ export default async function PayrollPage() {
         .range(0, PAGE_SIZE - 1),
     ])
 
-  if (bErr || rErr) {
-    console.error('[payroll] โหลดข้อมูลไม่ได้', bErr?.message ?? rErr?.message)
+  // ── ข้อมูลของแท็บ "ตารางการทำงาน" — ดึงเฉพาะตอนเปิดแท็บนั้นจริง ──────
+  // เปิดแท็บยอดค้างอยู่แล้วไม่ต้องจ่ายค่า query ของอีกแท็บหนึ่ง
+  const [{ data: gridCells, error: gErr }, { data: gridPeople, error: pErr }] =
+    tab === 'grid'
+      ? await Promise.all([
+          sb
+            .rpc('attendance_grid', { p_from: month.from, p_to: month.to })
+            .order('work_date', { ascending: true })
+            .range(0, 2000),
+          sb
+            .from('employees')
+            .select('id, full_name, job_title, default_site_id, employee_wages(wage_type, daily_rate)')
+            .eq('is_active', true)
+            .order('full_name', { ascending: true })
+            .range(0, PAGE_SIZE - 1),
+        ])
+      : [
+          { data: null, error: null },
+          { data: null, error: null },
+        ]
+
+  if (bErr || rErr || gErr || pErr) {
+    console.error(
+      '[payroll] โหลดข้อมูลไม่ได้',
+      bErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message,
+    )
     return (
       <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
         <p className="text-sm text-urgent">โหลดข้อมูลค่าแรงไม่สำเร็จ</p>
@@ -51,6 +86,7 @@ export default async function PayrollPage() {
     employee_id: b.employee_id,
     full_name: b.full_name,
     job_title: b.job_title,
+    days: Number(b.days),
     accrued: Number(b.accrued),
     advanced: Number(b.advanced),
     balance: Number(b.balance),
@@ -86,7 +122,95 @@ export default async function PayrollPage() {
         <Metric label="คนที่มียอดค้าง" value={rows.length} unit="คน" />
       </MetricBar>
 
-      {rows.length === 0 && (runs ?? []).length === 0 ? (
+      {/* ── สองมุมมอง — ยอดค้างจ่ายรายคน / ตารางการทำงานของเดือนที่เลือก ── */}
+      <div className="mb-4 flex flex-col gap-2.5 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex gap-1.5">
+          {(
+            [
+              { key: 'balances', label: 'ค้างจ่ายรายคน', href: '/payroll' },
+              {
+                key: 'grid',
+                label: 'ตารางการทำงาน',
+                href: `/payroll?tab=grid&p=${month.key}`,
+              },
+            ] as const
+          ).map((t) => (
+            <Link
+              key={t.key}
+              href={t.href}
+              aria-current={tab === t.key ? 'true' : undefined}
+              className={`inline-flex items-center gap-1.5 rounded-sm border px-3 py-2 text-sm font-medium transition-colors duration-100 ${
+                tab === t.key
+                  ? 'border-ink bg-ink text-canvas'
+                  : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2 hover:text-ink'
+              }`}
+            >
+              {t.key === 'grid' ? <CalendarDays className="size-4" /> : <Wallet className="size-4" />}
+              {t.label}
+            </Link>
+          ))}
+        </div>
+
+        {/* เลือกเดือน — ค่าเริ่มต้นคือเดือนปัจจุบัน · เป็นฟอร์ม GET ไม่มี state ฝั่ง client */}
+        {tab === 'grid' && (
+          <form action="/payroll" method="get" className="flex gap-2">
+            <input type="hidden" name="tab" value="grid" />
+            <select
+              name="p"
+              defaultValue={month.key}
+              aria-label="เดือน"
+              className="input-base w-auto min-w-40 py-2"
+            >
+              {periodOptions('month', today).map((o) => (
+                <option key={o.value} value={o.value}>
+                  {o.label}
+                </option>
+              ))}
+            </select>
+            <button type="submit" className="btn-secondary shrink-0 px-4 py-2">
+              ดู
+            </button>
+          </form>
+        )}
+      </div>
+
+      {tab === 'grid' ? (
+        (gridPeople ?? []).length === 0 ? (
+          <EmptyState
+            icon={CalendarDays}
+            message="ยังไม่มีคนงานในระบบ — เพิ่มคนงานที่หน้าตั้งค่าก่อน แล้วตารางจะขึ้นที่นี่"
+          />
+        ) : (
+          <WorkGrid
+            today={today}
+            days={monthDays}
+            sites={sites ?? []}
+            employees={(gridPeople ?? []).map((e) => ({
+              id: e.id,
+              full_name: e.full_name,
+              job_title: e.job_title,
+              default_site_id: e.default_site_id,
+              wage_type: e.employee_wages?.wage_type ?? 'daily',
+              daily_rate:
+                e.employee_wages?.daily_rate === null || e.employee_wages?.daily_rate === undefined
+                  ? null
+                  : Number(e.employee_wages.daily_rate),
+            }))}
+            cells={(gridCells ?? []).map((c) => ({
+              attendance_id: c.attendance_id,
+              employee_id: c.employee_id,
+              work_date: c.work_date,
+              site_id: c.site_id,
+              site_name: c.site_name,
+              work_units: Number(c.work_units),
+              wage_snapshot: Number(c.wage_snapshot),
+              ot_amount: Number(c.ot_amount),
+              amount: Number(c.amount),
+              paid: c.paid,
+            }))}
+          />
+        )
+      ) : rows.length === 0 && (runs ?? []).length === 0 ? (
         <EmptyState
           icon={Wallet}
           message="ยังไม่มีค่าแรงค้างจ่าย — ติ๊กคนเข้าไซต์ที่หน้าคนเข้าไซต์ก่อน แล้วยอดจะขึ้นที่นี่"

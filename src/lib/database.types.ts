@@ -1050,6 +1050,21 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attendance_grid: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          amount: number
+          attendance_id: string
+          employee_id: string
+          ot_amount: number
+          paid: boolean
+          site_id: string
+          site_name: string
+          wage_snapshot: number
+          work_date: string
+          work_units: number
+        }[]
+      }
       close_payroll_run: {
         Args: { p_run: string }
         Returns: {
@@ -1111,6 +1126,7 @@ export type Database = {
           accrued: number
           advanced: number
           balance: number
+          days: number
           employee_id: string
           full_name: string
           job_title: string
@@ -1188,6 +1204,17 @@ export type Database = {
           wage_total: number
           work_units: number
         }[]
+      }
+      save_attendance_day: {
+        Args: {
+          p_date: string
+          p_employee: string
+          p_ot?: number
+          p_site: string
+          p_wage: number
+          p_work_units: number
+        }
+        Returns: string
       }
       save_employee: {
         Args: {

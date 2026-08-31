@@ -201,8 +201,15 @@
   --color-brand-solid-hover: var(--brand-solid-hover);
   --color-brand-solid-active: var(--brand-solid-active);
   --color-sidebar: var(--sidebar);
+  /* 🔴 สองบรรทัดนี้เคยหายไป — โทเคนถูกประกาศใน :root ครบ แต่ไม่ได้ส่งเข้า @theme
+     Tailwind จึงไม่รู้จัก `text-sidebar-title` / `bg-sidebar-hover` แล้ว**ไม่สร้าง
+     CSS ให้เลย** ไม่มี error ที่ไหน · ผลคือชื่อบริษัทกับชื่อผู้ใช้ตกไปใช้ `--ink`
+     (เกือบดำ) บนแผงกรมท่า = อ่านไม่ออกบนจอใหญ่ และลิงก์เมนูไม่มี hover
+     · `verify-tokens.mjs` ตรวจข้อนี้แล้ว (§17 ข้อ 15) */
+  --color-sidebar-title: var(--sidebar-title);
   --color-sidebar-fg: var(--sidebar-fg);
   --color-sidebar-fg-dim: var(--sidebar-fg-dim);
+  --color-sidebar-hover: var(--sidebar-hover);
   --color-sidebar-active-bg: var(--sidebar-active-bg);
   --color-sidebar-active-fg: var(--sidebar-active-fg);
   --color-sidebar-line: var(--sidebar-line);

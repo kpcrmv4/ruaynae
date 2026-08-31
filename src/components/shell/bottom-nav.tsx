@@ -1,9 +1,9 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { ChevronRight, LogOut, MoreHorizontal, Plus, UserRound } from 'lucide-react'
+import { ChevronRight, MoreHorizontal, Plus, UserRound } from 'lucide-react'
 import Link from 'next/link'
-import { usePathname, useRouter } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   bottomNavFor,
@@ -12,6 +12,7 @@ import {
   type QuickAddTone,
   type Role,
 } from '@/components/shell/nav'
+import { SignOutButton } from '@/components/shell/sign-out-button'
 import { ThemeToggle } from '@/components/theme-toggle'
 
 /**
@@ -39,10 +40,8 @@ export function BottomNav({
   const slots = bottomNavFor(role)
   const quickAdd = quickAddFor(role)
   const pathname = usePathname()
-  const router = useRouter()
   const [moreOpen, setMoreOpen] = useState(false)
   const [addOpen, setAddOpen] = useState(false)
-  const [signingOut, setSigningOut] = useState(false)
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
 
@@ -52,18 +51,6 @@ export function BottomNav({
     ...g,
     items: g.items.filter((i) => !inBar.has(i.href)),
   })).filter((g) => g.items.length > 0)
-
-  async function signOut() {
-    if (signingOut) return
-    setSigningOut(true)
-    const r = await fetch('/api/auth/logout', { method: 'POST' })
-    if (r.ok) {
-      router.refresh()
-      router.push('/login')
-    } else {
-      setSigningOut(false)
-    }
-  }
 
   return (
     <>
@@ -205,10 +192,7 @@ export function BottomNav({
               ))}
 
               <div className="p-4">
-                <button onClick={signOut} disabled={signingOut} className="btn-secondary w-full">
-                  <LogOut className="size-4" />
-                  {signingOut ? 'กำลังออกจากระบบ' : 'ออกจากระบบ'}
-                </button>
+                <SignOutButton className="btn-secondary w-full" />
               </div>
             </Dialog.Content>
           </Dialog.Portal>

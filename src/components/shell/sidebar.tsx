@@ -4,6 +4,7 @@ import { HardHat } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { navFor, type Role } from '@/components/shell/nav'
+import { SignOutButton } from '@/components/shell/sign-out-button'
 
 /**
  * sidebar เดสก์ท็อป — แผงกรมท่าเข้ม ไม่ใช่สีแบรนด์
@@ -101,6 +102,9 @@ export function Sidebar({
       <div className="mt-auto border-t border-sidebar-line px-2.5 pt-3">
         <div className="truncate text-sm font-semibold text-sidebar-title">{userName}</div>
         <div className="truncate text-xs text-sidebar-fg-dim">{roleLabel}</div>
+        {/* ทางออกจากระบบของจอใหญ่ — เดิมมีแต่ในแผ่น "เพิ่มเติม" ของแถบล่างมือถือ
+            ซึ่งถูกซ่อนด้วย lg:hidden คนใช้เดสก์ท็อปจึงออกจากระบบไม่ได้เลย */}
+        <SignOutButton className="mt-2.5 flex w-full items-center gap-2 rounded-md px-2.5 py-2 text-sm font-medium text-sidebar-fg transition-colors duration-150 hover:bg-sidebar-hover hover:text-sidebar-title disabled:pointer-events-none disabled:opacity-60" />
       </div>
     </nav>
   )

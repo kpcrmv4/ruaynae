@@ -375,6 +375,14 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 - [x] **P6 · Audit** — หน้า `/audit` + กรอง + pagination, ตรวจว่าทุกตารางมี trigger จริง
 - [x] **P7 · PWA + push** — manifest, SW, subscribe, ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ, badge
 - [x] **P8 · seed/reset + ตรวจรับ** — ตาม §13 แล้วไล่ acceptance matrix ทุกเฟสให้ปิด
+- [ ] **P9 · ตัวเชื่อม MCP อ่านอย่างเดียว** — `mcp_keys`/`mcp_call_log`, ฟังก์ชัน `mcp_*` 6 ตัวที่
+      **สวมสิทธิ์เจ้าของแล้วเรียก RPC เงินตัวเดิม** (สูตรอยู่ที่เดียว), tool 7 ตัว + prompt 3 อัน,
+      เซิร์ฟเวอร์ Streamable HTTP เขียนเอง (`POST /api/mcp/[key]` + `Authorization: Bearer`),
+      หน้า `/mcp` ออก/เพิกถอนคีย์ + คู่มือเชื่อมต่อ · `MCP_KEY_PEPPER` (§18)
+      · 🔴 **401 ห้ามมี `WWW-Authenticate`** — header นั้นทำให้ client เริ่ม OAuth discovery แล้วค้าง
+      · **ยังไม่ปิด:** เหลือ 3 แถวแดงใน `docs/test-plan/P9.md` — `P9-TOOL-08` (ไซต์ที่ไม่มีอยู่จริง
+      ตอบออบเจ็กต์ว่างแทน `isError`) · `P9-UI-05` (`mcp/loading.tsx` ไม่ได้ใช้ `<PageSkeleton>`)
+      · `P9-UI-06` (กล่องเตือน localhost ไม่มี `data-testid`)
 
 **เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อไซต์+เตือน · ปันส่วนเงินเดือนเข้าไซต์ตามวัน
 
@@ -467,6 +475,8 @@ R2_SECRET_ACCESS_KEY=                # ← ผู้ใช้กรอก
 
 PIN_PEPPER=                          # สร้างให้ (random 32 bytes)
 CRON_SECRET=                         # สร้างให้ (random 32 bytes)
+MCP_KEY_PEPPER=                      # สร้างให้ (random 32 bytes) · pepper ของคีย์ตัวเชื่อม MCP
+#                                      ไม่มีค่า fallback โดยเจตนา — ไม่ตั้ง = /api/mcp ตอบ 500
 VAPID_PUBLIC_KEY=                    # สร้างให้
 VAPID_PRIVATE_KEY=                   # สร้างให้
 NEXT_PUBLIC_VAPID_PUBLIC_KEY=        # = VAPID_PUBLIC_KEY
@@ -491,9 +501,13 @@ ENABLE_DEMO_LOGIN=1                      # opt-in เท่านั้น · �
    — ยังไม่เปิดตอนพัฒนาเพราะมันจะปฏิเสธรหัสทดสอบ `123456` ทันที ทำให้ล็อกอินไม่ได้
 3. เปลี่ยนรหัสผ่าน/PIN ของบัญชีทดสอบทั้งหมดก่อนส่งมอบ
 ให้ P8 เขียนสคริปต์ตรวจข้อนี้ ไม่ใช่จำเอา
+4. `MCP_KEY_PEPPER` ใน Vercel ต้องเป็น **ค่าเดียวกับในเครื่อง** — สร้างใหม่ = คีย์ที่ออกให้เจ้าของ
+   ไปแล้วตายทุกใบพร้อมกัน โดยอาการที่เจ้าของเห็นคือ connector ที่เคยใช้ได้กลายเป็น 401 เฉย ๆ
+   ไม่มีข้อความบอกว่าเพราะอะไร · และต้องใช้ URL **production** ไม่ใช่ preview
+   (Deployment Protection ของ preview ตอบกำแพงล็อกอินที่ connector ผ่านไปไม่ได้)
 
 ⚠️ **ห้ามเขียนทับค่าที่มีอยู่แล้ว** — สร้าง VAPID ใหม่ = subscription ของทุกเครื่องตายหมด
-⚠️ ตอน deploy ต้องคัดลอก `PIN_PEPPER` / `CRON_SECRET` / VAPID ชุดเดียวกันไปใส่ใน Vercel env
+⚠️ ตอน deploy ต้องคัดลอก `PIN_PEPPER` / `CRON_SECRET` / `MCP_KEY_PEPPER` / VAPID ชุดเดียวกันไปใส่ใน Vercel env
 ⚠️ `NEXT_PUBLIC_*` ถูกฝังตอนเริ่ม dev server — แก้แล้วต้องรีสตาร์ท ไม่ใช่แค่ refresh
 
 <!-- BEGIN:nextjs-agent-rules -->

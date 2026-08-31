@@ -76,6 +76,8 @@ export function AttendanceBoard({
   const [bulkBusy, setBulkBusy] = useState(false)
   const [half, setHalf] = useState<Record<string, boolean>>({})
   const [ot, setOt] = useState<Record<string, string>>({})
+  // คนที่ติ๊กไว้รอบันทึก — ลงชื่อทีเดียวทั้งชุด ไม่ใช่กดทีละคน
+  const [picked, setPicked] = useState<Record<string, boolean>>({})
 
   const byEmployee = new Map(signedIn.map((r) => [r.employee_id, r]))
   const inSite = employees.filter((e) => byEmployee.has(e.id))
@@ -125,23 +127,44 @@ export function AttendanceBoard({
     }
   }
 
-  async function signIn(employeeId: string) {
-    if (busy || bulkBusy) return
-    setBusy(employeeId)
-    // ลงครึ่งวันที่ไซต์อื่นไปแล้ว = เหลือโควตาแค่ครึ่งวัน ส่งเต็มวันไปก็โดนปฏิเสธ
-    const cap = capacityOf(employeeId)
-    const code = await postSignIn(
-      employeeId,
-      half[employeeId] || cap < 1 ? 0.5 : 1,
-      Number(ot[employeeId] ?? 0) || 0,
+  /** คนที่เลือกได้จริง — คนเต็มโควตาที่ไซต์อื่นแล้วกดยังไงก็ไม่ผ่าน */
+  const selectable = notIn.filter((e) => capacityOf(e.id) > 0)
+  const pickedIds = selectable.filter((e) => picked[e.id]).map((e) => e.id)
+  const allPicked = selectable.length > 0 && pickedIds.length === selectable.length
+
+  const toggle = (employeeId: string) =>
+    setPicked((p) => ({ ...p, [employeeId]: !p[employeeId] }))
+
+  const toggleAll = () =>
+    setPicked(
+      allPicked ? {} : Object.fromEntries(selectable.map((e) => [e.id, true])),
     )
-    if (code === null) {
-      toast.success('ลงชื่อแล้ว')
-      router.refresh()
-    } else {
-      toast.error(code === 'NETWORK' ? 'เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่' : fail(code))
+
+  /**
+   * ลงชื่อทุกคนที่ติ๊กไว้ในทีเดียว
+   *
+   * ยิงผ่าน API เดิมทีละคน — ด่านของฐานข้อมูล (กันซ้ำ · เพดาน 1 วัน · ไซต์ที่ดูแล)
+   * จึงตรวจครบทุกคนเหมือนกดทีละคน ไม่มีทางลัดไหนถูกข้าม
+   */
+  async function signInPicked() {
+    if (busy || bulkBusy || pickedIds.length === 0) return
+    setBulkBusy(true)
+    let ok = 0
+    const failures: string[] = []
+    for (const id of pickedIds) {
+      // ลงครึ่งวันที่ไซต์อื่นไปแล้ว = เหลือโควตาแค่ครึ่งวัน ส่งเต็มวันไปก็โดนปฏิเสธ
+      const units = Math.min(half[id] ? 0.5 : 1, capacityOf(id))
+      const code = await postSignIn(id, units, Number(ot[id] ?? 0) || 0)
+      if (code === null) ok += 1
+      else failures.push(code)
     }
-    setBusy(null)
+    if (ok > 0 && failures.length === 0) toast.success(`ลงชื่อแล้ว ${ok} คน`)
+    else if (ok > 0) toast.success(`ลงชื่อแล้ว ${ok} คน · ไม่สำเร็จ ${failures.length} คน`)
+    // ล้มทั้งหมด: บอกเหตุผลจริงของรายการแรก ดีกว่าข้อความกลาง ๆ ที่ไม่ช่วยอะไร
+    else toast.error(failures[0] === 'NETWORK' ? 'เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่' : fail(failures[0]))
+    setPicked({})
+    router.refresh()
+    setBulkBusy(false)
   }
 
   /**
@@ -298,6 +321,16 @@ export function AttendanceBoard({
           <span className="ml-auto text-xs font-normal tnum text-muted-token">
             {notIn.length} คน
           </span>
+          {selectable.length > 0 && (
+            <button
+              type="button"
+              onClick={toggleAll}
+              disabled={bulkBusy}
+              className="btn-ghost -my-1 shrink-0 text-brand hover:text-brand"
+            >
+              {allPicked ? 'ล้างที่เลือก' : 'เลือกทุกคน'}
+            </button>
+          )}
         </div>
         {notIn.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-token">
@@ -314,82 +347,108 @@ export function AttendanceBoard({
               const full = Boolean(other) && cap <= 0
               const halfOnly = Boolean(other) && cap > 0 && cap < 1
               const where = other?.siteNames.join(' · ')
+              const on = Boolean(picked[e.id]) && !full
               return (
                 <li
                   key={e.id}
-                  className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-3.5 py-2.5 last:border-b-0 md:px-4 ${
-                    full ? 'bg-surface-2' : ''
-                  }`}
+                  className={`border-b border-line-soft last:border-b-0 ${full ? 'bg-surface-2' : ''}`}
                 >
-                  <div className="min-w-0 flex-1">
-                    <div className={`truncate font-medium ${full ? 'text-muted-token' : 'text-ink'}`}>
-                      {e.full_name}
-                    </div>
-                    <div className="truncate text-xs text-muted-token">
-                      {e.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
-                      {/* บอกตั้งแต่ก่อนกด ไม่ใช่ให้กดแล้วค่อยขึ้น error */}
-                      {other && (
-                        <>
-                          {' · '}
-                          <span className={full ? 'font-medium text-urgent' : 'text-status-progress'}>
-                            {where ? `วันนี้อยู่ ${where}` : 'วันนี้ลงชื่อที่ไซต์อื่นแล้ว'}
-                            {full ? ' (เต็มวัน)' : ' (ครึ่งวัน)'}
-                          </span>
-                        </>
-                      )}
-                    </div>
-                  </div>
-
-                  {full ? (
-                    <span className="chip shrink-0 bg-status-pending-bg text-status-pending ring-status-pending-ring">
-                      ลงครบวันแล้ว
+                  {/*
+                    🔴 ชื่อคนต้องได้ความกว้างของตัวเอง — เดิมยัด ชื่อ + ครึ่งวัน + OT +
+                    ปุ่ม ไว้บรรทัดเดียว สามอันหลังเป็น `shrink-0` ชื่อจึงถูกบีบเหลือ
+                    "ค…" บนจอ 390px · ตอนนี้ทั้งแถวเป็นปุ่มติ๊กเลือก และตัวเลือกย่อย
+                    ไปอยู่บรรทัดที่สองเฉพาะคนที่เลือกไว้
+                  */}
+                  <button
+                    type="button"
+                    onClick={() => toggle(e.id)}
+                    disabled={full || bulkBusy}
+                    aria-pressed={on}
+                    className={`flex w-full items-center gap-3 px-3.5 py-3 text-left transition-colors duration-100 md:px-4 ${
+                      on ? 'bg-brand-tint' : 'active:bg-surface-2'
+                    } ${full ? 'cursor-not-allowed' : ''}`}
+                  >
+                    <span
+                      aria-hidden
+                      className={`grid size-5.5 shrink-0 place-items-center rounded-sm border-2 transition-colors duration-100 ${
+                        on
+                          ? 'border-brand-solid bg-brand-solid text-white'
+                          : full
+                            ? 'border-line'
+                            : 'border-line-strong'
+                      }`}
+                    >
+                      {on && <Check className="size-3.5" strokeWidth={3} />}
                     </span>
-                  ) : (
-                    <>
-                      {halfOnly ? (
-                        // โควตาเหลือครึ่งวัน — ไม่ให้เลือกเป็นอย่างอื่น เพราะเลือกไปก็ถูกปฏิเสธ
-                        <span className="chip shrink-0 bg-status-progress-bg text-status-progress ring-status-progress-ring">
-                          ลงได้ครึ่งวัน
-                        </span>
-                      ) : (
-                        <label className="flex shrink-0 items-center gap-1.5 text-sm text-ink-2">
+
+                    <span className="min-w-0 flex-1">
+                      <span
+                        className={`block truncate text-base font-medium ${
+                          full ? 'text-muted-token' : 'text-ink'
+                        }`}
+                      >
+                        {e.full_name}
+                      </span>
+                      <span className="block truncate text-xs text-muted-token">
+                        {e.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
+                        {/* บอกตั้งแต่ก่อนกด ไม่ใช่ให้กดแล้วค่อยขึ้น error */}
+                        {other && (
+                          <>
+                            {' · '}
+                            <span
+                              className={full ? 'font-medium text-urgent' : 'text-status-progress'}
+                            >
+                              {where ? `วันนี้อยู่ ${where}` : 'วันนี้ลงชื่อที่ไซต์อื่นแล้ว'}
+                              {full ? ' (เต็มวัน)' : ' (ครึ่งวัน)'}
+                            </span>
+                          </>
+                        )}
+                      </span>
+                    </span>
+
+                    {full && (
+                      <span className="chip shrink-0 bg-status-pending-bg text-status-pending ring-status-pending-ring">
+                        ลงครบวันแล้ว
+                      </span>
+                    )}
+                    {halfOnly && !full && (
+                      <span className="chip shrink-0 bg-status-progress-bg text-status-progress ring-status-progress-ring">
+                        ลงได้ครึ่งวัน
+                      </span>
+                    )}
+                  </button>
+
+                  {/* ตัวเลือกย่อยของคนที่ติ๊กไว้ — โผล่เมื่อจำเป็นเท่านั้น
+                      คนที่เหลือโควตาครึ่งวันไม่มีให้เลือก เพราะเลือกอย่างอื่นก็ถูกปฏิเสธ */}
+                  {on && (halfOnly === false || canSeeMoney) && (
+                    <div className="flex flex-wrap items-center gap-x-4 gap-y-2 border-t border-line-soft bg-surface-2 px-3.5 py-2.5 md:px-4">
+                      {!halfOnly && (
+                        <label className="flex items-center gap-2 text-sm text-ink-2">
                           <input
                             type="checkbox"
                             checked={Boolean(half[e.id])}
                             onChange={(ev) => setHalf((h) => ({ ...h, [e.id]: ev.target.checked }))}
-                            className="size-4 accent-brand"
+                            className="size-4.5 accent-brand"
                           />
                           ครึ่งวัน
                         </label>
                       )}
-
                       {/* ช่อง OT เป็นเงิน — เจ้าของเท่านั้นที่เห็นและกรอกได้ */}
                       {canSeeMoney && (
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={ot[e.id] ?? ''}
-                          onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
-                          placeholder="OT ฿"
-                          aria-label={`ค่า OT ของ ${e.full_name}`}
-                          className="input-base w-24 shrink-0 tnum"
-                        />
+                        <label className="flex items-center gap-2 text-sm text-ink-2">
+                          OT
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={ot[e.id] ?? ''}
+                            onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
+                            placeholder="฿0"
+                            aria-label={`ค่า OT ของ ${e.full_name}`}
+                            className="input-base w-24 py-1.5 tnum"
+                          />
+                        </label>
                       )}
-
-                      <button
-                        type="button"
-                        onClick={() => signIn(e.id)}
-                        disabled={busy !== null || bulkBusy}
-                        className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        {busy === e.id ? (
-                          <Loader2 className="size-4 animate-spin" />
-                        ) : (
-                          <Check className="size-4" />
-                        )}
-                        เข้าไซต์
-                      </button>
-                    </>
+                    </div>
                   )}
                 </li>
               )
@@ -403,21 +462,50 @@ export function AttendanceBoard({
           บนจอเล็กลอยเหนือแถบเมนูล่าง · หัวหน้าไซต์เห็นจำนวนคน ไม่เห็นเงิน */}
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 lg:bottom-4">
         <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-e2">
-          <UserRound className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
-          <div className="min-w-0 flex-1">
-            <div className="text-xs text-muted-token">เข้าไซต์แล้ว</div>
-            <div
-              className="truncate text-lg font-bold leading-6 tnum text-ink"
-              {...(dayWage !== undefined ? { 'data-day-wage': dayWage } : {})}
-            >
-              {inSite.length} คน
-              {dayWage !== undefined && (
-                <span className="ml-1.5 font-semibold">· ค่าแรงวันนี้ {fmtBaht(dayWage)}</span>
+          {pickedIds.length > 0 ? (
+            // ติ๊กค้างไว้แล้ว — แถบเปลี่ยนเป็นปุ่มบันทึกทั้งชุด บันทึกครั้งเดียวจบ
+            <>
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-muted-token">เลือกไว้</div>
+                <div className="truncate text-lg font-bold leading-6 tnum text-ink">
+                  {pickedIds.length} คน
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={signInPicked}
+                disabled={bulkBusy || busy !== null}
+                className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {bulkBusy ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <Check className="size-4" />
+                )}
+                {bulkBusy ? 'กำลังลงชื่อ…' : `ลงชื่อ ${pickedIds.length} คน`}
+              </button>
+            </>
+          ) : (
+            <>
+              <UserRound className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs text-muted-token">เข้าไซต์แล้ว</div>
+                <div
+                  className="truncate text-lg font-bold leading-6 tnum text-ink"
+                  {...(dayWage !== undefined ? { 'data-day-wage': dayWage } : {})}
+                >
+                  {inSite.length} คน
+                  {dayWage !== undefined && (
+                    <span className="ml-1.5 font-semibold">· ค่าแรงวันนี้ {fmtBaht(dayWage)}</span>
+                  )}
+                </div>
+              </div>
+              {notIn.length > 0 && (
+                <span className="shrink-0 text-sm tnum text-muted-token">
+                  ยังไม่เข้า {notIn.length} คน
+                </span>
               )}
-            </div>
-          </div>
-          {notIn.length > 0 && (
-            <span className="shrink-0 text-sm tnum text-muted-token">ยังไม่เข้า {notIn.length} คน</span>
+            </>
           )}
         </div>
       </div>

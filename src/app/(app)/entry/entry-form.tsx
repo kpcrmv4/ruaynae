@@ -454,7 +454,7 @@ export function EntryForm({
                   <img
                     src={s.preview}
                     alt="สลิปที่แนบ"
-                    className="size-20 rounded-md border border-line object-cover animate-pop-in"
+                    className="size-20 rounded-md border border-line object-cover animate-zoom-in"
                   />
                   <button
                     type="button"

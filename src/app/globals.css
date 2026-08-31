@@ -345,11 +345,28 @@
 
 @keyframes kp-fade-in { from { opacity: 0 } to { opacity: 1 } }
 
-/* โมดัล: ขึ้นมา 8px พร้อมย่อเล็กน้อย — ไม่ใช่เด้ง
-   translate ต้องคง -50% ทั้งสองแกนไว้ ไม่งั้นกล่องจะกระโดดออกจากกลางจอ */
+/* โมดัลกลางจอ: ขึ้นมา 8px พร้อมย่อเล็กน้อย — ไม่ใช่เด้ง
+   🔴 ต้องเขียนด้วย property `translate`/`scale` ห้ามใช้ `transform`
+   Tailwind v4 คอมไพล์ `-translate-x-1/2 -translate-y-1/2` เป็น property
+   `translate` (คนละตัวกับ `transform`) ถ้า keyframes ตรงนี้ไปตั้ง `transform`
+   มันจะ **ทบกัน ไม่ใช่ทับกัน** — กล่องถูกเลื่อนซ้ายรวม -100% แทน -50%
+   ขอบขวาไปตกที่กึ่งกลางจอพอดี จอกว้างยังอยู่ในจอ (แค่เยื้องซ้ายจนไม่มีใคร
+   สังเกต) จอแคบหลุดออกนอกจอเลย — วัดจริง 31 ส.ค. 2569 ที่จอ 390px:
+   กล่องกว้าง 358 → getBoundingClientRect().left = -163
+   (v3 คอมไพล์ utility เป็น `transform` ซึ่งเป็น property เดียวกับ keyframes
+   เดิม จึงทับกันถูกต้องมาตลอด — บั๊กนี้เป็น regression จากการย้ายมา v4) */
 @keyframes kp-pop-in {
-  from { opacity: 0; transform: translate(-50%, calc(-50% + 8px)) scale(0.98) }
-  to   { opacity: 1; transform: translate(-50%, -50%) scale(1) }
+  from { opacity: 0; translate: -50% calc(-50% + 8px); scale: 0.98 }
+  to   { opacity: 1; translate: -50% -50%; scale: 1 }
+}
+
+/* ย่อ-ขยายอย่างเดียว สำหรับของที่ **ไม่ได้** อยู่กลางจอ (เช่นรูปย่อสลิปที่
+   เพิ่งแนบ) — ห้ามแตะ translate เพราะของกลุ่มนี้ไม่ได้ถูกจัดกึ่งกลางด้วย
+   -translate-x/y-1/2 ถ้าใช้ kp-pop-in (ด้านบน) กับของกลุ่มนี้ มันจะกระโดด
+   ไปครึ่งขนาดตัวเองทันทีตอนอนิเมชั่นเริ่ม */
+@keyframes kp-zoom-in {
+  from { opacity: 0; scale: 0.98 }
+  to   { opacity: 1; scale: 1 }
 }
 
 /* แถวในลิสต์และการ์ดสรุป — ไล่ขึ้นมาทีละใบ */
@@ -367,6 +384,7 @@
 @layer components {
   .animate-fade-in { animation: kp-fade-in 180ms var(--ease-out-quart) both; }
   .animate-pop-in  { animation: kp-pop-in 220ms var(--ease-out-quart) both; }
+  .animate-zoom-in { animation: kp-zoom-in 220ms var(--ease-out-quart) both; }
   .animate-rise-in { animation: kp-rise-in 300ms var(--ease-out-quart) both; }
   .animate-grow-x  { animation: kp-grow-x 380ms var(--ease-out-quart) both;
                      transform-origin: left center; }

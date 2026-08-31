@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Receipt } from 'lucide-react'
+import { Receipt, Warehouse } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -83,11 +83,21 @@ export default async function LedgerPage({
     return count ?? 0
   }
 
-  const [listResult, ...counts] = await Promise.all([
+  const [listResult, siteFilterName, ...counts] = await Promise.all([
     listQuery
       .order('txn_date', { ascending: false })
       .order('id', { ascending: false })
       .range(0, PAGE_SIZE),
+    // ชื่อไซต์ที่กำลังกรองอยู่ — ตัวกรองที่มองไม่เห็นคือตัวกรองที่ทำให้คนอ่าน
+    // ตัวเลขผิดขอบเขตโดยไม่รู้ตัว · RLS กรองอีกชั้น ไซต์ที่ไม่มีสิทธิ์เห็นคืนค่าว่าง
+    sp.site && sp.site !== 'central'
+      ? sb
+          .from('sites')
+          .select('name')
+          .eq('id', sp.site)
+          .maybeSingle()
+          .then(({ data }) => data?.name ?? null)
+      : Promise.resolve(null),
     countFor('all'),
     ...TXN_STATUSES.map((s) => countFor(s)),
   ])
@@ -163,6 +173,11 @@ export default async function LedgerPage({
   const isFiltered = terms.length > 0 || status !== 'all' || kind !== 'all'
     || Boolean(sp.site) || Boolean(sp.from) || Boolean(sp.to)
 
+  // ลิงก์ถอดตัวกรองไซต์ออก โดยเก็บตัวกรองอื่นไว้ทั้งหมด
+  const clearSite = new URLSearchParams(keep)
+  clearSite.delete('site')
+  const clearSiteHref = clearSite.toString() ? `/ledger?${clearSite}` : '/ledger'
+
   return (
     <>
       <div className="mb-5">
@@ -203,7 +218,32 @@ export default async function LedgerPage({
         filters={filters}
         activeFilter={status}
         placeholder="ค้นหาจากรายละเอียด…"
+        // ตัวกรองที่ไม่มีปุ่มของตัวเองบนแถบนี้ ต้องติดไปกับชิปและการค้นหาด้วย
+        // ไม่งั้นกดชิปสถานะแล้วขอบเขต "เฉพาะไซต์นี้" หายไปเงียบ ๆ
+        extra={{
+          ...(kind !== 'all' ? { kind } : {}),
+          ...(sp.site ? { site: sp.site } : {}),
+          ...(sp.from ? { from: sp.from } : {}),
+          ...(sp.to ? { to: sp.to } : {}),
+        }}
       />
+
+      {/* ── ขอบเขตที่กำลังดูอยู่ — มาจากปุ่มลัดบนหน้าไซต์หรือการ์ดงานวันนี้ ──
+          ต้องเห็นว่ากรองอยู่ และต้องออกจากมันได้ในแตะเดียว */}
+      {sp.site && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-brand-tint-strong bg-brand-tint px-3 py-2">
+          <Warehouse className="size-4 shrink-0 text-brand-on-tint" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-on-tint">
+            เฉพาะ{sp.site === 'central' ? 'รายการส่วนกลาง (ไม่ผูกไซต์)' : `ไซต์ ${siteFilterName ?? 'ที่เลือก'}`}
+          </span>
+          <Link
+            href={clearSiteHref}
+            className="shrink-0 rounded-sm px-2 py-0.5 text-sm font-semibold text-brand-on-tint underline underline-offset-2"
+          >
+            ดูทุกไซต์
+          </Link>
+        </div>
+      )}
 
       {page.length === 0 ? (
         <EmptyState

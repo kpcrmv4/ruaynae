@@ -32,7 +32,7 @@ const isUploadError = (e: unknown): e is Error =>
   e instanceof Error && e.name === UPLOAD_ERROR
 
 export function EntryForm({
-  role, today, sites, categories, initialKind = 'expense',
+  role, today, sites, categories, initialKind = 'expense', initialSiteId,
 }: {
   role: Role
   /** วันนี้ตามเวลาไทย คำนวณฝั่งเซิร์ฟเวอร์ — ห้ามใช้ new Date() ที่นี่
@@ -42,6 +42,8 @@ export function EntryForm({
   categories: Category[]
   /** เปิดหน้าจากแผ่นบันทึกประจำวันด้วย ?kind=income — หน้า page กรอง role ให้แล้ว */
   initialKind?: TxnKind
+  /** เปิดหน้าจากปุ่มลัดบนหน้าไซต์ด้วย ?site= — หน้า page ตรวจแล้วว่าไซต์นี้เลือกได้จริง */
+  initialSiteId?: string
 }) {
   const router = useRouter()
   const isOwner = role === 'owner'
@@ -56,7 +58,8 @@ export function EntryForm({
   const amountRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
     // "ส่วนกลาง" มีเฉพาะฝั่งรายจ่ายของเจ้าของ — เปิดหน้าแบบรายรับต้องไม่ตกไปที่ค่านั้น
-    siteId: sites[0]?.id ?? (isOwner && initialKind === 'expense' ? CENTRAL : ''),
+    siteId:
+      initialSiteId ?? sites[0]?.id ?? (isOwner && initialKind === 'expense' ? CENTRAL : ''),
     categoryId: '',
     amount: '',
     txnDate: today,
@@ -80,7 +83,13 @@ export function EntryForm({
   const switchKind = (next: TxnKind) => {
     setKind(next)
     // หมวดของอีกชนิดใช้ไม่ได้ — ล้างทิ้งแทนที่จะปล่อยให้ส่งไปแล้วโดนปฏิเสธ
-    setForm((f) => ({ ...f, categoryId: '', siteId: next === 'income' ? (sites[0]?.id ?? '') : f.siteId }))
+    // ไซต์ที่เลือกไว้ต้องอยู่ต่อ (เข้ามาจากปุ่มลัดของไซต์ก็ยังเป็นไซต์นั้น) —
+    // ยกเว้น "ส่วนกลาง" ซึ่งฝั่งรายรับไม่มีตัวเลือกนี้
+    setForm((f) => ({
+      ...f,
+      categoryId: '',
+      siteId: next === 'income' && f.siteId === CENTRAL ? (sites[0]?.id ?? '') : f.siteId,
+    }))
     setFieldError(null)
   }
 

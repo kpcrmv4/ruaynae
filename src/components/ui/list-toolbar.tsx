@@ -34,6 +34,7 @@ export function ListToolbar({
   filterParam = 'status',
   placeholder = 'ค้นหา…',
   searchLabel = 'ค้นหา',
+  extra,
 }: {
   basePath: string
   q: string
@@ -42,7 +43,16 @@ export function ListToolbar({
   filterParam?: string
   placeholder?: string
   searchLabel?: string
+  /**
+   * ตัวกรองอื่นที่ต้องติดไปกับทุกลิงก์และการค้นหา (เช่น `site`, `from`, `to`)
+   *
+   * 🔴 ไม่มีตัวนี้ ชิปสถานะจะสร้าง URL ใหม่จากศูนย์แล้ว**ทิ้งตัวกรองที่ผู้ใช้
+   * ตั้งไว้เงียบ ๆ** — คนกรองไซต์เดียวอยู่ พอกดชิป "รออนุมัติ" จะได้ทั้งบริษัท
+   * โดยไม่มีอะไรบอกว่าขอบเขตเปลี่ยนไปแล้ว
+   */
+  extra?: Record<string, string>
 }) {
+  const extras = Object.entries(extra ?? {}).filter(([, v]) => v !== '')
   return (
     <div className="mb-4 flex flex-col gap-2.5 md:flex-row md:items-center md:justify-between">
       {/* phones: one scrolling strip (the scrollbar itself is noise, hence
@@ -52,6 +62,7 @@ export function ListToolbar({
           const params = new URLSearchParams()
           if (f.key !== 'all') params.set(filterParam, f.key)
           if (q) params.set('q', q)
+          for (const [k, v] of extras) params.set(k, v)
           const href = params.toString() ? `${basePath}?${params}` : basePath
           const active = activeFilter === f.key
           return (
@@ -85,6 +96,9 @@ export function ListToolbar({
       <form action={basePath} method="get" className="flex shrink-0 gap-2 md:w-[19rem]">
         {/* keep the active filter when searching, or typing silently resets it */}
         {activeFilter !== 'all' && <input type="hidden" name={filterParam} value={activeFilter} />}
+        {extras.map(([k, v]) => (
+          <input key={k} type="hidden" name={k} value={v} />
+        ))}
         <div className="relative flex-1">
           <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-token" />
           <input

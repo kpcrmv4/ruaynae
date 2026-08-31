@@ -1,6 +1,6 @@
 'use client'
 
-import { Check, Loader2, UserRound, X } from 'lucide-react'
+import { Check, History, Loader2, UserRound, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -45,6 +45,8 @@ export function AttendanceBoard({
   employees,
   signedIn,
   canSeeMoney,
+  dayWage,
+  yesterdaySignIns,
 }: {
   date: string
   today: string
@@ -54,16 +56,27 @@ export function AttendanceBoard({
   signedIn: Row[]
   /** เจ้าของเท่านั้น — หัวหน้าไซต์บันทึกว่าใครมา ไม่ได้ดูเงิน */
   canSeeMoney: boolean
+  /** ค่าแรงรวมของวัน จาก RPC ฝั่งเซิร์ฟเวอร์ — undefined = คนดูไม่มีสิทธิ์เห็นเงิน */
+  dayWage?: number
+  /** ใครเข้าไซต์นี้เมื่อวาน (วันก่อนวันที่เลือก) — ป้อนปุ่ม "เหมือนเมื่อวาน" */
+  yesterdaySignIns: { employee_id: string; work_units: number }[]
 }) {
   const router = useRouter()
   const params = useSearchParams()
   const [busy, setBusy] = useState<string | null>(null)
+  const [bulkBusy, setBulkBusy] = useState(false)
   const [half, setHalf] = useState<Record<string, boolean>>({})
   const [ot, setOt] = useState<Record<string, string>>({})
 
   const byEmployee = new Map(signedIn.map((r) => [r.employee_id, r]))
   const inSite = employees.filter((e) => byEmployee.has(e.id))
   const notIn = employees.filter((e) => !byEmployee.has(e.id))
+
+  // ชุดของเมื่อวานที่ยังไม่ถูกลงวันนี้ และคนยังอยู่ในรายชื่อ (ไม่ถูกปิดใช้งาน)
+  const employeeIds = new Set(employees.map((e) => e.id))
+  const copyFromYesterday = yesterdaySignIns.filter(
+    (r) => employeeIds.has(r.employee_id) && !byEmployee.has(r.employee_id),
+  )
 
   /** เปลี่ยนวันหรือไซต์ = เปลี่ยน URL — แชร์ลิงก์ได้ กดย้อนกลับได้ */
   function go(next: Record<string, string>) {
@@ -72,9 +85,8 @@ export function AttendanceBoard({
     router.push(`/attendance?${p.toString()}`)
   }
 
-  async function signIn(employeeId: string) {
-    if (busy) return
-    setBusy(employeeId)
+  /** ยิงลงชื่อหนึ่งคน — คืนรหัสเหตุผลที่ไม่สำเร็จ (null = สำเร็จ) ให้ผู้เรียกสรุปข้อความเอง */
+  async function postSignIn(employeeId: string, workUnits: number, otAmount: number) {
     try {
       const r = await fetch('/api/attendance', {
         method: 'POST',
@@ -83,27 +95,61 @@ export function AttendanceBoard({
           siteId,
           employeeId,
           workDate: date,
-          workUnits: half[employeeId] ? 0.5 : 1,
+          workUnits,
           // ส่งเฉพาะตอนเป็นเจ้าของ · API ก็เพิกเฉยค่าที่หัวหน้าไซต์ส่งมาอีกชั้น
-          ...(canSeeMoney ? { otAmount: Number(ot[employeeId] ?? 0) || 0 } : {}),
+          ...(canSeeMoney ? { otAmount } : {}),
         }),
       })
+      if (r.ok) return null
       const b = await r.json().catch(() => ({}))
-      if (!r.ok) {
-        toast.error(fail(b.error))
-        return
-      }
-      toast.success('ลงชื่อแล้ว')
-      router.refresh()
+      return typeof b.error === 'string' ? b.error : 'UNKNOWN'
     } catch {
-      toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
-    } finally {
-      setBusy(null)
+      return 'NETWORK'
     }
   }
 
+  async function signIn(employeeId: string) {
+    if (busy || bulkBusy) return
+    setBusy(employeeId)
+    const code = await postSignIn(
+      employeeId,
+      half[employeeId] ? 0.5 : 1,
+      Number(ot[employeeId] ?? 0) || 0,
+    )
+    if (code === null) {
+      toast.success('ลงชื่อแล้ว')
+      router.refresh()
+    } else {
+      toast.error(code === 'NETWORK' ? 'เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่' : fail(code))
+    }
+    setBusy(null)
+  }
+
+  /**
+   * ลงชื่อทั้งชุดของเมื่อวานในแตะเดียว — ชุดคนหน้างานมักซ้ำกันทั้งสัปดาห์
+   *
+   * ยิงผ่าน API เดิมทีละคน (ด่านกันซ้ำ/กันเกินวันของฐานข้อมูลยังตรวจครบทุกคน)
+   * คัดลอกเฉพาะ เต็มวัน/ครึ่งวัน — OT เป็นเรื่องของแต่ละวัน ไม่คัดลอก
+   */
+  async function signInLikeYesterday() {
+    if (busy || bulkBusy || copyFromYesterday.length === 0) return
+    setBulkBusy(true)
+    let ok = 0
+    let skipped = 0
+    for (const r of copyFromYesterday) {
+      const code = await postSignIn(r.employee_id, r.work_units === 0.5 ? 0.5 : 1, 0)
+      if (code === null) ok += 1
+      else skipped += 1
+    }
+    if (ok > 0 && skipped === 0) toast.success(`ลงชื่อเหมือนเมื่อวานแล้ว ${ok} คน`)
+    else if (ok > 0) toast.success(`ลงชื่อแล้ว ${ok} คน · ข้าม ${skipped} คน (ถูกลงชื่อที่อื่นแล้ว)`)
+    else toast.error('ลงชื่อไม่สำเร็จ ลองติ๊กทีละคนเพื่อดูเหตุผล')
+    router.refresh()
+    setBulkBusy(false)
+  }
+
   async function signOut(row: Row) {
-    if (busy) return
+    if (busy || bulkBusy) return
     setBusy(row.employee_id)
     try {
       const r = await fetch(`/api/attendance/${row.id}`, { method: 'DELETE' })
@@ -152,6 +198,21 @@ export function AttendanceBoard({
         </div>
       </div>
 
+      {/* ทางลัดของเช้าวันปกติ — ชุดคนเหมือนเมื่อวาน ไม่ต้องไล่ติ๊กใหม่ทั้งไซต์ */}
+      {copyFromYesterday.length > 0 && (
+        <button
+          type="button"
+          onClick={signInLikeYesterday}
+          disabled={busy !== null || bulkBusy}
+          className="btn-secondary w-full disabled:cursor-not-allowed disabled:opacity-60 sm:w-auto"
+        >
+          {bulkBusy ? <Loader2 className="size-4 animate-spin" /> : <History className="size-4" />}
+          {bulkBusy
+            ? 'กำลังลงชื่อ…'
+            : `เหมือนเมื่อวาน — ลงชื่อ ${copyFromYesterday.length} คนเดิม`}
+        </button>
+      )}
+
       <section className="panel">
         <div className="panel-head">
           เข้าไซต์แล้ว
@@ -192,7 +253,7 @@ export function AttendanceBoard({
                   <button
                     type="button"
                     onClick={() => signOut(row)}
-                    disabled={busy !== null}
+                    disabled={busy !== null || bulkBusy}
                     aria-label={`เอา ${e.full_name} ออกจากไซต์`}
                     className="btn-secondary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
                   >
@@ -262,7 +323,7 @@ export function AttendanceBoard({
                 <button
                   type="button"
                   onClick={() => signIn(e.id)}
-                  disabled={busy !== null}
+                  disabled={busy !== null || bulkBusy}
                   className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
                 >
                   {busy === e.id ? (
@@ -277,6 +338,30 @@ export function AttendanceBoard({
           </ul>
         )}
       </section>
+
+      {/* ── แถบสรุปลอยล่าง — เห็นตลอดเวลาที่ไล่ติ๊กรายชื่อยาว ๆ ─────────────
+          ตัวเลขมาจากเซิร์ฟเวอร์ (router.refresh() หลังทุกการติ๊ก) ไม่ใช่บวกเอง
+          บนจอเล็กลอยเหนือแถบเมนูล่าง · หัวหน้าไซต์เห็นจำนวนคน ไม่เห็นเงิน */}
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 lg:bottom-4">
+        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-e2">
+          <UserRound className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-muted-token">เข้าไซต์แล้ว</div>
+            <div
+              className="truncate text-lg font-bold leading-6 tnum text-ink"
+              {...(dayWage !== undefined ? { 'data-day-wage': dayWage } : {})}
+            >
+              {inSite.length} คน
+              {dayWage !== undefined && (
+                <span className="ml-1.5 font-semibold">· ค่าแรงวันนี้ {fmtBaht(dayWage)}</span>
+              )}
+            </div>
+          </div>
+          {notIn.length > 0 && (
+            <span className="shrink-0 text-sm tnum text-muted-token">ยังไม่เข้า {notIn.length} คน</span>
+          )}
+        </div>
+      </div>
     </div>
   )
 }

@@ -4,7 +4,7 @@ import { ClipboardCheck, Inbox } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
-import { fmtBaht, fmtDate } from '@/lib/format'
+import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
 import { INCOME_KIND_LABEL, PAY_METHOD_LABEL } from '@/lib/transactions'
 import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
@@ -65,6 +65,12 @@ export default async function ApprovalsPage({
   const page = hasMore ? all.slice(0, PAGE_SIZE) : all
   const last = page[page.length - 1]
 
+  // อายุของรายการในคิว — เทียบกับสิ้นวันนี้เวลาไทย ให้ของเมื่อวานนับเป็น 1 วัน
+  // ค้างนานคือสัญญาณว่าหัวหน้าไซต์กำลังรอคำตอบ ไม่ใช่แค่ตัวเลขประดับ
+  const endOfToday = Date.parse(`${todayInBangkok()}T23:59:59+07:00`)
+  const ageDays = (iso: string) =>
+    Math.max(0, Math.floor((endOfToday - Date.parse(iso)) / 86_400_000))
+
   return (
     <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
@@ -114,7 +120,8 @@ export default async function ApprovalsPage({
                       src={`/api/uploads/${t.attachments[0].id}?thumb=1`}
                       alt="สลิป"
                       loading="lazy"
-                      className="size-14 rounded-sm border border-line object-cover transition-colors hover:border-brand"
+                      // จอเล็กรูปใหญ่ขึ้น — สลิปคือหลักฐานที่ต้องอ่านก่อนกด ไม่ใช่ของประดับ
+                      className="size-16 rounded-sm border border-line object-cover transition-colors hover:border-brand sm:size-14"
                     />
                   </a>
                 )}
@@ -144,6 +151,18 @@ export default async function ApprovalsPage({
                     <span className="font-medium text-ink-2">
                       {t.profiles?.full_name ?? 'ผู้ใช้ที่ถูกลบแล้ว'}
                     </span>
+                    {ageDays(t.created_at) >= 1 && (
+                      <>
+                        {' · '}
+                        <span
+                          className={
+                            ageDays(t.created_at) >= 2 ? 'font-semibold text-urgent' : undefined
+                          }
+                        >
+                          ค้าง {ageDays(t.created_at)} วัน
+                        </span>
+                      </>
+                    )}
                   </div>
                   {t.note && <div className="mt-0.5 text-sm text-ink-2">{t.note}</div>}
                 </div>

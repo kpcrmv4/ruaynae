@@ -3,7 +3,7 @@ import { HardHat } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
-import { fmtBaht, fmtDateLong, todayInBangkok } from '@/lib/format'
+import { fmtDateLong, todayInBangkok } from '@/lib/format'
 import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import { AttendanceBoard } from './attendance-client'
@@ -79,7 +79,17 @@ export default async function AttendancePage({
     )
   }
 
-  const [{ data: employees, error: eErr }, { data: rows, error: aErr }, { data: dayWage }] =
+  // วันก่อนหน้าของวันที่เลือก — ใช้กับปุ่ม "เหมือนเมื่อวาน" (ชุดคนมักซ้ำกันทั้งสัปดาห์)
+  const prev = new Date(`${date}T00:00:00Z`)
+  prev.setUTCDate(prev.getUTCDate() - 1)
+  const prevDate = prev.toISOString().slice(0, 10)
+
+  const [
+    { data: employees, error: eErr },
+    { data: rows, error: aErr },
+    { data: dayWage },
+    { data: prevRows, error: pErr },
+  ] =
     await Promise.all([
       // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้เลย — หัวหน้าไซต์มีหน้าที่บันทึกว่าใครมาทำงาน
       // ไม่ใช่ดูเงิน (เจ้าของสั่งไว้ 31 ส.ค. 2569) · เรตอยู่ `employee_wages`
@@ -131,12 +141,19 @@ export default async function AttendancePage({
             })),
       // 🔴 ยอดรวมมาจากฐานข้อมูล ไม่ใช่บวกแถวที่หน้านี้โหลดมา —
       // ไซต์ที่มีคนงานเกินหนึ่งหน้า ยอดจะน้อยกว่าความจริงโดยไม่มี error
-      // · RPC คืน null ให้คนที่ไม่ใช่เจ้าของ การ์ดจึงหายไปทั้งใบ ไม่ใช่โชว์ ฿0
+      // · RPC คืน null ให้คนที่ไม่ใช่เจ้าของ ยอดเงินจึงหายไป ไม่ใช่โชว์ ฿0
       sb.rpc('site_day_wage', { p_site: siteId, p_on: date }),
+      sb
+        .from('attendance')
+        .select('employee_id, work_units')
+        .eq('site_id', siteId)
+        .eq('work_date', prevDate)
+        .order('created_at', { ascending: true })
+        .range(0, PAGE_SIZE - 1),
     ])
 
-  if (eErr || aErr) {
-    console.error('[attendance] โหลดข้อมูลไม่ได้', eErr?.message ?? aErr?.message)
+  if (eErr || aErr || pErr) {
+    console.error('[attendance] โหลดข้อมูลไม่ได้', eErr?.message ?? aErr?.message ?? pErr?.message)
     return (
       <DataError message="โหลดข้อมูลคนเข้าไซต์ไม่สำเร็จ" />
     )
@@ -144,7 +161,7 @@ export default async function AttendancePage({
 
   return (
     <>
-      <Header date={date} total={dayWage === null ? undefined : Number(dayWage)} />
+      <Header date={date} />
       <AttendanceBoard
         date={date}
         today={today}
@@ -153,28 +170,23 @@ export default async function AttendancePage({
         employees={employees ?? []}
         canSeeMoney={isOwner}
         signedIn={rows}
+        dayWage={dayWage === null ? undefined : Number(dayWage)}
+        yesterdaySignIns={(prevRows ?? []).map((r) => ({
+          employee_id: r.employee_id,
+          work_units: Number(r.work_units),
+        }))}
       />
     </>
   )
 }
 
-function Header({ date, total }: { date: string; total?: number }) {
+function Header({ date }: { date: string }) {
   return (
-    <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-      <div className="min-w-0">
-        <h1 className="text-2xl font-bold text-ink">คนเข้าไซต์</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          ติ๊กคนที่มาทำงาน — ค่าแรงเข้าต้นทุนไซต์ทันทีโดยไม่ต้องรออนุมัติ
-        </p>
-      </div>
-      {total !== undefined && (
-        <div className="shrink-0 rounded-lg border border-line bg-surface px-4 py-2 text-right shadow-e1">
-          <div className="text-xs font-medium text-muted-token">ค่าแรงวันนี้</div>
-          <div data-day-wage={total} className="text-xl font-bold tnum text-ink">
-            {fmtBaht(total)}
-          </div>
-        </div>
-      )}
+    <div className="mb-4">
+      <h1 className="text-2xl font-bold text-ink">คนเข้าไซต์</h1>
+      <p className="mt-0.5 text-sm text-muted-token">
+        {fmtDateLong(date)} · ติ๊กคนที่มาทำงาน — ค่าแรงเข้าต้นทุนไซต์ทันทีโดยไม่ต้องรออนุมัติ
+      </p>
     </div>
   )
 }

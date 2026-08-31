@@ -23,21 +23,27 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
   // แต่ `.order()` + `.range()` ยังต้องมีเสมอ ไม่พึ่งค่าเริ่มต้นของ PostgREST
   // 🔴 ตัวเลขบนกระดิ่งนับในฐานข้อมูล ไม่ใช่ `items.filter().length`
   // ซึ่งจะหยุดเพิ่มที่ 20 แล้วคนจะเชื่อว่าค้างอยู่แค่นั้น
-  const [{ data: items, error: nErr }, { count, error: cErr }] = await Promise.all([
-    sb
-      .from('notifications')
-      .select('id, kind, title, body, link, read_at, created_at')
-      .order('created_at', { ascending: false })
-      .range(0, BELL_SIZE - 1),
-    sb
-      .from('notifications')
-      .select('id', { count: 'exact', head: true })
-      .is('read_at', null),
-  ])
+  const [{ data: items, error: nErr }, { count, error: cErr }, { count: pendingCount, error: pErr }] =
+    await Promise.all([
+      sb
+        .from('notifications')
+        .select('id, kind, title, body, link, read_at, created_at')
+        .order('created_at', { ascending: false })
+        .range(0, BELL_SIZE - 1),
+      sb
+        .from('notifications')
+        .select('id', { count: 'exact', head: true })
+        .is('read_at', null),
+      // ตัวเลขค้างอนุมัติบนเมนู — เฉพาะเจ้าของ (ช่อง "รออนุมัติ" มีแค่ฝั่งนั้น)
+      // หัวหน้าไซต์ไม่ยิง query นี้เลย ไม่ใช่ยิงแล้วเอาไปซ่อน
+      user.role === 'owner'
+        ? sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+        : Promise.resolve({ count: 0, error: null }),
+    ])
 
-  if (nErr || cErr) {
-    // กระดิ่งพังต้องไม่ทำให้ทั้งแอปพัง — บันทึกไว้แล้วแสดงเป็นกระดิ่งว่าง
-    console.error('[shell] อ่านแจ้งเตือนไม่ได้', nErr?.message ?? cErr?.message)
+  if (nErr || cErr || pErr) {
+    // กระดิ่ง/ตัวเลขเมนูพังต้องไม่ทำให้ทั้งแอปพัง — บันทึกไว้แล้วแสดงเป็นค่าว่าง
+    console.error('[shell] อ่านแจ้งเตือนไม่ได้', nErr?.message ?? cErr?.message ?? pErr?.message)
   }
 
   return (
@@ -50,6 +56,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
         roleLabel={ROLE_LABEL[user.role]}
         companyName={branding.companyName}
         logoUrl={branding.logoUrl}
+        pendingCount={pendingCount ?? 0}
       />
       {/* min-w-0 บนคอลัมน์เนื้อหา ไม่งั้นตารางกว้าง ๆ จะดันทั้งหน้าให้เลื่อนออกด้านข้าง
           แทนที่จะเลื่อนอยู่ในกล่องของตัวเอง */}
@@ -62,7 +69,12 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
           unread={count ?? 0}
         />
         <main className="mx-auto w-full max-w-5xl flex-1 p-4 lg:p-6">{children}</main>
-        <BottomNav role={user.role} />
+        <BottomNav
+          role={user.role}
+          userName={user.fullName}
+          roleLabel={ROLE_LABEL[user.role]}
+          pendingCount={pendingCount ?? 0}
+        />
       </div>
     </div>
   )

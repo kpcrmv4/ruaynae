@@ -16,12 +16,15 @@ export function Sidebar({
   roleLabel,
   companyName,
   logoUrl,
+  pendingCount,
 }: {
   role: Role
   userName: string
   roleLabel: string
   companyName: string
   logoUrl: string | null
+  /** จำนวนรายการรออนุมัติ — โชว์เป็นป้ายแดงท้ายเมนู "รออนุมัติ" (เจ้าของเท่านั้นที่มีเมนูนี้) */
+  pendingCount: number
 }) {
   // 🔴 คำนวณเมนูในฝั่ง client เอง ห้ามรับเป็น prop จาก Server Component
   // เพราะ icon เป็นคอมโพเนนต์ (ฟังก์ชัน) ซึ่งข้ามเส้น server→client ไม่ได้
@@ -74,7 +77,7 @@ export function Sidebar({
                 <item.icon className="size-5 shrink-0" strokeWidth={1.8} />
                 {/* min-w-0 จำเป็น ไม่งั้น truncate ในลูกจะไม่ทำงานเพราะ flex item
                     มีความกว้างขั้นต่ำเท่าเนื้อหา */}
-                <span className="flex min-w-0 flex-col">
+                <span className="flex min-w-0 flex-1 flex-col">
                   <span className="truncate leading-tight">{item.label}</span>
                   <span
                     className={`truncate text-[11px] font-normal leading-tight ${
@@ -84,6 +87,11 @@ export function Sidebar({
                     {item.sub}
                   </span>
                 </span>
+                {item.href === '/approvals' && pendingCount > 0 && (
+                  <span className="ml-auto shrink-0 rounded-full bg-urgent-solid px-1.5 py-px text-[11px] font-bold leading-tight text-white tnum">
+                    {pendingCount > 99 ? '99+' : pendingCount}
+                  </span>
+                )}
               </Link>
             )
           })}

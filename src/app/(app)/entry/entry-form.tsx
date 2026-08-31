@@ -1,6 +1,6 @@
 'use client'
 
-import { Banknote, Camera, Check, ImagePlus, Loader2, Wallet, X } from 'lucide-react'
+import { Banknote, Camera, Check, Coins, ImagePlus, Landmark, Loader2, Wallet, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -32,7 +32,7 @@ const isUploadError = (e: unknown): e is Error =>
   e instanceof Error && e.name === UPLOAD_ERROR
 
 export function EntryForm({
-  role, today, sites, categories,
+  role, today, sites, categories, initialKind = 'expense',
 }: {
   role: Role
   /** วันนี้ตามเวลาไทย คำนวณฝั่งเซิร์ฟเวอร์ — ห้ามใช้ new Date() ที่นี่
@@ -40,19 +40,23 @@ export function EntryForm({
   today: string
   sites: Site[]
   categories: Category[]
+  /** เปิดหน้าจากแผ่นบันทึกประจำวันด้วย ?kind=income — หน้า page กรอง role ให้แล้ว */
+  initialKind?: TxnKind
 }) {
   const router = useRouter()
   const isOwner = role === 'owner'
 
-  const [kind, setKind] = useState<TxnKind>('expense')
+  const [kind, setKind] = useState<TxnKind>(initialKind)
   const [busy, setBusy] = useState(false)
   const [fieldError, setFieldError] = useState<{ field: string; text: string } | null>(null)
   const [slips, setSlips] = useState<Slip[]>([])
   const [uploading, setUploading] = useState(false)
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
+  const amountRef = useRef<HTMLInputElement>(null)
   const [form, setForm] = useState({
-    siteId: sites[0]?.id ?? (isOwner ? CENTRAL : ''),
+    // "ส่วนกลาง" มีเฉพาะฝั่งรายจ่ายของเจ้าของ — เปิดหน้าแบบรายรับต้องไม่ตกไปที่ค่านั้น
+    siteId: sites[0]?.id ?? (isOwner && initialKind === 'expense' ? CENTRAL : ''),
     categoryId: '',
     amount: '',
     txnDate: today,
@@ -239,6 +243,9 @@ export function EntryForm({
       for (const s of slips) URL.revokeObjectURL(s.preview)
       setSlips([])
       setForm((f) => ({ ...f, amount: '', note: '', installmentNo: '' }))
+      // จังหวะ "บันทึกรายการต่อ" — ไซต์ หมวด วันที่ วิธีจ่าย ค้างไว้ให้
+      // เคอร์เซอร์กลับไปที่ช่องยอดเงิน คีย์บิลใบถัดไปได้เลย
+      amountRef.current?.focus()
       router.refresh()
     } catch {
       toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
@@ -296,6 +303,7 @@ export function EntryForm({
           <label htmlFor="amount" className="label-base">จำนวนเงิน (บาท)</label>
           <input
             id="amount"
+            ref={amountRef}
             type="text"
             inputMode="decimal"
             value={form.amount}
@@ -312,6 +320,41 @@ export function EntryForm({
               <p className="mt-1 text-sm text-muted-token tnum">{fmtBaht(amountNumber)}</p>
             )
           )}
+        </div>
+
+        {/* ── หมวดเป็นชิปแตะได้เลย ไม่ใช่กล่องเลือกที่ต้องเปิดก่อน ────────
+            หมวดมีไม่กี่ตัวและใช้ซ้ำทุกวัน — เห็นครบ แตะเดียวจบ และตัวที่เลือก
+            ค้างอยู่ให้เห็นตอน "บันทึกรายการต่อ" ว่ากำลังคีย์หมวดเดิมอยู่ */}
+        <div>
+          <span id="category-label" className="label-base">หมวด</span>
+          {visibleCategories.length === 0 ? (
+            <p className="text-sm text-muted-token">
+              ยังไม่มีหมวดของ{kind === 'income' ? 'รายรับ' : 'รายจ่าย'} — เจ้าของเพิ่มได้ที่หน้าตั้งค่า
+            </p>
+          ) : (
+            <div role="radiogroup" aria-labelledby="category-label" className="flex flex-wrap gap-2">
+              {visibleCategories.map((c) => {
+                const active = form.categoryId === c.id
+                return (
+                  <button
+                    key={c.id}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => set('categoryId', c.id)}
+                    className={`min-h-11 rounded-md border px-3.5 text-sm transition-colors duration-100 ${
+                      active
+                        ? 'border-brand bg-brand-tint font-semibold text-brand-on-tint'
+                        : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2'
+                    }`}
+                  >
+                    {c.name}
+                  </button>
+                )
+              })}
+            </div>
+          )}
+          {err('category') && <p className="mt-1 text-sm text-urgent">{err('category')}</p>}
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2">
@@ -338,23 +381,6 @@ export function EntryForm({
           </div>
 
           <div>
-            <label htmlFor="category" className="label-base">หมวด</label>
-            <select
-              id="category"
-              value={form.categoryId}
-              onChange={(e) => set('categoryId', e.target.value)}
-              aria-invalid={err('category') ? 'true' : undefined}
-              className="input-base"
-            >
-              <option value="">— เลือกหมวด —</option>
-              {visibleCategories.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
-            {err('category') && <p className="mt-1 text-sm text-urgent">{err('category')}</p>}
-          </div>
-
-          <div>
             {/* 🔴 input type=date แสดงปี พ.ศ. บนเครื่องที่ตั้งภาษาไทย
                 แต่ค่าที่อ่านได้เป็น ค.ศ. เสมอ — ส่งลงฐานข้อมูลได้ตรง ๆ */}
             <label htmlFor="date" className="label-base">วันที่</label>
@@ -369,17 +395,31 @@ export function EntryForm({
           </div>
 
           <div>
-            <label htmlFor="pay" className="label-base">จ่ายด้วย</label>
-            <select
-              id="pay"
-              value={form.payMethod}
-              onChange={(e) => set('payMethod', e.target.value as PayMethod)}
-              className="input-base"
-            >
-              {PAY_METHODS.map((m) => (
-                <option key={m} value={m}>{PAY_METHOD_LABEL[m]}</option>
-              ))}
-            </select>
+            {/* สองทางเลือกที่สลับกันทุกรายการ — สองปุ่มเห็นสถานะค้าง เร็วกว่ากล่องเลือก */}
+            <span id="pay-label" className="label-base">จ่ายด้วย</span>
+            <div role="radiogroup" aria-labelledby="pay-label" className="grid grid-cols-2 gap-2">
+              {PAY_METHODS.map((m) => {
+                const active = form.payMethod === m
+                const Icon = m === 'cash' ? Coins : Landmark
+                return (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={active}
+                    onClick={() => set('payMethod', m)}
+                    className={`flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm transition-colors duration-100 ${
+                      active
+                        ? 'border-brand bg-brand-tint font-semibold text-brand-on-tint'
+                        : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2'
+                    }`}
+                  >
+                    <Icon className="size-4.5" strokeWidth={1.8} />
+                    {PAY_METHOD_LABEL[m]}
+                  </button>
+                )
+              })}
+            </div>
           </div>
 
           {kind === 'income' && (
@@ -509,9 +549,27 @@ export function EntryForm({
           </p>
         </div>
 
-        <button onClick={submit} disabled={busy || uploading} className="btn-primary w-full py-3 text-lg">
+      </div>
+
+      {/* ── ปุ่มบันทึกลอยเหนือแถบเมนูล่างเสมอ ─────────────────────────────
+          ฟอร์มยาวกว่าจอมือถือ — ปุ่มที่ต้องเลื่อนหาคือปุ่มที่กดช้าไปหนึ่งจังหวะ
+          ยอดเงินอยู่บนปุ่นให้เช็คตาเปล่าอีกรอบก่อนกด · บนเดสก์ท็อปกลับไปอยู่
+          ท้ายฟอร์มตามปกติ */}
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mt-4 lg:static">
+        <button
+          onClick={submit}
+          disabled={busy || uploading}
+          className="btn-primary w-full py-3 text-lg shadow-e2 lg:shadow-none"
+        >
           {busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
-          {busy ? 'กำลังบันทึก…' : 'บันทึก'}
+          {busy ? (
+            'กำลังบันทึก…'
+          ) : (
+            <>
+              บันทึก
+              {amountValid && <span className="tnum">{fmtBaht(amountNumber)}</span>}
+            </>
+          )}
         </button>
       </div>
     </div>

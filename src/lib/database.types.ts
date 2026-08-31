@@ -1068,6 +1068,43 @@ export type Database = {
         }[]
       }
       is_owner: { Args: never; Returns: boolean }
+      mcp_assume_owner: { Args: { p_actor: string }; Returns: undefined }
+      mcp_overview: { Args: { p_actor: string; p_on?: string }; Returns: Json }
+      mcp_payroll: {
+        Args: { p_actor: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_pending: {
+        Args: { p_actor: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_site_detail: {
+        Args: { p_actor: string; p_site: string }
+        Returns: Json
+      }
+      mcp_sites: {
+        Args: {
+          p_actor: string
+          p_limit?: number
+          p_offset?: number
+          p_status?: string
+        }
+        Returns: Json
+      }
+      mcp_transactions: {
+        Args: {
+          p_actor: string
+          p_from?: string
+          p_kind?: string
+          p_limit?: number
+          p_offset?: number
+          p_site?: string
+          p_status?: string
+          p_terms?: string[]
+          p_to?: string
+        }
+        Returns: Json
+      }
       payroll_balances: {
         Args: never
         Returns: {

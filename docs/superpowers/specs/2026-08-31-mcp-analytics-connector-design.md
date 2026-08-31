@@ -57,7 +57,7 @@
 Claude (คลาวด์ Anthropic)  ──POST──▶  /api/mcp/<key>
                                           │ 1. ถอดคีย์ → HMAC → หาแถวใน mcp_keys
                                           │ 2. เพิกถอนแล้ว / ไม่พบ → 401 (ไม่มี WWW-Authenticate)
-                                          │ 3. เกิน rate limit → 429
+                                          │ 3. เกิน rate limit → 200 + isError (§5.3)
                                           │ 4. dispatch JSON-RPC
                                           ▼
                                     src/lib/mcp/*  ── admin client (service_role) ──▶  mcp_*()
@@ -441,7 +441,7 @@ MCP_KEY_PEPPER=      # ใหม่ · random 32 bytes — ผมสร้าง
 | 7 | `initialize` สะท้อน `protocolVersion` ที่ส่งไป | ส่งค่าแปลก ๆ เข้าไปแล้วดูว่าสะท้อนกลับ |
 | 8 | **ไม่มีฟิลด์ใน blocklist หลุด** | ยิงทุก tool แล้วไล่หาคีย์ต้องห้ามใน JSON ที่ได้ทั้งก้อน |
 | 9 | ไม่มี tool ไหนเขียนได้ | นับแถวทุกตารางก่อน/หลังยิงครบทุก tool — ต้องเท่าเดิม |
-| 10 | rate limit ทำงาน | ยิงเกินเพดานแล้วต้องได้ 429 |
+| 10 | rate limit ทำงาน | ยิงเกินเพดานแล้วได้ `200` ที่มี `result.isError === true` พร้อมข้อความไทยว่าเรียกถี่เกินไป (ดู §5.3 — **ไม่ใช่ 429**) |
 | 11 | ทุก call ลง `mcp_call_log` | นับก่อน/หลัง |
 | 12 | `p_actor` ที่ไม่ใช่เจ้าของ → exception | เรียก `mcp_*` ด้วย id ของหัวหน้าไซต์ |
 | 13 | `audit_row()` ยังตัด `pin_hash` **และ** ตัด `key_hash` | แก้ `profiles` กับ `mcp_keys` อย่างละแถว แล้วอ่าน `audit_log` ว่าไม่มีทั้งสองคีย์ |

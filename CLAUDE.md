@@ -137,7 +137,12 @@ create type payroll_status as enum ('open','closed');
 1. **เพดานเบิกล่วงหน้า** — trigger `before insert/update on advances`:
    `เพดาน = Σ attendance.amount (ยังไม่ปิดรอบ) − Σ advances.amount (ยังไม่หัก)` เกินแล้ว `raise exception`
 2. **`wage_snapshot` ห้ามแก้หลังปิดรอบ** — guard trigger บน `attendance`
-3. **`transactions.status`** — supervisor เปลี่ยนเป็น `approved` ไม่ได้ · แก้ `amount` หลัง `approved` ไม่ได้
+3. **`transactions.status`** — supervisor เปลี่ยนเป็น `approved` ไม่ได้ · supervisor แก้/ลบรายการที่
+   `approved` แล้วไม่ได้ · supervisor แก้รายการที่ `rejected` ของตัวเองได้ และ trigger จะดันสถานะ
+   กลับเป็น `pending` ให้เอง (= ส่งใหม่) · **เจ้าของแก้และลบได้ทุกแถวรวมที่อนุมัติแล้ว**
+   เพราะรายการที่เจ้าของคีย์เองเกิดมาเป็น `approved` ตั้งแต่วินาทีแรก ล็อกไว้แปลว่า
+   พิมพ์ยอดผิดหนึ่งหลักแล้วแก้ไม่ได้ตลอดกาล — **ความรับผิดชอบอยู่ที่ `audit_log`
+   (มี `before`/`after` ครบทุกครั้ง อ่านได้ที่ `/audit`) ไม่ใช่ที่การล็อกแถวไม่ให้ใครแตะ**
 4. **`profiles.role`** — เปลี่ยนได้เฉพาะ owner
 5. **Audit trigger** ติดกับ **ทุกตาราง** ในรายการข้างบน
 
@@ -325,14 +330,19 @@ src/
     (app)/settings/branding  ชื่อบริษัท + โลโก้
     api/auth/pin/route.ts
     api/branding/route.ts    ← ไม่ต้องล็อกอิน · หน้า login เรียกใช้
+    api/transactions/route.ts · api/transactions/[id]/route.ts
+    api/transactions/[id]/attachments/route.ts · api/attachments/[id]/route.ts
     api/uploads/sign/route.ts · api/uploads/[id]/route.ts
     api/cron/sweep-orphans/route.ts · api/cron/daily-digest/route.ts
     api/push/subscribe/route.ts
     globals.css · layout.tsx · loading.tsx · error.tsx
   components/ui/*          ← จาก thai-admin-page-kit
   components/{sites,ledger,attendance,employees}/*
+#                            ledger/txn-row.tsx (แถวรายการ ใช้ทั้ง /ledger และหน้าไซต์)
+#                            ledger/txn-edit.tsx (กล่องแก้ไข/ลบ — ตัวเดียวต่อหน้า)
   lib/supabase/{browser,server,admin,middleware}.ts
   lib/{r2,constants,dates,money,database.types}.ts
+  lib/{attachments,slip-upload}.ts   ← ผูกสลิปฝั่งเซิร์ฟเวอร์ / บีบ+อัปฝั่งเบราว์เซอร์
   proxy.ts
 supabase/migrations/*.sql
 docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
@@ -510,6 +520,24 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    — React 19 นับเป็น cascading render (`react-hooks/set-state-in-effect` เป็น **error**
    ไม่ใช่ warning) · ใช้ `useIsClient()` ใน `src/lib/use-is-client.ts` แทน
    ซึ่งมีช่อง `getServerSnapshot` ให้ตอบค่าฝั่งเซิร์ฟเวอร์แยกอยู่แล้ว
+
+17. **กฎที่ล็อกแถวไว้ ต้องถามก่อนว่ามันล็อก *ใคร* จริง ๆ**
+   "แก้ `amount` หลัง `approved` ไม่ได้" อ่านเหมือนกฎที่ทำให้การอนุมัติมีความหมาย
+   แต่ในระบบนี้ **เจ้าของคือคนอนุมัติ และรายการที่เจ้าของคีย์เองเป็น `approved`
+   ตั้งแต่วินาทีแรก** (route ตั้งให้ตาม role) · กฎนี้จึงไม่ได้กันเจ้าของจากใครเลย
+   มันแค่แปลว่าพิมพ์ยอดผิดหนึ่งหลักแล้วแก้ไม่ได้และลบไม่ได้ตลอดกาล — ทางออกเดียว
+   ที่เหลือคือปล่อยตัวเลขผิดค้างในรายงาน · คำถามที่ถูกคือ "ใครถูกกันจากใคร"
+   ไม่ใช่ "แถวนี้ล็อกแล้วหรือยัง" · **ร่องรอยความรับผิดชอบอยู่ที่ `audit_log`
+   ซึ่งเก็บ before/after ทุกครั้ง ไม่ใช่ที่การล็อกแถวไม่ให้ใครแตะ**
+   · เจอตอนเจ้าของแจ้งว่าแก้รายการที่บันทึกไปแล้วไม่ได้เลยสักรายการ (31 ส.ค. 2569)
+
+18. **ข้อความบนหน้าจอที่สัญญาสิ่งที่ policy ไม่อนุญาต — ไม่มี error ให้ใครเห็น**
+   กล่องตีกลับเขียนว่า *"คนที่คีย์จะได้รับแจ้งเตือนพร้อมเหตุผลนี้ เพื่อให้แก้แล้วส่งใหม่ได้"*
+   แต่ `transactions_update` ยอมให้แก้เฉพาะแถวที่ `status = 'pending'` · หัวหน้าไซต์
+   ที่ถูกตีกลับจึงแก้ใบเดิมไม่ได้ ลบก็ไม่ได้ ทำได้อย่างเดียวคือคีย์ใบใหม่แล้วทิ้ง
+   ใบเก่าค้างไว้ในระบบตลอดไป · อาการฝั่งผู้ใช้คือกดแล้ว "สำเร็จ" แต่ไม่มีอะไรเปลี่ยน
+   (RLS ตัดเหลือ 0 แถว แล้ว PostgREST ตอบ 200) · **ทุกประโยคบนหน้าจอที่บอกว่า
+   "ทำได้" คือข้อกำหนดหนึ่งข้อที่ต้องมีแถวตรวจรับรองรับ ไม่ใช่คำโฆษณา**
 
 ## 18. ตัวแปรสภาพแวดล้อม
 

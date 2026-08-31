@@ -1,4 +1,5 @@
 import type { Database } from '@/lib/database.types'
+import type { Role } from '@/lib/auth/current-user'
 import type { BadgeTone } from '@/components/ui/badge'
 import { parseAmount, parseDate } from '@/lib/sites'
 
@@ -62,6 +63,28 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
 export const isUuid = (v: unknown): v is string => typeof v === 'string' && UUID.test(v)
 
 export const MAX_NOTE = 500
+
+/**
+ * ใครแก้/ลบรายการไหนได้ — **สำเนาของ policy `transactions_update` และ
+ * `transactions_delete` ในรูปที่หน้าจอใช้ตัดสินว่าจะวาดปุ่มไหม**
+ *
+ * 🔴 ฐานข้อมูลยังเป็นคนบังคับจริงเสมอ ตรงนี้ไม่ใช่ด่าน — มันมีไว้เพื่อไม่ให้
+ * มีปุ่มที่กดแล้วโดนปฏิเสธทุกครั้ง (CLAUDE.md §15) · ปุ่มที่ไม่ควรมี ต้อง
+ * ไม่วาด ไม่ใช่วาดแล้ว disable
+ *
+ * เงื่อนไข `supervises_site` ไม่ต้องเช็คซ้ำที่นี่ เพราะแถวที่หัวหน้าไซต์
+ * **มองเห็น** ผ่าน `transactions_select` ผ่านเงื่อนไขนั้นมาแล้วทุกแถว
+ */
+export function canModifyTxn(
+  txn: { status: TxnStatus; created_by: string | null },
+  me: { id: string; role: Role },
+): boolean {
+  // เจ้าของแก้และลบได้ทุกแถว รวมที่อนุมัติแล้ว — เพราะรายการที่เจ้าของคีย์เอง
+  // เกิดมาเป็น `approved` ตั้งแต่แรก ล็อกไว้แปลว่าพิมพ์ผิดแล้วแก้ไม่ได้เลย
+  // ทุกการแก้/ลบถูกบันทึกใน `audit_log` ซึ่งเจ้าของย้อนดูได้ที่ /audit
+  if (me.role === 'owner') return true
+  return txn.created_by === me.id && txn.status !== 'approved'
+}
 
 export type TxnFields = {
   kind: TxnKind
@@ -197,9 +220,15 @@ export const TXN_MESSAGES: Record<string, string> = {
   ALREADY_APPROVED: 'รายการนี้ถูกอนุมัติไปแล้ว',
   REASON_REQUIRED: 'กรุณาบอกเหตุผลที่ตีกลับ',
   APPROVE_FORBIDDEN: 'เฉพาะเจ้าของเท่านั้นที่อนุมัติได้',
-  AMOUNT_LOCKED: 'แก้จำนวนเงินของรายการที่อนุมัติแล้วไม่ได้',
-  APPROVED_IMMUTABLE: 'รายการที่อนุมัติแล้วลบไม่ได้',
+  AMOUNT_LOCKED: 'แก้จำนวนเงินของรายการที่อนุมัติแล้วไม่ได้ — เจ้าของเป็นคนแก้ให้',
+  APPROVED_IMMUTABLE: 'ลบรายการที่อนุมัติแล้วไม่ได้ — เจ้าของเป็นคนลบให้',
   UPDATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
+  // ── แก้ไข / ลบ รายการที่บันทึกแล้ว ─────────────────────────────
+  EDIT_FORBIDDEN: 'แก้รายการนี้ไม่ได้ — แก้ได้เฉพาะรายการที่คุณคีย์เองและยังไม่อนุมัติ',
+  DELETE_FORBIDDEN: 'ลบรายการนี้ไม่ได้ — ลบได้เฉพาะรายการที่คุณคีย์เองและยังไม่อนุมัติ',
+  DELETE_FAILED: 'ลบไม่สำเร็จ กรุณาลองใหม่',
+  READ_FAILED: 'อ่านข้อมูลไม่สำเร็จ กรุณาลองใหม่',
+  ATTACHMENT_INVALID: 'สลิปที่แนบมาไม่ถูกต้อง กรุณาแนบใหม่',
 }
 
 export const txnError = (code?: string) =>

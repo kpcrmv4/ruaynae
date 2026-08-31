@@ -5,31 +5,21 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { Role } from '@/lib/auth/current-user'
-import { IMAGE, IMAGE_UPLOAD_ACCEPT, MAX_ATTACHMENTS } from '@/lib/constants'
+import { IMAGE_UPLOAD_ACCEPT, MAX_ATTACHMENTS } from '@/lib/constants'
 import { fmtBaht } from '@/lib/format'
+import { slipUploadError, uploadSlip, type UploadedSlip } from '@/lib/slip-upload'
 import {
   INCOME_KINDS, INCOME_KIND_LABEL, PAY_METHODS, PAY_METHOD_LABEL, txnError,
   type IncomeKind, type PayMethod, type TxnKind,
 } from '@/lib/transactions'
 
 type Site = { id: string; name: string }
-type Slip = { objectKey: string; thumbKey: string; preview: string; size: number }
 type Category = { id: string; name: string; kind: TxnKind }
 
 const fail = txnError
 
 
 const CENTRAL = '__central__'
-
-/**
- * error ที่ "เราเขียนข้อความเอง" — ติดป้ายไว้เพื่อให้ catch แยกออกจาก error
- * ของเบราว์เซอร์ ซึ่งเป็นภาษาอังกฤษและไม่ควรถูกโยนใส่หน้าจอผู้ใช้
- */
-const UPLOAD_ERROR = 'UploadError'
-const uploadError = (message: string) =>
-  Object.assign(new Error(message), { name: UPLOAD_ERROR })
-const isUploadError = (e: unknown): e is Error =>
-  e instanceof Error && e.name === UPLOAD_ERROR
 
 export function EntryForm({
   role, today, sites, categories, initialKind = 'expense', initialSiteId,
@@ -51,7 +41,7 @@ export function EntryForm({
   const [kind, setKind] = useState<TxnKind>(initialKind)
   const [busy, setBusy] = useState(false)
   const [fieldError, setFieldError] = useState<{ field: string; text: string } | null>(null)
-  const [slips, setSlips] = useState<Slip[]>([])
+  const [slips, setSlips] = useState<UploadedSlip[]>([])
   const [uploading, setUploading] = useState(false)
   const cameraRef = useRef<HTMLInputElement>(null)
   const galleryRef = useRef<HTMLInputElement>(null)
@@ -97,97 +87,22 @@ export function EntryForm({
   const amountValid = Number.isFinite(amountNumber) && amountNumber > 0
 
   /**
-   * บีบรูปแล้วอัปตรงเข้า R2 · ไบต์ไม่ผ่านเซิร์ฟเวอร์ของเราเลย
-   *
-   * 🔴 นำเข้าไลบรารีบีบรูปแบบ dynamic — มันหนักกว่าโค้ดทั้งหน้ารวมกัน
-   * และคนส่วนใหญ่เปิดหน้านี้เพื่อกรอกตัวเลข ไม่ได้แนบรูปทุกครั้ง
+   * บีบรูปแล้วอัปตรงเข้า R2 · ขั้นตอนจริงอยู่ใน `lib/slip-upload.ts`
+   * ที่เดียวกับที่กล่องแก้ไขรายการเรียกใช้
    */
   async function addFile(file: File) {
     if (slips.length >= MAX_ATTACHMENTS) {
       toast.error('แนบได้ไม่เกิน ' + MAX_ATTACHMENTS + ' รูปต่อรายการ')
       return
     }
-    // ตรงนี้จงใจ "หลวม" ต่างจากฟอร์มโลโก้ — สลิปถูกบีบเป็น WebP เสมอ
-    // (`fileType: IMAGE.type`) เซิร์ฟเวอร์จึงได้ชนิดที่รองรับแน่นอนไม่ว่าต้นทาง
-    // จะเป็นอะไร · เงื่อนไขเดียวที่แท้จริงคือ "เบราว์เซอร์ถอดรหัสรูปนี้ได้ไหม"
-    // ซึ่งรู้ได้ตอนบีบเท่านั้น · เช็คชนิดให้เข้มกว่านี้จะปฏิเสธรูปที่ใช้ได้จริง
-    // บนเครื่องที่ส่ง MIME แปลก ๆ มา แล้วคนคีย์ของกลางไซต์จะแนบสลิปไม่ได้เลย
-    if (!file.type.startsWith('image/')) {
-      toast.error('รองรับเฉพาะไฟล์รูปภาพ')
-      return
-    }
     setUploading(true)
     try {
-      const { default: compress } = await import('browser-image-compression')
-      let full: File
-      let thumb: File
-      try {
-        ;[full, thumb] = await Promise.all([
-          compress(file, {
-            maxWidthOrHeight: IMAGE.full.maxWidthOrHeight,
-            maxSizeMB: IMAGE.full.maxSizeMB,
-            fileType: IMAGE.type,
-            useWebWorker: true,
-          }),
-          compress(file, {
-            maxWidthOrHeight: IMAGE.thumb.maxWidthOrHeight,
-            maxSizeMB: IMAGE.thumb.maxSizeMB,
-            fileType: IMAGE.type,
-            useWebWorker: true,
-          }),
-        ])
-      } catch {
-        toast.error('เปิดไฟล์รูปนี้ไม่ได้ ลองถ่ายใหม่หรือเลือกรูปอื่น')
-        return
-      }
-
-      const signRes = await fetch('/api/uploads/sign', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          purpose: 'slip',
-          contentType: IMAGE.type,
-          siteId: form.siteId === CENTRAL ? null : form.siteId,
-          byteSize: full.size,
-        }),
-      })
-      const sign = await signRes.json().catch(() => ({}))
-      if (!signRes.ok) {
-        toast.error(fail(sign.error))
-        return
-      }
-
-      // 🔴 CORS ที่ไม่ครอบ origin นี้ทำให้ `fetch` โยน TypeError ซึ่งข้อความ
-      // ข้างในเป็นภาษาอังกฤษของเบราว์เซอร์ ("Failed to fetch") · เดิม catch
-      // ข้างล่างเอา `e.message` มาโชว์ตรง ๆ — คนงานกลางไซต์จึงเห็นอังกฤษ
-      const put = async (url: string, blob: Blob) => {
-        let r: Response
-        try {
-          r = await fetch(url, {
-            method: 'PUT',
-            headers: { 'Content-Type': IMAGE.type },
-            body: blob,
-          })
-        } catch {
-          throw uploadError('ต่อกับที่เก็บรูปไม่ได้ — ถ้าอินเทอร์เน็ตปกติ กรุณาแจ้งผู้ดูแลระบบ')
-        }
-        if (!r.ok) throw uploadError('ที่เก็บรูปปฏิเสธไฟล์นี้ (' + r.status + ')')
-      }
-      await Promise.all([put(sign.url, full), put(sign.thumbUrl, thumb)])
-
-      setSlips((cur) => [
-        ...cur,
-        {
-          objectKey: sign.key,
-          thumbKey: sign.thumbKey,
-          preview: URL.createObjectURL(thumb),
-          size: full.size,
-        },
-      ])
+      const slip = await uploadSlip(file, form.siteId === CENTRAL ? null : form.siteId)
+      setSlips((cur) => [...cur, slip])
     } catch (e) {
       // แสดงเฉพาะข้อความที่เราเขียนเอง — error จากเบราว์เซอร์หรือจากการโหลด
       // chunk เป็นภาษาอังกฤษล้วน และไม่บอกอะไรกับคนที่ยืนอยู่กลางไซต์
-      toast.error(isUploadError(e) ? e.message : 'แนบรูปไม่สำเร็จ กรุณาลองใหม่')
+      toast.error(slipUploadError(e))
     } finally {
       setUploading(false)
     }

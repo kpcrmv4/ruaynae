@@ -5,14 +5,12 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
 import { searchTerms } from '@/lib/search-core'
-import {
-  INCOME_KIND_LABEL, PAY_METHOD_LABEL, TXN_STATUSES, TXN_STATUS_LABEL, TXN_STATUS_TONE,
-  isTxnKind, isTxnStatus,
-} from '@/lib/transactions'
-import { Badge } from '@/components/ui/badge'
+import { TXN_STATUSES, TXN_STATUS_LABEL, isTxnKind, isTxnStatus } from '@/lib/transactions'
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
+import { TxnEditProvider } from '@/components/ledger/txn-edit'
+import { TxnRow } from '@/components/ledger/txn-row'
 
 export const metadata = { title: 'รายรับ-รายจ่าย' }
 
@@ -48,7 +46,7 @@ export default async function LedgerPage({
     .from('transactions')
     .select(`
       id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no, rejected_reason,
-      site_id, sites(name), categories(name),
+      site_id, created_by, category_id, sites(name), categories(name),
       attachments(id)
     `)
   if (status !== 'all') listQuery = listQuery.eq('status', status)
@@ -83,7 +81,7 @@ export default async function LedgerPage({
     return count ?? 0
   }
 
-  const [listResult, siteFilterName, ...counts] = await Promise.all([
+  const [listResult, siteFilterName, sitesResult, categoriesResult, ...counts] = await Promise.all([
     listQuery
       .order('txn_date', { ascending: false })
       .order('id', { ascending: false })
@@ -98,11 +96,34 @@ export default async function LedgerPage({
           .maybeSingle()
           .then(({ data }) => data?.name ?? null)
       : Promise.resolve(null),
+    // ตัวเลือกของกล่องแก้ไข — ชุดเดียวกับที่ `/entry` ใช้ตอนสร้างรายการ
+    // 🔴 RLS เป็นคนกรองว่าใครเห็นไซต์ไหน · หัวหน้าไซต์จึงย้ายรายการข้ามไป
+    // ไซต์ที่ตัวเองไม่ได้ดูแลไม่ได้ โดยไม่ต้องมีเงื่อนไขตรงนี้รู้เรื่องนั้นเลย
+    sb
+      .from('sites')
+      .select('id, name')
+      .in('status', ['planning', 'active', 'paused'])
+      .order('name', { ascending: true })
+      .range(0, PAGE_SIZE - 1),
+    sb
+      .from('categories')
+      .select('id, name, kind')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .range(0, PAGE_SIZE * 4 - 1),
     countFor('all'),
     ...TXN_STATUSES.map((s) => countFor(s)),
   ])
 
   const { data: rows, error } = listResult
+  if (sitesResult.error || categoriesResult.error) {
+    // ตัวเลือกโหลดไม่ได้ = กล่องแก้ไขจะเปิดมาแล้วไม่มีหมวดให้เลือก
+    // ลิสต์ยังอ่านได้ตามปกติ จึงไม่ล้มทั้งหน้า แต่ต้องเห็นใน log
+    console.error(
+      '[ledger] โหลดตัวเลือกของกล่องแก้ไขไม่ได้',
+      sitesResult.error?.message ?? categoriesResult.error?.message,
+    )
+  }
 
   if (error) {
     console.error('[ledger] อ่านรายการไม่ได้', error.message)
@@ -179,7 +200,12 @@ export default async function LedgerPage({
   const clearSiteHref = clearSite.toString() ? `/ledger?${clearSite}` : '/ledger'
 
   return (
-    <>
+    <TxnEditProvider
+      me={{ id: me.id, role: me.role }}
+      today={today}
+      sites={sitesResult.data ?? []}
+      categories={categoriesResult.data ?? []}
+    >
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-ink">รายรับ-รายจ่าย</h1>
         <p className="mt-0.5 text-sm text-muted-token">
@@ -281,72 +307,7 @@ export default async function LedgerPage({
                     </span>
                   )}
                 </div>,
-                ...g.rows.map((t) => (
-              <div
-                key={t.id}
-                className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
-              >
-                <div className="min-w-0">
-                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-                    <span className="truncate font-semibold text-ink">
-                      {t.categories?.name ?? 'ไม่มีหมวด'}
-                    </span>
-                    {/* ผูกไซต์ = ชิปขอบทึบ · ส่วนกลาง = ชิปขอบประ (DESIGN §5.2)
-                        ต้องแยกออกในแวบเดียวเพราะสองอย่างนี้เข้าคนละยอดรวม */}
-                    {t.site_id ? (
-                      <span className="chip border border-brand-tint-strong bg-brand-tint text-brand-on-tint ring-0">
-                        {t.sites?.name ?? 'ไซต์'}
-                      </span>
-                    ) : (
-                      <span className="chip border border-dashed border-line-strong text-muted-token ring-0">
-                        ส่วนกลาง
-                      </span>
-                    )}
-                  </div>
-                  {/* วันที่อยู่ที่หัวกลุ่มแล้ว — meta ต่อแถวเหลือของที่ต่างกันจริงต่อรายการ */}
-                  <div className="mt-0.5 truncate text-sm text-muted-token">
-                    {PAY_METHOD_LABEL[t.pay_method]}
-                    {t.income_kind && ` · ${INCOME_KIND_LABEL[t.income_kind]}`}
-                    {t.installment_no && ` ${t.installment_no}`}
-                    {t.note && ` · ${t.note}`}
-                  </div>
-                  {/* 🔴 เหตุผลที่ตีกลับต้องอยู่ตรงนี้ ไม่ใช่อยู่แค่ในกระดิ่ง
-                      กระดิ่งถูกกดอ่านแล้วก็หายไป แต่คนที่ต้องแก้จะกลับมาดู
-                      ที่รายการ — ป้าย "ตีกลับ" ที่ไม่บอกว่าเพราะอะไร
-                      คือการส่งงานคืนโดยไม่บอกว่าต้องแก้อะไร */}
-                  {t.status === 'rejected' && t.rejected_reason && (
-                    <div className="mt-1 text-sm text-urgent">
-                      เหตุผลที่ตีกลับ: {t.rejected_reason}
-                    </div>
-                  )}
-                </div>
-
-                <div className="flex flex-col items-end gap-1">
-                  <span
-                    className={`text-base font-bold tnum ${
-                      t.kind === 'income' ? 'text-income' : 'text-expense'
-                    }`}
-                  >
-                    {t.kind === 'income' ? '+' : '−'}
-                    {fmtBaht(t.amount)}
-                  </span>
-                  <div className="flex items-center gap-1.5">
-                    {t.attachments.length > 0 && (
-                      /* eslint-disable-next-line @next/next/no-img-element */
-                      <img
-                        src={`/api/uploads/${t.attachments[0].id}?thumb=1`}
-                        alt="สลิป"
-                        loading="lazy"
-                        className="size-8 rounded-xs border border-line object-cover"
-                      />
-                    )}
-                    <Badge tone={TXN_STATUS_TONE[t.status]} dot>
-                      {TXN_STATUS_LABEL[t.status]}
-                    </Badge>
-                  </div>
-                </div>
-              </div>
-                )),
+                ...g.rows.map((t) => <TxnRow key={t.id} txn={t} />),
               ]
             })}
           </div>
@@ -366,6 +327,6 @@ export default async function LedgerPage({
           )}
         </>
       )}
-    </>
+    </TxnEditProvider>
   )
 }

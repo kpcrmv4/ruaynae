@@ -2,6 +2,7 @@ import { ChevronRight, HardHat, Lock, Tags, Users } from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { PushToggle } from '../push-client'
+import { PwaCard } from '../pwa-card'
 import { getBranding } from '@/lib/branding'
 import { BrandingForm } from '../branding-form'
 import { PasswordForm } from '../password-form'
@@ -97,6 +98,10 @@ export default async function SettingsPage() {
           <ChevronRight className="size-4 shrink-0 text-muted-token" />
         </Link>
       )}
+
+      {/* ติดตั้งแอปกับแจ้งเตือนเป็นเรื่องเดียวกันในหัวคนใช้ — วางติดกัน
+          และเรียงตามลำดับที่ควรทำ: ติดตั้งก่อน แล้วค่อยเปิดแจ้งเตือน */}
+      <PwaCard />
 
       {/* คีย์สาธารณะของ VAPID ถูกฝังใน JavaScript ตามการออกแบบ —
           มันเป็นคีย์สาธารณะ ไม่ใช่ความลับ · คีย์ส่วนตัวอยู่ฝั่งเซิร์ฟเวอร์เท่านั้น */}

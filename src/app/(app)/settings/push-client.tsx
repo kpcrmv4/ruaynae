@@ -3,25 +3,7 @@
 import { Bell, BellOff, Loader2 } from 'lucide-react'
 import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
-
-/**
- * base64url ของ VAPID → ArrayBuffer ที่ `pushManager.subscribe` ต้องการ
- *
- * คืน `ArrayBuffer` ไม่ใช่ `Uint8Array` เพราะชนิดของ DOM รับเฉพาะ
- * `ArrayBufferView<ArrayBuffer>` ซึ่ง `Uint8Array` ทั่วไปไม่ตรง
- * (มันอาจอยู่บน `SharedArrayBuffer` ได้ในทางทฤษฎี)
- */
-function urlBase64ToBuffer(base64: string): ArrayBuffer {
-  const padding = '='.repeat((4 - (base64.length % 4)) % 4)
-  const b64 = (base64 + padding).replace(/-/g, '+').replace(/_/g, '/')
-  const raw = atob(b64)
-  const buf = new ArrayBuffer(raw.length)
-  const view = new Uint8Array(buf)
-  for (let i = 0; i < raw.length; i++) view[i] = raw.charCodeAt(i)
-  return buf
-}
-
-type State = 'loading' | 'unsupported' | 'denied' | 'off' | 'on'
+import { disablePush, enablePush, readPushState, type PushState } from '@/lib/push'
 
 /**
  * เปิด/ปิดการแจ้งเตือนบนเครื่องนี้
@@ -34,28 +16,14 @@ type State = 'loading' | 'unsupported' | 'denied' | 'off' | 'on'
  * ไม่ใช่ให้ปุ่มที่กดแล้วไม่มีอะไรเกิดขึ้น
  */
 export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string }) {
-  const [state, setState] = useState<State>('loading')
+  const [state, setState] = useState<PushState>('loading')
   const [busy, setBusy] = useState(false)
 
   useEffect(() => {
     let cancelled = false
-    ;(async () => {
-      if (!('serviceWorker' in navigator) || !('PushManager' in window) || !vapidPublicKey) {
-        if (!cancelled) setState('unsupported')
-        return
-      }
-      if (Notification.permission === 'denied') {
-        if (!cancelled) setState('denied')
-        return
-      }
-      try {
-        const reg = await navigator.serviceWorker.ready
-        const sub = await reg.pushManager.getSubscription()
-        if (!cancelled) setState(sub ? 'on' : 'off')
-      } catch {
-        if (!cancelled) setState('unsupported')
-      }
-    })()
+    void readPushState(vapidPublicKey).then((next) => {
+      if (!cancelled) setState(next)
+    })
     return () => {
       cancelled = true
     }
@@ -64,62 +32,31 @@ export function PushToggle({ vapidPublicKey }: { vapidPublicKey: string }) {
   async function enable() {
     if (busy) return
     setBusy(true)
-    try {
-      const permission = await Notification.requestPermission()
-      if (permission !== 'granted') {
-        setState(permission === 'denied' ? 'denied' : 'off')
-        toast.error('ยังไม่ได้อนุญาตให้แจ้งเตือน')
-        return
-      }
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.subscribe({
-        userVisibleOnly: true,
-        applicationServerKey: urlBase64ToBuffer(vapidPublicKey),
-      })
-      const r = await fetch('/api/push/subscribe', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(sub.toJSON()),
-      })
-      if (!r.ok) {
-        // เก็บฝั่งเราไม่สำเร็จ = เครื่องนี้จะไม่มีวันได้รับ push
-        // ต้องถอน subscription ทิ้งด้วย ไม่งั้นหน้าจอจะบอกว่า "เปิดแล้ว" ทั้งที่ไม่
-        await sub.unsubscribe().catch(() => {})
-        toast.error('บันทึกการแจ้งเตือนไม่สำเร็จ กรุณาลองใหม่')
-        setState('off')
-        return
-      }
+    const result = await enablePush(vapidPublicKey)
+    if (result === 'on') {
       setState('on')
       toast.success('เปิดแจ้งเตือนบนเครื่องนี้แล้ว')
-    } catch {
-      toast.error('เปิดแจ้งเตือนไม่สำเร็จ')
+    } else if (result === 'denied') {
+      setState('denied')
+      toast.error('ยังไม่ได้อนุญาตให้แจ้งเตือน')
+    } else {
       setState('off')
-    } finally {
-      setBusy(false)
+      toast.error(result === 'failed' ? 'เปิดแจ้งเตือนไม่สำเร็จ' : 'ยังไม่ได้อนุญาตให้แจ้งเตือน')
     }
+    setBusy(false)
   }
 
   async function disable() {
     if (busy) return
     setBusy(true)
-    try {
-      const reg = await navigator.serviceWorker.ready
-      const sub = await reg.pushManager.getSubscription()
-      if (sub) {
-        await fetch('/api/push/subscribe', {
-          method: 'DELETE',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ endpoint: sub.endpoint }),
-        })
-        await sub.unsubscribe()
-      }
+    const ok = await disablePush()
+    if (ok) {
       setState('off')
       toast.success('ปิดแจ้งเตือนบนเครื่องนี้แล้ว')
-    } catch {
+    } else {
       toast.error('ปิดแจ้งเตือนไม่สำเร็จ')
-    } finally {
-      setBusy(false)
     }
+    setBusy(false)
   }
 
   return (

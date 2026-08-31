@@ -499,6 +499,18 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    build ออกมาจริง (ไม่ใช่เทียบรายชื่อโทเคนกับตัวเอง ซึ่งจะเขียวตลอด) · ต่อเข้า
    `npm run gate` แล้ว รันหลัง `next build` เสมอ
 
+16. **`beforeinstallprompt` ยิงครั้งเดียวและยิงก่อน React mount — คอมโพเนนต์ที่ดักเองจะไม่ได้ event เลย**
+   ปุ่ม "ติดตั้งแอป" หายไปเฉย ๆ ทั้งที่เบราว์เซอร์พร้อมติดตั้ง · **ไม่มี error ที่ไหน**
+   เพราะในมุมของ React ก็แค่ state ที่ไม่เคยถูกอัปเดต · ต้องดัก **ตอน import โมดูล**
+   (นอก React) แล้วแจกด้วย `useSyncExternalStore` — `src/lib/pwa-install.ts`
+   · และห้ามเทสต์บนเครื่องที่ติดตั้งแอปนี้ไปแล้ว เพราะเบราว์เซอร์จะไม่ยิง event นี้อีกเลย
+   ซึ่งหน้าตาเหมือนโค้ดพังเป๊ะ
+   · ต่อเนื่องกัน: **สถานะที่ฝั่งเซิร์ฟเวอร์ไม่มีทางรู้** (ติดตั้งแล้วไหม · ปิดคำชวนไปหรือยัง ·
+   ธีมไหน) ห้ามเขียนเป็น `useState(false)` + `useEffect(() => setState(true), [])`
+   — React 19 นับเป็น cascading render (`react-hooks/set-state-in-effect` เป็น **error**
+   ไม่ใช่ warning) · ใช้ `useIsClient()` ใน `src/lib/use-is-client.ts` แทน
+   ซึ่งมีช่อง `getServerSnapshot` ให้ตอบค่าฝั่งเซิร์ฟเวอร์แยกอยู่แล้ว
+
 ## 18. ตัวแปรสภาพแวดล้อม
 
 `.env.local` (gitignored) — ค่าที่สร้างเองได้ต้องสร้างให้ตอน scaffold ค่าที่เหลือเว้นว่างให้ผู้ใช้กรอก

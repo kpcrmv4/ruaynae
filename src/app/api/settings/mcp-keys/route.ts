@@ -1,5 +1,5 @@
 import { NextResponse, type NextRequest } from 'next/server'
-import { denyUnlessOwner } from '@/lib/auth/current-user'
+import { getCurrentUserOrNull } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { generateKey, keyPrefix } from '@/lib/mcp/keys-core'
 import { hashKeyWithPepper } from '@/lib/mcp/keys'
@@ -12,8 +12,14 @@ const MAX_ACTIVE_KEYS = 10
 
 /** POST /api/settings/mcp-keys — ออกคีย์ใหม่ (เจ้าของเท่านั้น) */
 export async function POST(req: NextRequest) {
-  const denied = await denyUnlessOwner()
-  if (denied) return denied
+  // 🔴 route นี้ต้องรู้ว่า **ใคร** เป็นคนออกคีย์ จึงใช้ `getCurrentUserOrNull()`
+  // แทน `denyUnlessOwner()` — แบบเดียวกับ `src/app/api/sites/route.ts`
+  // ห้ามเรียก `sb.auth.getUser()` ซ้ำเพื่อเอา id: มันเป็น call ที่ไม่มีใครเช็ค
+  // `error` และต้องจบด้วย `user!` ซึ่งจะโยนอยู่ใน argument ของ `.insert()`
+  // ก่อน query จะได้รัน แล้ว route ตาย 500 แทนที่จะตอบ JSON ตามรูปแบบของระบบ
+  const me = await getCurrentUserOrNull()
+  if (!me) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
+  if (me.role !== 'owner') return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
 
   let label = ''
   try {
@@ -49,7 +55,7 @@ export async function POST(req: NextRequest) {
       label,
       key_hash: hashKeyWithPepper(secret),
       key_prefix: keyPrefix(secret),
-      created_by: (await sb.auth.getUser()).data.user!.id,
+      created_by: me.id,
     })
     .select('id, label, key_prefix, created_at, last_used_at')
     .maybeSingle()

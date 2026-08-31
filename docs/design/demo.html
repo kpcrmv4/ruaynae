@@ -1326,7 +1326,76 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
       </div>
     </section>
 
-    <!-- ══════════ 10. หน้าล็อกอิน — ตรวจว่าแบรนด์ขึ้นตอนยังไม่ล็อกอิน ══════════ -->
+    <!-- ══════════ 10. เชื่อมต่อ AI (MCP) ══════════ -->
+    <section id="mcp" class="screen">
+      <div class="note warn" style="margin-bottom:14px">
+        <svg class="icon icon-sm"><use href="#i-alert"/></svg>
+        <span>ที่อยู่ตอนนี้เป็น <b>http://localhost:3100</b> ซึ่งเป็นเครื่องในบ้าน — Claude เรียกจากอินเทอร์เน็ตมาไม่ถึง ต้องนำระบบขึ้นเซิร์ฟเวอร์จริงก่อน คีย์ที่ออกตอนนี้จึงใช้ต่อจากแอปไม่ได้</span>
+      </div>
+
+      <div class="card pad" style="margin-bottom:14px">
+        <div class="flexrow" style="align-items:flex-end">
+          <div class="field" style="flex:1;min-width:200px;margin:0">
+            <label for="mcpname">ชื่อเครื่องที่จะเชื่อมต่อ</label>
+            <input id="mcpname" class="input" placeholder="เช่น โน้ตบุ๊กเจ้าของ">
+          </div>
+          <button class="btn-primary"><svg class="icon icon-sm"><use href="#i-plus"/></svg> ออกคีย์ใหม่</button>
+        </div>
+
+        <div style="margin-top:14px;padding:12px 13px;border:1px solid var(--brand);border-radius:var(--r-md);background:var(--surface-2)">
+          <b style="font-size:13.5px">คัดลอกเก็บไว้ตอนนี้ — ปิดหน้านี้แล้วจะไม่เห็นค่านี้อีก</b>
+          <div class="num" style="margin-top:8px;padding:9px 11px;border-radius:var(--r-xs);background:var(--surface);font-family:monospace;font-size:12px;color:var(--ink-2);word-break:break-all">http://localhost:3100/api/mcp/k_9F2aQ7x1B3dE5fG7hJ9kL1mN3oP5qR7sT9uV1wX3yZ1a</div>
+          <button class="btn-sec" style="margin-top:10px">คัดลอก</button>
+        </div>
+      </div>
+
+      <h2 class="sec">คีย์ที่ใช้งานอยู่ <span class="n">2 ใบ</span></h2>
+      <div class="card">
+        <div class="row">
+          <div class="grow">
+            <div class="t">โน้ตบุ๊กเจ้าของ</div>
+            <div class="s num">k_9F2aQ7x1… · ออกเมื่อ 30 ส.ค. 2569 · ใช้ล่าสุด 31 ส.ค. 09:14</div>
+          </div>
+          <button class="btn-no">เพิกถอน</button>
+        </div>
+        <div class="row">
+          <div class="grow">
+            <div class="t">ไอแพดที่ออฟฟิศ</div>
+            <div class="s num">k_1C77mZ4… · ออกเมื่อ 20 ส.ค. 2569 · ยังไม่เคยใช้</div>
+          </div>
+          <button class="btn-no">เพิกถอน</button>
+        </div>
+      </div>
+
+      <h2 class="sec">คู่มือเชื่อมต่อกับ Claude</h2>
+      <div class="card pad">
+        <div class="note warn" style="margin-bottom:12px">
+          <svg class="icon icon-sm"><use href="#i-alert"/></svg>
+          <span><b>แอปมือถือเพิ่มการเชื่อมต่อเองไม่ได้</b> — เปิด claude.ai บนคอมพิวเตอร์ก่อน ทำครั้งเดียวแล้วซิงก์ลงมือถือให้เอง</span>
+        </div>
+        <ol style="padding-left:18px;font-size:13.5px;line-height:1.7;color:var(--ink-2)">
+          <li>เปิด claude.ai → <b>Settings → Customize → Connectors → + → Add custom connector</b></li>
+          <li>วาง URL ที่คัดลอกไว้ด้านบน · ช่อง Authentication เลือก <b>None</b></li>
+          <li>กด Add แล้วสลับเครื่องมือทั้งหมดเป็น <b>“Always allow”</b> ทันที (ค่าเริ่มต้นคือ “Needs approval”)</li>
+        </ol>
+      </div>
+
+      <h2 class="sec">การใช้งานล่าสุด <span class="n">2 รายการ</span></h2>
+      <div class="card">
+        <div class="row">
+          <svg class="icon" style="color:var(--brand)"><use href="#i-check"/></svg>
+          <div class="grow"><div class="t num" style="font-family:monospace;font-size:13px">get_sales_summary</div><div class="s">210 ms</div></div>
+          <span class="num" style="color:var(--muted);font-size:12.5px">31 ส.ค. 09:14</span>
+        </div>
+        <div class="row">
+          <svg class="icon" style="color:var(--brand)"><use href="#i-check"/></svg>
+          <div class="grow"><div class="t num" style="font-family:monospace;font-size:13px">get_site_detail</div><div class="s">180 ms</div></div>
+          <span class="num" style="color:var(--muted);font-size:12.5px">31 ส.ค. 09:12</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ══════════ 11. หน้าล็อกอิน — ตรวจว่าแบรนด์ขึ้นตอนยังไม่ล็อกอิน ══════════ -->
     <section id="login" class="screen">
       <div class="loginwrap">
         <div class="card pad" style="max-width:380px;width:100%">
@@ -1386,6 +1455,7 @@ const TITLES = {
   audit:    ['ประวัติการแก้ไข', 'บันทึกที่ระดับฐานข้อมูล ลบไม่ได้'],
   ledger:   ['รายรับ-รายจ่าย', 'ทุกรายการ ค้นหาและกรองได้'],
   settings: ['ตั้งค่า', 'แบรนด์ · ผู้ใช้และคน · แจ้งเตือน · หมวด · พื้นที่เก็บรูป'],
+  mcp:      ['เชื่อมต่อ AI', 'ให้ Claude หรือ ChatGPT อ่านตัวเลขของคุณเพื่อตอบคำถาม — อ่านอย่างเดียว แก้ไขอะไรไม่ได้'],
   login:    ['ตัวอย่างหน้าล็อกอิน', 'ชื่อและโลโก้มาจากฐานข้อมูล แก้ได้ในหน้าตั้งค่า'],
 };
 function go(id) {

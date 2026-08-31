@@ -1,10 +1,11 @@
-import { ChevronRight, Lock, Tags, Users } from 'lucide-react'
+import { ChevronRight, HardHat, Lock, Tags, Users } from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { PushToggle } from '../push-client'
 import { getBranding } from '@/lib/branding'
 import { BrandingForm } from '../branding-form'
 import { PasswordForm } from '../password-form'
+import { StorageCard } from '../storage-card'
 
 export const metadata = { title: 'ตั้งค่า' }
 
@@ -66,6 +67,23 @@ export default async function SettingsPage() {
         </Link>
       )}
 
+      {/* คนงานเป็นคนละเรื่องกับผู้ใช้ระบบ (CLAUDE.md §5) — คนงานคือคนที่มีค่าแรง
+          ต้องจ่าย ส่วนผู้ใช้ระบบคือคนที่ล็อกอินได้ · เจ้าของเข้าหน้าคนงานบ่อยกว่ามาก
+          (จ้างเพิ่ม ปรับค่าแรง) จึงควรมีปุ่มของตัวเอง ไม่ใช่ซ่อนอยู่หลังแท็บ */}
+      {isOwner && (
+        <Link
+          href="/settings/users?tab=workers"
+          className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-brand"
+        >
+          <HardHat className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">คนงาน</span>
+            <span className="block text-xs text-muted-token">เพิ่มคนงาน ตั้งค่าแรงรายคน และปิดใช้งาน</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-token" />
+        </Link>
+      )}
+
       {isOwner && (
         <Link
           href="/settings/categories"
@@ -84,11 +102,9 @@ export default async function SettingsPage() {
           มันเป็นคีย์สาธารณะ ไม่ใช่ความลับ · คีย์ส่วนตัวอยู่ฝั่งเซิร์ฟเวอร์เท่านั้น */}
       <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''} />
 
-      <section className="rounded-lg border border-line bg-surface px-4 py-6 text-center">
-        <p className="text-sm text-muted-token">
-          ส่วนพื้นที่เก็บรูปจะเพิ่มในเฟสถัดไป
-        </p>
-      </section>
+      {/* พื้นที่เก็บรูปเป็นเรื่องของค่าใช้จ่าย → เจ้าของเท่านั้น
+          หัวหน้าไซต์ไม่ได้ตัดสินใจเรื่องโควตาและไม่ควรเห็นภาพรวมทั้งระบบ */}
+      {isOwner && <StorageCard />}
     </div>
   )
 }

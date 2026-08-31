@@ -3,18 +3,16 @@ import { getCurrentUserOrNull } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { objectKey, presignPut } from '@/lib/r2'
 import { isUuid } from '@/lib/transactions'
+import { IMAGE_UPLOAD_TYPES, UPLOAD_MAX_BYTES } from '@/lib/constants'
 
 export const runtime = 'nodejs'
 
-/** ชนิดไฟล์ที่รับ → นามสกุลที่จะใช้ตั้งชื่อ */
-const ALLOWED: Record<string, string> = {
-  'image/webp': 'webp',
-  'image/jpeg': 'jpg',
-  'image/png': 'png',
-}
-
-/** เพดานต่อไฟล์ — client บีบเหลือ ~400KB อยู่แล้ว เผื่อไว้กันของหลุด */
-const MAX_BYTES = 3 * 1024 * 1024
+/**
+ * ชนิดไฟล์ที่รับ → นามสกุลที่จะใช้ตั้งชื่อ
+ * มาจาก `constants.ts` ที่เดียวกับที่หน้าจอใช้ตรวจก่อนบีบรูป — ถ้าสองฝั่ง
+ * ไม่ตรงกัน ผู้ใช้จะเลือกไฟล์ได้แล้วมาตายตอนขอลิงก์ โดยไม่รู้ว่าเพราะอะไร
+ */
+const ALLOWED: Record<string, string> = IMAGE_UPLOAD_TYPES
 
 /** ลิงก์อัปโหลดมีอายุเท่านี้ · หมดอายุแล้วไฟล์กำพร้าจะถูกกวาด */
 const INTENT_TTL_MINUTES = 30
@@ -45,7 +43,7 @@ export async function POST(req: NextRequest) {
 
   const ext = ALLOWED[contentType]
   if (!ext) return NextResponse.json({ error: 'UNSUPPORTED_TYPE' }, { status: 415 })
-  if (byteSize > MAX_BYTES) {
+  if (byteSize > UPLOAD_MAX_BYTES) {
     return NextResponse.json({ error: 'FILE_TOO_LARGE' }, { status: 413 })
   }
 

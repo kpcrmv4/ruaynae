@@ -10,6 +10,7 @@
  */
 import { readFileSync } from 'node:fs'
 import { S3Client, PutBucketCorsCommand, GetBucketCorsCommand } from '@aws-sdk/client-s3'
+import { APP_ORIGINS } from './app-origins.mjs'
 
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
@@ -24,14 +25,9 @@ const client = new S3Client({
   credentials: { accessKeyId: env.R2_ACCESS_KEY_ID, secretAccessKey: env.R2_SECRET_ACCESS_KEY },
 })
 
-// เพิ่มโดเมน production ตอน deploy — อย่าใส่ '*'
-const ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:3100',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:3100',
-  ...(process.argv.slice(2)),
-]
+// โดเมนจริงอยู่ใน app-origins.mjs แล้ว — argv มีไว้สำหรับ preview URL ชั่วคราว
+// ที่สุ่มใหม่ทุก deploy จึงใส่ล่วงหน้าไม่ได้ · `verify-r2` พิสูจน์รายการนี้ทีละตัว
+const ORIGINS = [...APP_ORIGINS, ...process.argv.slice(2)]
 
 await client.send(
   new PutBucketCorsCommand({

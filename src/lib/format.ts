@@ -41,6 +41,29 @@ export const fmtMoney = (n: number | null | undefined): string => moneyFmt.forma
 export const fmtBaht = (n: number | null | undefined): string => `฿${fmtMoney(n)}`
 
 /**
+ * ขนาดไฟล์เป็นข้อความไทย · `1024` → `1 KB` · `0` → `0 ไบต์`
+ *
+ * 🔴 ไฟล์ที่เล็กกว่า 1 KB ถ้าปัดเป็น KB จะได้ "0 KB" ซึ่งคนอ่านว่า
+ * "อัปโหลดไม่สำเร็จ" · ต่ำกว่า 1 KB จึงบอกเป็นไบต์ตรง ๆ
+ *
+ * ใช้ฐาน 1024 เท่ากับที่ระบบปฏิบัติการและ Cloudflare รายงาน
+ */
+const SIZE_UNITS = ['ไบต์', 'KB', 'MB', 'GB', 'TB'] as const
+export const fmtBytes = (bytes: number | null | undefined): string => {
+  const n = Math.max(0, bytes ?? 0)
+  if (n < 1024) return `${fmtMoney(n)} ไบต์`
+  let value = n
+  let unit = 0
+  while (value >= 1024 && unit < SIZE_UNITS.length - 1) {
+    value /= 1024
+    unit += 1
+  }
+  // ทศนิยมหนึ่งตำแหน่งพอ — "1.2 GB" อ่านง่ายกว่า "1.23456 GB"
+  const digits = value < 10 && unit > 1 ? 1 : 0
+  return `${value.toLocaleString(LOCALE, { maximumFractionDigits: digits })} ${SIZE_UNITS[unit]}`
+}
+
+/**
  * "วันนี้" ตามเวลาไทย ในรูป `YYYY-MM-DD` (ค.ศ.)
  *
  * `new Date().toISOString().slice(0,10)` ผิดตั้งแต่ 7 โมงเช้าของทุกวันบนเซิร์ฟเวอร์ UTC

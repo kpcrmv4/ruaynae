@@ -37,6 +37,29 @@ export const IMAGE = {
   type: 'image/webp' as const,
 } as const
 
+/**
+ * ชนิดไฟล์ที่รับขึ้น R2 → นามสกุลที่ใช้ตั้งชื่อคีย์
+ *
+ * 🔴 รายการนี้ต้องมีที่เดียว เพราะมันถูกใช้สามที่ที่ต้องตรงกันเป๊ะ:
+ * `accept` ของช่องเลือกไฟล์ · การตรวจฝั่ง client ก่อนบีบรูป · การตรวจ
+ * ฝั่งเซิร์ฟเวอร์ใน `/api/uploads/sign` · ถ้าแยกกันเขียน วันที่เพิ่มชนิดใหม่
+ * ที่หนึ่งแล้วลืมอีกสองที่ ผู้ใช้จะเลือกไฟล์ได้แต่อัปไม่ขึ้น โดยข้อความที่
+ * ได้บอกแค่ว่า "ไม่สำเร็จ"
+ */
+export const IMAGE_UPLOAD_TYPES = {
+  'image/png': 'png',
+  'image/jpeg': 'jpg',
+  'image/webp': 'webp',
+} as const
+
+export type ImageUploadType = keyof typeof IMAGE_UPLOAD_TYPES
+
+/** ค่า `accept` ของ `<input type="file">` — มาจากรายการเดียวกันข้างบน */
+export const IMAGE_UPLOAD_ACCEPT = Object.keys(IMAGE_UPLOAD_TYPES).join(',')
+
+/** เพดานต่อไฟล์ที่เซิร์ฟเวอร์บังคับ — client บีบมาให้เล็กกว่านี้มากอยู่แล้ว */
+export const UPLOAD_MAX_BYTES = 3 * 1024 * 1024
+
 /** แนบได้กี่รูปต่อหนึ่งรายการ */
 export const MAX_ATTACHMENTS = 4
 

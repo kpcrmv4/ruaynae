@@ -1,7 +1,8 @@
 import 'server-only'
 
 import {
-  DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, PutObjectCommand, S3Client,
+  DeleteObjectCommand, GetObjectCommand, HeadObjectCommand, ListObjectsV2Command,
+  PutObjectCommand, S3Client,
 } from '@aws-sdk/client-s3'
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner'
 import { SIGNED_URL_TTL_SECONDS } from '@/lib/constants'
@@ -85,6 +86,73 @@ export async function headObject(
   } catch {
     return null
   }
+}
+
+/** หมวดของไฟล์ ตัดสินจากคีย์ — `slips/thumb/…` ต้องเช็คก่อน `slips/…` */
+export type UsageGroup = 'slips' | 'thumbs' | 'branding' | 'other'
+
+export type BucketUsage = {
+  totalBytes: number
+  totalFiles: number
+  groups: Record<UsageGroup, { bytes: number; files: number }>
+  /** จริงเมื่อไฟล์เยอะเกินเพดานหน้า — ตัวเลขที่ได้เป็น "อย่างน้อยเท่านี้" */
+  truncated: boolean
+}
+
+/** กี่หน้าอย่างมาก · หน้าละ 1,000 คีย์ = ครอบได้ 20,000 ไฟล์ */
+const USAGE_MAX_PAGES = 20
+
+const groupOf = (key: string): UsageGroup =>
+  key.startsWith('slips/thumb/') ? 'thumbs'
+    : key.startsWith('slips/') ? 'slips'
+      : key.startsWith('branding/') ? 'branding'
+        : 'other'
+
+/**
+ * พื้นที่ที่ใช้จริงใน bucket
+ *
+ * 🔴 นับจาก R2 ไม่ใช่จาก `sum(attachments.byte_size)` — เพราะสองตัวเลขนี้
+ * ไม่เท่ากันโดยตั้งใจ: ไฟล์ที่อัปสำเร็จแต่ผู้ใช้กดยกเลิกก่อนบันทึกรายการ
+ * ไม่มีแถวใน `attachments` เลย แต่**กินโควตาเต็ม ๆ** · หน้าที่ชื่อว่า
+ * "พื้นที่เก็บรูป" ต้องตอบว่าคลาวด์คิดเงินจากอะไร ไม่ใช่ว่าฐานข้อมูลจำอะไรได้
+ *
+ * R2 ไม่มี API ถามยอดรวม ต้องไล่ list เอง — หน้าละ 1,000 คีย์ · ที่ปริมาณ
+ * ของงานจริง (หลักพันไฟล์ต่อปี) คือไม่กี่ request ต่อการเปิดหน้าตั้งค่าหนึ่งครั้ง
+ */
+export async function bucketUsage(): Promise<BucketUsage> {
+  const groups: BucketUsage['groups'] = {
+    slips: { bytes: 0, files: 0 },
+    thumbs: { bytes: 0, files: 0 },
+    branding: { bytes: 0, files: 0 },
+    other: { bytes: 0, files: 0 },
+  }
+  let totalBytes = 0
+  let totalFiles = 0
+  let token: string | undefined
+  let pages = 0
+  let truncated = false
+
+  do {
+    const r = await r2().send(
+      new ListObjectsV2Command({ Bucket: r2Bucket(), ContinuationToken: token }),
+    )
+    for (const o of r.Contents ?? []) {
+      const size = Number(o.Size ?? 0)
+      const g = groups[groupOf(o.Key ?? '')]
+      g.bytes += size
+      g.files += 1
+      totalBytes += size
+      totalFiles += 1
+    }
+    token = r.IsTruncated ? r.NextContinuationToken : undefined
+    pages += 1
+    if (token && pages >= USAGE_MAX_PAGES) {
+      truncated = true
+      break
+    }
+  } while (token)
+
+  return { totalBytes, totalFiles, groups, truncated }
 }
 
 /**

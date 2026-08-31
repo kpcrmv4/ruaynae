@@ -5,11 +5,14 @@ import { ImageIcon, Loader2, Save, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useRef, useState } from 'react'
 import { toast } from 'sonner'
+import { IMAGE_UPLOAD_ACCEPT, IMAGE_UPLOAD_TYPES } from '@/lib/constants'
+import { fmtBytes } from '@/lib/format'
 
 const MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
   FORBIDDEN: 'เฉพาะเจ้าของเท่านั้นที่แก้ได้',
   UNSUPPORTED_TYPE: 'รองรับเฉพาะไฟล์ PNG, JPG และ WebP',
+  FILE_TOO_LARGE: 'ไฟล์ใหญ่เกินไป ลองย่อรูปก่อนแล้วอัปใหม่',
   UPDATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
   READ_FAILED: 'อ่านค่าเดิมไม่ได้ กรุณาลองใหม่',
 }
@@ -18,12 +21,27 @@ const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายกา�
 /** โลโก้ไม่ต้องใหญ่ — 512px พอสำหรับทุกที่ที่ใช้ รวมไอคอน PWA */
 const LOGO = { maxWidthOrHeight: 512, maxSizeMB: 0.15, useWebWorker: true }
 
+/** นามสกุล → ชนิดไฟล์ · พลิกจากรายการกลาง จะได้ไม่มีวันไม่ตรงกัน */
+const TYPE_BY_EXT: Record<string, string> = Object.fromEntries(
+  Object.entries(IMAGE_UPLOAD_TYPES).map(([mime, ext]) => [ext, mime]),
+)
+
 /**
- * ไฟล์ที่เล็กกว่า 1 KB ปัดเป็น KB แล้วได้ "0 KB" ซึ่งอ่านเหมือนอัปโหลดไม่สำเร็จ
- * บอกเป็นไบต์ไปเลยเมื่อมันเล็กจริง
+ * ชนิดไฟล์ที่เชื่อถือได้ของไฟล์นี้ · คืน `null` ถ้าไม่ใช่ชนิดที่เรารับ
+ *
+ * 🔴 ต้องเช็ค **ก่อน** เรียกตัวบีบรูป · `accept` ของช่องเลือกไฟล์กันได้แค่
+ * ค่าเริ่มต้นของกล่องเลือกไฟล์ ผู้ใช้สลับไป "ไฟล์ทั้งหมด" แล้วหยิบ HEIC
+ * จากไอโฟนได้เสมอ — และตัวบีบรูปจะ throw ทันทีเพราะเบราว์เซอร์ decode ไม่ได้
+ * ทำให้ข้อความ "รองรับเฉพาะ PNG, JPG, WebP" ที่เขียนไว้แล้วไปไม่ถึงตาผู้ใช้
  */
-const formatBytes = (n: number) =>
-  n < 1024 ? `${n} ไบต์` : `${(n / 1024).toLocaleString('th-TH', { maximumFractionDigits: 0 })} KB`
+function imageTypeOf(file: File): string | null {
+  if (file.type in IMAGE_UPLOAD_TYPES) return file.type
+  // ⚠️ ตัวเลือกไฟล์บางตัวส่ง `type` ว่าง และบางตัวส่งค่าที่ไม่มีอยู่ในสเปกเลย
+  // (`image/jpg` — ของจริงคือ `image/jpeg`) · ถ้าตัดจบแค่ `type` ผู้ใช้ที่ถือ
+  // เครื่องพวกนั้นจะอัปรูป .jpg ธรรมดาไม่ได้เลย · นามสกุลเป็นแหล่งที่สอง
+  const ext = file.name.split('.').pop()?.toLowerCase() ?? ''
+  return TYPE_BY_EXT[ext] ?? null
+}
 
 export function BrandingForm({
   initialName,
@@ -58,29 +76,57 @@ export function BrandingForm({
     }
   }
 
+  /**
+   * เลือกไฟล์ → บีบ → PUT เข้า R2 → บันทึกคีย์
+   *
+   * 🔴 สามขั้นนี้พังคนละสาเหตุกันสิ้นเชิง และเคยรวบเป็นข้อความเดียวว่า
+   * "อัปโหลดไม่สำเร็จ กรุณาลองใหม่" — ซึ่งแปลว่าเจ้าของที่เจอปัญหาบอกช่างไม่ได้
+   * ว่าเกิดอะไรขึ้น และช่างก็ไล่ไม่ได้เพราะไม่มีอะไรตกถึงฝั่งเซิร์ฟเวอร์เลย
+   * (เจอจริง 31 ส.ค. 2569: bucket ไม่ได้อนุญาต origin ของ production
+   * → อัปโหลดตายทุกครั้งบนเว็บจริง โดย log ของ Vercel ว่างเปล่า)
+   */
   async function uploadLogo(file: File) {
     if (busy) return
+
+    // ตรวจชนิดไฟล์ก่อนแตะตัวบีบรูป ไม่งั้นข้อความจะกลายเป็น "ไม่สำเร็จ" ลอย ๆ
+    const sourceType = imageTypeOf(file)
+    if (!sourceType) return void toast.error(MESSAGES.UNSUPPORTED_TYPE)
+
     setBusy('logo')
     try {
       // บีบก่อนอัปเสมอ — รูปจากมือถือ 3-4 MB ไม่มีเหตุผลให้ขึ้นไปทั้งก้อน
-      const small = await imageCompression(file, LOGO)
-      const contentType = small.type || file.type
+      let small: File
+      try {
+        small = await imageCompression(file, LOGO)
+      } catch {
+        return void toast.error('เปิดไฟล์รูปนี้ไม่ได้ ลองบันทึกเป็น PNG หรือ JPG แล้วอัปใหม่')
+      }
+      const contentType = small.type || sourceType
 
       const signRes = await fetch('/api/uploads/sign', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ purpose: 'logo', contentType }),
+        body: JSON.stringify({ purpose: 'logo', contentType, byteSize: small.size }),
       })
       const sign = await signRes.json().catch(() => ({}))
       if (!signRes.ok) return void toast.error(fail(sign.error))
 
       // PUT ตรงเข้า R2 — ไบต์ไม่ผ่านเซิร์ฟเวอร์ของเรา
-      const put = await fetch(sign.url, {
-        method: 'PUT',
-        headers: { 'Content-Type': contentType },
-        body: small,
-      })
-      if (!put.ok) return void toast.error('อัปโหลดรูปไม่สำเร็จ กรุณาลองใหม่')
+      //
+      // 🔴 ถ้า CORS ของ bucket ไม่ได้อนุญาต origin นี้ เบราว์เซอร์จะบล็อกตั้งแต่
+      // preflight แล้ว `fetch` โยน TypeError — แยกจาก "เน็ตหลุด" ไม่ได้เลยตาม
+      // การออกแบบของเบราว์เซอร์ · จึงต้องบอกผู้ใช้ทั้งสองทางที่เป็นไปได้
+      let put: Response
+      try {
+        put = await fetch(sign.url, {
+          method: 'PUT',
+          headers: { 'Content-Type': contentType },
+          body: small,
+        })
+      } catch {
+        return void toast.error('ต่อกับที่เก็บรูปไม่ได้ — ถ้าอินเทอร์เน็ตปกติ กรุณาแจ้งผู้ดูแลระบบ')
+      }
+      if (!put.ok) return void toast.error(`ที่เก็บรูปปฏิเสธไฟล์นี้ (${put.status}) กรุณาลองใหม่`)
 
       // บันทึกคีย์หลังอัปสำเร็จเท่านั้น — บันทึกก่อนแล้วอัปพลาด = ชี้ไปไฟล์ที่ไม่มีอยู่
       const save = await fetch('/api/settings/branding', {
@@ -92,10 +138,10 @@ export function BrandingForm({
       if (!save.ok) return void toast.error(fail(sb.error))
 
       setLogoUrl(URL.createObjectURL(small))
-      toast.success(`อัปโหลดโลโก้แล้ว (${formatBytes(small.size)})`)
+      toast.success(`อัปโหลดโลโก้แล้ว (${fmtBytes(small.size)})`)
       router.refresh()
     } catch {
-      toast.error('อัปโหลดไม่สำเร็จ กรุณาลองใหม่')
+      toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
     } finally {
       setBusy(null)
       if (fileRef.current) fileRef.current.value = ''
@@ -169,7 +215,7 @@ export function BrandingForm({
           <input
             ref={fileRef}
             type="file"
-            accept="image/png,image/jpeg,image/webp"
+            accept={IMAGE_UPLOAD_ACCEPT}
             className="sr-only"
             onChange={(e) => {
               const f = e.target.files?.[0]

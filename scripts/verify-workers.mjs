@@ -164,6 +164,22 @@ try {
       `users มีคนงาน=${users.includes(`${MARK} สมชาย`)} · workers มีคนงาน=${workers.includes(`${MARK} สมชาย`)}`)
   }
 
+  // ── P4-UI-01c · คนงานมีปุ่มของตัวเองบนหน้าตั้งค่า ─────────────────
+  // 🔴 ฝั่งลบสำคัญพอ ๆ กับฝั่งบวก — ปุ่มที่หัวหน้าไซต์เห็นแล้วกดไปเจอ redirect
+  // คือปุ่มที่โกหก (§15: role ที่อนุญาตต้องตรงกับที่ปุ่มนั้นอยู่)
+  {
+    const ownerSettings = await page('/settings', ownerJar)
+    const supSettings = await page('/settings', supJar)
+    const linkRe = /href="\/settings\/users\?tab=workers"/
+    // ต้องอยู่ **หลัง** ปุ่มผู้ใช้ระบบ ตามที่เจ้าของสั่ง — เทียบตำแหน่งในหน้า
+    const posUsers = ownerSettings.indexOf('href="/settings/users"')
+    const posWorkers = ownerSettings.search(linkRe)
+    check('P4-UI-01c หน้าตั้งค่ามีปุ่ม "คนงาน" ต่อจาก "ผู้ใช้ระบบ" · หัวหน้าไซต์ไม่เห็นปุ่มนี้',
+      posUsers >= 0 && posWorkers > posUsers && ownerSettings.includes('คนงาน')
+        && !linkRe.test(supSettings),
+      `เจ้าของ: ผู้ใช้ระบบ@${posUsers} · คนงาน@${posWorkers} · หัวหน้าไซต์เห็นปุ่ม=${linkRe.test(supSettings)}`)
+  }
+
   // ── P4-UI-02 · หัวหน้าไซต์เข้าไม่ได้ ──────────────────────────────
   {
     const r = await fetch(`${BASE}/settings/users?tab=workers`, {

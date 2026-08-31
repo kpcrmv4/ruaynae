@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import type { Role } from '@/lib/auth/current-user'
-import { IMAGE, MAX_ATTACHMENTS } from '@/lib/constants'
+import { IMAGE, IMAGE_UPLOAD_ACCEPT, MAX_ATTACHMENTS } from '@/lib/constants'
 import { fmtBaht } from '@/lib/format'
 import {
   INCOME_KINDS, INCOME_KIND_LABEL, PAY_METHODS, PAY_METHOD_LABEL, txnError,
@@ -20,6 +20,16 @@ const fail = txnError
 
 
 const CENTRAL = '__central__'
+
+/**
+ * error ที่ "เราเขียนข้อความเอง" — ติดป้ายไว้เพื่อให้ catch แยกออกจาก error
+ * ของเบราว์เซอร์ ซึ่งเป็นภาษาอังกฤษและไม่ควรถูกโยนใส่หน้าจอผู้ใช้
+ */
+const UPLOAD_ERROR = 'UploadError'
+const uploadError = (message: string) =>
+  Object.assign(new Error(message), { name: UPLOAD_ERROR })
+const isUploadError = (e: unknown): e is Error =>
+  e instanceof Error && e.name === UPLOAD_ERROR
 
 export function EntryForm({
   role, today, sites, categories,
@@ -84,6 +94,11 @@ export function EntryForm({
       toast.error('แนบได้ไม่เกิน ' + MAX_ATTACHMENTS + ' รูปต่อรายการ')
       return
     }
+    // ตรงนี้จงใจ "หลวม" ต่างจากฟอร์มโลโก้ — สลิปถูกบีบเป็น WebP เสมอ
+    // (`fileType: IMAGE.type`) เซิร์ฟเวอร์จึงได้ชนิดที่รองรับแน่นอนไม่ว่าต้นทาง
+    // จะเป็นอะไร · เงื่อนไขเดียวที่แท้จริงคือ "เบราว์เซอร์ถอดรหัสรูปนี้ได้ไหม"
+    // ซึ่งรู้ได้ตอนบีบเท่านั้น · เช็คชนิดให้เข้มกว่านี้จะปฏิเสธรูปที่ใช้ได้จริง
+    // บนเครื่องที่ส่ง MIME แปลก ๆ มา แล้วคนคีย์ของกลางไซต์จะแนบสลิปไม่ได้เลย
     if (!file.type.startsWith('image/')) {
       toast.error('รองรับเฉพาะไฟล์รูปภาพ')
       return
@@ -91,20 +106,27 @@ export function EntryForm({
     setUploading(true)
     try {
       const { default: compress } = await import('browser-image-compression')
-      const [full, thumb] = await Promise.all([
-        compress(file, {
-          maxWidthOrHeight: IMAGE.full.maxWidthOrHeight,
-          maxSizeMB: IMAGE.full.maxSizeMB,
-          fileType: IMAGE.type,
-          useWebWorker: true,
-        }),
-        compress(file, {
-          maxWidthOrHeight: IMAGE.thumb.maxWidthOrHeight,
-          maxSizeMB: IMAGE.thumb.maxSizeMB,
-          fileType: IMAGE.type,
-          useWebWorker: true,
-        }),
-      ])
+      let full: File
+      let thumb: File
+      try {
+        ;[full, thumb] = await Promise.all([
+          compress(file, {
+            maxWidthOrHeight: IMAGE.full.maxWidthOrHeight,
+            maxSizeMB: IMAGE.full.maxSizeMB,
+            fileType: IMAGE.type,
+            useWebWorker: true,
+          }),
+          compress(file, {
+            maxWidthOrHeight: IMAGE.thumb.maxWidthOrHeight,
+            maxSizeMB: IMAGE.thumb.maxSizeMB,
+            fileType: IMAGE.type,
+            useWebWorker: true,
+          }),
+        ])
+      } catch {
+        toast.error('เปิดไฟล์รูปนี้ไม่ได้ ลองถ่ายใหม่หรือเลือกรูปอื่น')
+        return
+      }
 
       const signRes = await fetch('/api/uploads/sign', {
         method: 'POST',
@@ -122,13 +144,21 @@ export function EntryForm({
         return
       }
 
+      // 🔴 CORS ที่ไม่ครอบ origin นี้ทำให้ `fetch` โยน TypeError ซึ่งข้อความ
+      // ข้างในเป็นภาษาอังกฤษของเบราว์เซอร์ ("Failed to fetch") · เดิม catch
+      // ข้างล่างเอา `e.message` มาโชว์ตรง ๆ — คนงานกลางไซต์จึงเห็นอังกฤษ
       const put = async (url: string, blob: Blob) => {
-        const r = await fetch(url, {
-          method: 'PUT',
-          headers: { 'Content-Type': IMAGE.type },
-          body: blob,
-        })
-        if (!r.ok) throw new Error('อัปโหลดไม่สำเร็จ (' + r.status + ')')
+        let r: Response
+        try {
+          r = await fetch(url, {
+            method: 'PUT',
+            headers: { 'Content-Type': IMAGE.type },
+            body: blob,
+          })
+        } catch {
+          throw uploadError('ต่อกับที่เก็บรูปไม่ได้ — ถ้าอินเทอร์เน็ตปกติ กรุณาแจ้งผู้ดูแลระบบ')
+        }
+        if (!r.ok) throw uploadError('ที่เก็บรูปปฏิเสธไฟล์นี้ (' + r.status + ')')
       }
       await Promise.all([put(sign.url, full), put(sign.thumbUrl, thumb)])
 
@@ -142,7 +172,9 @@ export function EntryForm({
         },
       ])
     } catch (e) {
-      toast.error(e instanceof Error ? e.message : 'แนบรูปไม่สำเร็จ')
+      // แสดงเฉพาะข้อความที่เราเขียนเอง — error จากเบราว์เซอร์หรือจากการโหลด
+      // chunk เป็นภาษาอังกฤษล้วน และไม่บอกอะไรกับคนที่ยืนอยู่กลางไซต์
+      toast.error(isUploadError(e) ? e.message : 'แนบรูปไม่สำเร็จ กรุณาลองใหม่')
     } finally {
       setUploading(false)
     }
@@ -422,6 +454,10 @@ export function EntryForm({
             </button>
           </div>
 
+          {/* ⚠️ ช่องกล้องคง `image/*` ไว้ตามเดิม — ต่างจากช่องแกลอรี่ข้างล่าง
+              กล้องบนไอโอเอสส่ง JPEG มาอยู่แล้ว ไม่เคยส่ง HEIC ผ่านทางนี้
+              การจำกัดชนิดจึงไม่ได้อะไรเพิ่ม แต่แลกมากับความเสี่ยงที่แอนดรอยด์
+              บางรุ่นจะไม่ยอมเปิดกล้องให้ — ซึ่งทดสอบจากเครื่องพัฒนาไม่ได้ */}
           <input
             ref={cameraRef}
             type="file"
@@ -437,7 +473,7 @@ export function EntryForm({
           <input
             ref={galleryRef}
             type="file"
-            accept="image/*"
+            accept={IMAGE_UPLOAD_ACCEPT}
             hidden
             onChange={(e) => {
               const f = e.target.files?.[0]

@@ -160,7 +160,10 @@ test.describe('P8-E2E-04 · ความกว้าง 390 / 768 / 1440', () =>
       await page.setViewportSize({ width: w, height: h })
       const overflowing: string[] = []
 
-      for (const path of DATA_PAGES) {
+      // 🔴 `/settings` ไม่ได้อยู่ใน DATA_PAGES (มันไม่มี loading.tsx และไม่ใช่หน้าลิสต์)
+      // จึงเคยหลุดจากการกวาดความกว้างทั้งหมด — การ์ดใหม่ทุกใบที่ไปลงหน้านั้น
+      // เลยไม่เคยถูกวัดว่าล้นขอบจอมือถือหรือไม่ · ตรงนี้กวาดมันด้วย
+      for (const path of [...DATA_PAGES, '/settings']) {
         await page.goto(path)
         await ready(page)
         const bad = await overflowingElements(page)

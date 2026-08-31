@@ -216,8 +216,22 @@ try {
       `${r.status} · ${rows[0].s} · audit ${audit[0].n}`)
   }
 
-  // ── P2-DB-05 · แก้ amount หลัง approved ไม่ได้ แม้แต่เจ้าของ ───────
+  // ── P2-DB-05 · ยอดของรายการที่อนุมัติแล้ว — หัวหน้าไซต์แตะไม่ได้ ────
+  // 🔴 แก้ความหมายเมื่อ R4: **เจ้าของ**แก้ได้แล้ว (รายการที่เจ้าของคีย์เอง
+  // เกิดมาเป็น approved ทันที ล็อกไว้แปลว่าพิมพ์ผิดแล้วแก้ไม่ได้ตลอดกาล)
+  // ส่วนหัวหน้าไซต์ยังแตะไม่ได้เหมือนเดิม — การอนุมัติจึงยังมีความหมาย
   {
+    const blocked = await db(supTok, `/transactions?id=eq.${mineTxn}`, {
+      method: 'PATCH',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ amount: 88888 }),
+    })
+    const { rows: kept } = await sql(
+      `select amount::float8 as a from public.transactions where id='${mineTxn}'`)
+    check('P2-DB-05 หัวหน้าไซต์แก้ยอดของรายการที่อนุมัติแล้วไม่ได้ · ยอดเดิมคงอยู่',
+      kept[0].a === 1000 && (blocked.status === 200 ? blocked.body?.length === 0 : true),
+      `${blocked.status} · ยอด ${kept[0].a}`)
+
     const r = await db(ownerTok, `/transactions?id=eq.${mineTxn}`, {
       method: 'PATCH',
       headers: { Prefer: 'return=representation' },
@@ -225,19 +239,34 @@ try {
     })
     const { rows } = await sql(
       `select amount::float8 as a from public.transactions where id='${mineTxn}'`)
-    check('P2-DB-05 แก้จำนวนเงินของรายการที่อนุมัติแล้วไม่ได้ → AMOUNT_LOCKED · ยอดเดิมคงอยู่',
-      /AMOUNT_LOCKED/.test(msgOf(r)) && rows[0].a === 1000,
-      `${r.status} · ยอด ${rows[0].a}`)
+    const { rows: audit } = await sql(
+      `select count(*)::int as n from public.audit_log
+       where table_name='transactions' and action='UPDATE' and row_id='${mineTxn}'
+         and (before->>'amount')::float8 = 1000`)
+    check('P2-DB-05b เจ้าของแก้ยอดของรายการที่อนุมัติแล้วได้ · ค่าเดิมถูกเก็บใน audit_log',
+      r.status === 200 && rows[0].a === 99999 && audit[0].n >= 1,
+      `${r.status} · ยอด ${rows[0].a} · audit ${audit[0].n}`)
   }
 
-  // ── P2-DB-11 · ลบรายการที่ approved แล้วไม่ได้ ────────────────────
+  // ── P2-DB-11 · ลบรายการที่ approved แล้ว — หัวหน้าไซต์ไม่ได้ เจ้าของได้ ──
+  // 🔴 แก้ความหมายเมื่อ R4 ด้วยเหตุผลเดียวกับ P2-DB-05 · ร่องรอยของแถวที่
+  // ถูกลบยังอยู่ครบใน audit_log ซึ่งเป็นที่ที่ความรับผิดชอบอยู่จริง
   {
     const before = await txnCount()
+    const blocked = await db(supTok, `/transactions?id=eq.${mineTxn}`, { method: 'DELETE' })
+    const still = await txnCount()
+    check('P2-DB-11 หัวหน้าไซต์ลบรายการที่อนุมัติแล้วไม่ได้ · จำนวนเท่าเดิม',
+      still === before, `${blocked.status} · ${before}→${still}`)
+
     const r = await db(ownerTok, `/transactions?id=eq.${mineTxn}`, { method: 'DELETE' })
     const after = await txnCount()
-    check('P2-DB-11 ลบรายการที่อนุมัติแล้วไม่ได้ → APPROVED_IMMUTABLE · จำนวนเท่าเดิม',
-      /APPROVED_IMMUTABLE/.test(msgOf(r)) && after === before,
-      `${r.status} · ${before}→${after}`)
+    const { rows: audit } = await sql(
+      `select count(*)::int as n from public.audit_log
+       where table_name='transactions' and action='DELETE' and row_id='${mineTxn}'
+         and before is not null`)
+    check('P2-DB-11b เจ้าของลบรายการที่อนุมัติแล้วได้ · audit_log เก็บค่าเดิมทั้งแถว',
+      r.ok && after === before - 1 && audit[0].n >= 1,
+      `${r.status} · ${before}→${after} · audit ${audit[0].n}`)
   }
 
   // ── P2-DB-07 · หัวหน้าไซต์คีย์รายรับไม่ได้ ────────────────────────

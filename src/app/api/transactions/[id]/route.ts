@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { getCurrentUserOrNull } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { todayInBangkok } from '@/lib/format'
-import { parseTxnFields, MAX_NOTE } from '@/lib/transactions'
+import { canModifyTxn, parseTxnFields, MAX_NOTE } from '@/lib/transactions'
 import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
@@ -19,7 +19,8 @@ const guardCode = (msg: string) => GUARD_CODES.find((c) => msg.includes(c))
  *
  * ทำสามอย่างคนละสิทธิ์กัน:
  *  - `action: 'approve' | 'reject'` — เจ้าของเท่านั้น
- *  - แก้เนื้อรายการ — เจ้าของ หรือคนที่คีย์เองตอนยังเป็น `pending`
+ *  - แก้เนื้อรายการ — เจ้าของ (ทุกแถว) หรือคนที่คีย์เองตอนยังไม่อนุมัติ
+ *    · ของที่ถูกตีกลับแล้วเจ้าตัวแก้ = ส่งใหม่ สถานะกลับเป็น `pending` ให้เอง
  */
 export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const me = await getCurrentUserOrNull()
@@ -32,7 +33,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   // 0 แถวตอบเหมือนกันทั้งสองกรณี ซึ่งทำให้ผู้ใช้ไล่หาปัญหาผิดทาง
   const { data: existing, error: rErr } = await sb
     .from('transactions')
-    .select('id, status, kind, site_id')
+    .select('id, status, kind, site_id, created_by')
     .eq('id', id)
     .maybeSingle()
   if (rErr) {
@@ -69,11 +70,19 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     }
   } else {
     // แก้เนื้อรายการ — ตรวจด้วยตัวเดียวกับตอนสร้าง
+    // policy บังคับสิทธิ์จริงอยู่แล้ว · เช็คซ้ำที่นี่เพื่อให้ได้ 403 พร้อม
+    // เหตุผล แทน update ที่โดน RLS ตัดเหลือ 0 แถวแล้วอ่านไม่ออกว่าเพราะอะไร
+    if (!canModifyTxn(existing, me)) {
+      return NextResponse.json({ error: 'EDIT_FORBIDDEN' }, { status: 403 })
+    }
     const parsed = parseTxnFields(body, todayInBangkok())
     if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
     Object.assign(patch, parsed.fields)
     // client_ref เป็นของ "ครั้งที่กดบันทึก" ไม่ใช่ของแถว — แก้ทีหลังไม่ต้องแตะ
     delete patch.client_ref
+    // 🔴 สถานะไม่อยู่ใน patch โดยตั้งใจ · หัวหน้าไซต์ที่แก้ของที่ถูกตีกลับ
+    // จะถูก guard trigger ดันกลับเป็น `pending` ให้เอง (= ส่งใหม่)
+    // ฝั่งนี้จึงไม่ต้องรู้เรื่องนั้นเลย และเปลี่ยนสถานะเองไม่ได้ด้วย
   }
 
   const { data, error } = await sb
@@ -95,7 +104,13 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   return NextResponse.json({ ok: true, transaction: data })
 }
 
-/** DELETE /api/transactions/[id] — ลบได้เฉพาะรายการที่ยังไม่อนุมัติ */
+/**
+ * DELETE /api/transactions/[id] — ลบรายการทิ้ง
+ *
+ * เจ้าของลบได้ทุกแถว · หัวหน้าไซต์ลบได้เฉพาะของตัวเองที่ยังไม่อนุมัติ
+ * แถวที่ถูกลบยังอยู่ครบใน `audit_log` (ค่าเดิมทั้งแถวใน `before`)
+ * ซึ่งเจ้าของเปิดดูย้อนหลังได้ที่ /audit
+ */
 export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
   const me = await getCurrentUserOrNull()
   if (!me) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
@@ -104,12 +119,15 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   const sb = await getSupabaseServer()
 
   const { data: existing, error: rErr } = await sb
-    .from('transactions').select('id, status').eq('id', id).maybeSingle()
+    .from('transactions').select('id, status, created_by').eq('id', id).maybeSingle()
   if (rErr) {
     console.error('[transactions] อ่านรายการไม่ได้', rErr.message)
     return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
   }
   if (!existing) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+  if (!canModifyTxn(existing, me)) {
+    return NextResponse.json({ error: 'DELETE_FORBIDDEN' }, { status: 403 })
+  }
 
   const { data, error } = await sb
     .from('transactions').delete().eq('id', id).select('id').maybeSingle()

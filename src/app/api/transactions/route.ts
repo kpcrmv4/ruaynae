@@ -1,11 +1,9 @@
 import { NextResponse, type NextRequest } from 'next/server'
 import { getCurrentUserOrNull } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
-import { headObject } from '@/lib/r2'
 import { todayInBangkok } from '@/lib/format'
-import { MAX_ATTACHMENTS } from '@/lib/constants'
+import { attachSlips, parseSlips } from '@/lib/attachments'
 import { parseTxnFields } from '@/lib/transactions'
-import type { Database } from '@/lib/database.types'
 
 export const runtime = 'nodejs'
 
@@ -32,19 +30,9 @@ export async function POST(req: NextRequest) {
   const parsed = parseTxnFields(body, todayInBangkok())
   if (!parsed.ok) return NextResponse.json({ error: parsed.error }, { status: 400 })
 
-  const rawSlips = (body as Record<string, unknown>)?.attachments
-  const slips: Slip[] = Array.isArray(rawSlips)
-    ? rawSlips.map((a) => ({
-        objectKey: String((a as Record<string, unknown>)?.objectKey ?? ''),
-        thumbKey: String((a as Record<string, unknown>)?.thumbKey ?? ''),
-      }))
-    : []
-  if (slips.length > MAX_ATTACHMENTS) {
-    return NextResponse.json({ error: 'TOO_MANY_ATTACHMENTS' }, { status: 400 })
-  }
-  if (slips.some((s) => !s.objectKey || !s.thumbKey)) {
-    return NextResponse.json({ error: 'ATTACHMENT_INVALID' }, { status: 400 })
-  }
+  const slipsParsed = parseSlips((body as Record<string, unknown>)?.attachments)
+  if (!slipsParsed.ok) return NextResponse.json({ error: slipsParsed.error }, { status: 400 })
+  const slips = slipsParsed.slips
 
   const isOwner = me.role === 'owner'
 
@@ -108,70 +96,4 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({ ok: true, transaction: data }, { status: 201 })
-}
-
-type Slip = { objectKey: string; thumbKey: string }
-
-/**
- * ผูกสลิปที่อัปขึ้น R2 แล้วเข้ากับรายการ
- *
- * 🔴 ต้องมีแถว `upload_intents` **ของคนที่กำลังบันทึก** อยู่ก่อน — กันคนอ้าง
- * คีย์ของคนอื่นมาแปะกับรายการตัวเอง · RLS ของ `upload_intents` จำกัดให้เห็น
- * เฉพาะของตัวเองอยู่แล้ว การอ่านไม่เจอจึงแปลว่าไม่ใช่ของเขา
- *
- * 🔴 ถาม R2 ว่าไฟล์มีจริงและใหญ่เท่าไร — ขนาดที่ client บอกมาเป็นคำกล่าวอ้าง
- * ถ้าไม่ถาม จะได้แถวที่ชี้ไปยังไฟล์ที่ไม่เคยถูกอัป = รูปที่กดดูแล้วพังตลอดกาล
- */
-async function attachSlips(
-  sb: Awaited<ReturnType<typeof getSupabaseServer>>,
-  transactionId: string,
-  slips: Slip[],
-): Promise<{ error?: string }> {
-  const rows: Database['public']['Tables']['attachments']['Insert'][] = []
-  const intentIds: string[] = []
-
-  for (const slip of slips) {
-    const { data: intent, error } = await sb
-      .from('upload_intents')
-      .select('id, object_key, thumb_key')
-      .eq('object_key', slip.objectKey)
-      .is('consumed_at', null)
-      .maybeSingle()
-    if (error) {
-      console.error('[transactions] อ่าน upload_intents ไม่ได้', error.message)
-      return { error: 'ATTACH_FAILED' }
-    }
-    if (!intent || intent.thumb_key !== slip.thumbKey) return { error: 'INTENT_NOT_FOUND' }
-
-    const head = await headObject(intent.object_key)
-    if (!head) return { error: 'FILE_NOT_UPLOADED' }
-
-    rows.push({
-      transaction_id: transactionId,
-      object_key: intent.object_key,
-      thumb_key: intent.thumb_key,
-      byte_size: head.size,
-      content_type: head.contentType,
-    })
-    intentIds.push(intent.id)
-  }
-
-  const { data: inserted, error: aErr } = await sb
-    .from('attachments').insert(rows).select('id')
-  if (aErr || !inserted || inserted.length !== rows.length) {
-    console.error('[transactions] แนบสลิปไม่สำเร็จ', aErr?.message ?? 'จำนวนแถวไม่ตรง')
-    return { error: 'ATTACH_FAILED' }
-  }
-
-  // ปิดความตั้งใจ — ไฟล์เหล่านี้มีเจ้าของแล้ว ตัวกวาดต้องไม่แตะ
-  const { error: cErr } = await sb
-    .from('upload_intents')
-    .update({ consumed_at: new Date().toISOString() })
-    .in('id', intentIds)
-  if (cErr) {
-    // ไม่ใช่ความล้มเหลวของผู้ใช้ แต่ต้องเห็นใน log — ถ้าปิดไม่สำเร็จ
-    // ตัวกวาดจะลบไฟล์ที่ใช้งานอยู่ทิ้งเมื่อหมดอายุ
-    console.error('[transactions] ปิด upload_intents ไม่สำเร็จ', cErr.message)
-  }
-  return {}
 }

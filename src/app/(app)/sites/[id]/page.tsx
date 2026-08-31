@@ -20,7 +20,12 @@ import { asNullableNumber, moneyBars } from '@/lib/money'
 import { Badge } from '@/components/ui/badge'
 import { Metric, MetricBar } from '@/components/ui/metric'
 import { MoneyBars, OverrunBadge } from '@/components/sites/money-bars'
+import { TxnEditProvider } from '@/components/ledger/txn-edit'
+import { TxnRow } from '@/components/ledger/txn-row'
 import { SiteDetailActions } from './site-detail-client'
+
+/** กี่แถวล่าสุดที่โชว์ในหน้าไซต์ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
+const RECENT_TXN = 10
 
 export const metadata = { title: 'รายละเอียดไซต์งาน' }
 
@@ -49,7 +54,15 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
 
   const isOwner = me.role === 'owner'
 
-  const [{ data: crew }, { data: milestones }, people, money] = await Promise.all([
+  const [
+    { data: crew },
+    { data: milestones },
+    people,
+    money,
+    txnResult,
+    pickerSites,
+    pickerCategories,
+  ] = await Promise.all([
     sb
       .from('site_supervisors')
       .select('id, effective_from, effective_to, profiles(id, full_name)')
@@ -92,6 +105,42 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           wage: Number(row?.cost_wage ?? 0),
         }
       }),
+    // ── รายรับ-รายจ่ายล่าสุดของไซต์นี้ ────────────────────────────────
+    // 🔴 ไม่มี `.eq('kind', …)` — RLS เป็นคนตัดสินว่าใครเห็นอะไร หัวหน้าไซต์
+    // จึงเห็นเฉพาะรายจ่ายโดยอัตโนมัติ ส่วนเจ้าของเห็นทั้งสองฝั่ง
+    // ดึงเกินมา 1 แถวเพื่อรู้ว่ายังมีต่อ โดยไม่ต้องนับทั้งตาราง
+    sb
+      .from('transactions')
+      .select(`
+        id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no,
+        rejected_reason, site_id, created_by, category_id, sites(name), categories(name),
+        attachments(id)
+      `)
+      .eq('site_id', id)
+      .order('txn_date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(0, RECENT_TXN),
+    // ตัวเลือกของกล่องแก้ไข — ชุดเดียวกับ `/entry` และ `/ledger`
+    sb
+      .from('sites')
+      .select('id, name')
+      .in('status', ['planning', 'active', 'paused'])
+      .order('name', { ascending: true })
+      .range(0, PAGE_SIZE - 1)
+      .then(({ data, error: e }) => {
+        if (e) console.error('[sites] อ่านรายชื่อไซต์ไม่ได้', e.message)
+        return data ?? []
+      }),
+    sb
+      .from('categories')
+      .select('id, name, kind')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true })
+      .range(0, PAGE_SIZE * 4 - 1)
+      .then(({ data, error: e }) => {
+        if (e) console.error('[sites] อ่านหมวดไม่ได้', e.message)
+        return data ?? []
+      }),
   ])
 
   const today = todayInBangkok()
@@ -101,6 +150,9 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   const progress = timeProgress(site.start_date, site.end_date, today)
   const plannedTotal = (milestones ?? []).reduce((sum, m) => sum + Number(m.planned_amount), 0)
   const bars = moneyBars(money)
+  const txnRows = txnResult.data ?? []
+  const hasMoreTxn = txnRows.length > RECENT_TXN
+  const recentTxns = hasMoreTxn ? txnRows.slice(0, RECENT_TXN) : txnRows
 
   return (
     <>
@@ -367,6 +419,55 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           </ul>
         )}
       </section>
+
+      {/* ── รายรับ-รายจ่ายของไซต์นี้ ──────────────────────────────────
+          เดิมหน้านี้บอกแค่ "ยอดรวมเท่าไร" แล้วให้เดินออกไปอีกหน้าเพื่อดูว่า
+          ยอดนั้นมาจากอะไร · ตัวเลขที่ไล่ที่มาไม่ได้คือตัวเลขที่ไม่มีใครเชื่อ
+          · โชว์ล่าสุดแค่ RECENT_TXN แถว ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรอง
+          และแบ่งหน้าครบอยู่แล้ว — ลิสต์ยาวไม่จำกัดบนหน้าที่มีอย่างอื่นด้วย
+          คือหน้าที่เลื่อนไม่จบ */}
+      <TxnEditProvider
+        me={{ id: me.id, role: me.role }}
+        today={today}
+        sites={pickerSites}
+        categories={pickerCategories}
+      >
+        <section className="panel mt-4">
+          <div className="panel-head">
+            รายรับ-รายจ่ายล่าสุด
+            <Link
+              href={`/ledger?site=${site.id}`}
+              className="ml-auto text-xs font-semibold text-brand hover:underline"
+            >
+              ดูทั้งหมด
+            </Link>
+          </div>
+
+          {txnResult.error ? (
+            <p className="px-4 py-6 text-center text-sm text-urgent">
+              โหลดรายการของไซต์นี้ไม่สำเร็จ — ลองรีเฟรชหน้านี้อีกครั้ง
+            </p>
+          ) : recentTxns.length === 0 ? (
+            <p className="px-4 py-6 text-center text-sm text-muted-token">
+              ยังไม่มีรายการของไซต์นี้
+              {canRecord && ' — กดปุ่มบันทึกรายจ่ายด้านบนเพื่อเริ่มรายการแรก'}
+            </p>
+          ) : (
+            <>
+              {recentTxns.map((t) => (
+                <TxnRow key={t.id} txn={t} showSite={false} showDate />
+              ))}
+              {hasMoreTxn && (
+                <div className="px-4 py-3 text-center">
+                  <Link href={`/ledger?site=${site.id}`} className="btn-secondary">
+                    ดูรายการทั้งหมดของไซต์นี้
+                  </Link>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+      </TxnEditProvider>
     </>
   )
 }

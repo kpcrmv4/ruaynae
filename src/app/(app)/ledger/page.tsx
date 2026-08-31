@@ -4,6 +4,7 @@ import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDate } from '@/lib/format'
+import { searchTerms } from '@/lib/search-core'
 import {
   INCOME_KIND_LABEL, PAY_METHOD_LABEL, TXN_STATUSES, TXN_STATUS_LABEL, TXN_STATUS_TONE,
   isTxnKind, isTxnStatus,
@@ -14,25 +15,6 @@ import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 
 export const metadata = { title: 'รายรับ-รายจ่าย' }
-
-/**
- * แยกคำค้นเป็นคำ ๆ แล้วค้นแบบ **ต้องเจอทุกคำ**
- *
- * 🔴 ไม่ใช้ `.or()` กับช่องค้นหาเลย — คอมมาเป็นตัวคั่นเงื่อนไขของ PostgREST
- * คนพิมพ์ `ร้านเจริญ, สาขาสอง` จะกลายเป็นสองเงื่อนไขโดยไม่มี error
- * · แปลงคอมมาเป็น **ตัวคั่นคำ** แทน แล้วต่อ `.ilike()` ทีละคำ ซึ่ง PostgREST
- * เอามา AND กันให้เอง · ได้ผลพลอยได้คือค้นข้ามคำได้ ไม่ต้องพิมพ์ติดกันเป๊ะ
- * (ตัดคอมมาเป็นช่องว่างเฉย ๆ ไม่พอ — `%a  b%` ไม่แมตช์ `a, b`)
- *
- * `%` กับ `_` เป็นไวลด์การ์ดของ ilike — ปล่อยผ่านแล้วคนพิมพ์ `%` จะได้ทุกแถว
- */
-const searchTerms = (raw: string) =>
-  raw
-    .slice(0, 60)
-    .split(/[\s,]+/)
-    .map((t) => t.replace(/[%_()\\]/g, '').trim())
-    .filter((t) => t.length > 0)
-    .slice(0, 5)
 
 type Search = {
   status?: string

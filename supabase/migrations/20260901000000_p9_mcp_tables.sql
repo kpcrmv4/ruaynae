@@ -72,6 +72,7 @@ declare
   v_after  jsonb;
   v_row_id text;
 begin
+  -- อ้าง NEW ใน DELETE trigger ไม่ได้ ต้องแยกกิ่งให้ชัด
   if tg_op = 'DELETE' then
     v_before := to_jsonb(old);
     v_after  := null;
@@ -86,12 +87,15 @@ begin
     v_row_id := v_after->>'id';
   end if;
 
-  -- ความลับที่ห้ามไหลลงตารางที่ไม่มี policy ให้ลบ
+  -- 🔴 อย่าเก็บ pin_hash ลง audit_log
+  -- ไม่งั้นเจ้าของที่เปิดหน้าประวัติจะเห็น hash ของ PIN ทุกคน และค่านั้นจะถูก
+  -- คัดลอกไปอยู่ในตารางที่ลบไม่ได้ตลอดกาล
+  -- 🔴 key_hash ก็เหมือนกัน — คีย์ MCP ที่หลุดลงตารางที่ลบไม่ได้คือคีย์ที่เพิกถอนแล้วยังอยู่ในประวัติตลอดกาล
   v_before := v_before - 'pin_hash' - 'key_hash';
   v_after  := v_after  - 'pin_hash' - 'key_hash';
 
   insert into public.audit_log(table_name, row_id, action, actor, before, after)
   values (tg_table_name, v_row_id, tg_op, auth.uid(), v_before, v_after);
 
-  return null;
+  return null;  -- AFTER trigger ไม่สนใจค่าที่คืน
 end $$;

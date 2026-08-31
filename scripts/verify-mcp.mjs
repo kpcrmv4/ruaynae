@@ -119,6 +119,7 @@ const F = {
   t4: randomUUID(), t5: randomUUID(), t6: randomUUID(),
   emp: randomUUID(), att: randomUUID(),
   ms1: randomUUID(), ms2: randomUUID(),
+  run: randomUUID(),
 }
 /** ทุกยอดต่างกันหมดและไม่มีศูนย์ — คอลัมน์สลับกันเมื่อไหร่แถวจะแดงทันที */
 const A = {
@@ -130,6 +131,9 @@ const A = {
   costPending: '7333.33',
 }
 const B = { contract: '987654.32', incomeApproved: '55111.55', costExpense: '3222.11' }
+/** รอบจ่ายค่าแรงตัวอย่าง — เอาไว้พิสูจน์ว่า runs ของ get_payroll_summary อ่านของจริง
+ * (เดิมเช็คแค่ Array.isArray([]) ซึ่งเป็นจริงตลอดกาลเพราะ fixture ไม่เคยสร้างแถวนี้เลย) */
+const PAYROLL = { accrued: '6543.21', advanceDeducted: '1234.56', paid: '5308.65' }
 const SECRET_PHONE = '0899000111'
 const SECRET_ADDR = 'ซอยลับเฉพาะตรวจรับ 99'
 
@@ -276,9 +280,13 @@ try {
 
     insert into public.attendance (id, work_date, site_id, employee_id, work_units, note, created_by)
     values ('${F.att}', date '${TODAY}' - 3, '${F.siteA}', '${F.emp}', 1.00, '${TAG}', '${owner.id}');
+
+    insert into public.payroll_runs (id, period_start, period_end, site_id, status, total_accrued, total_advance_deducted, total_paid)
+    values ('${F.run}', date '${TODAY}' - 14, date '${TODAY}' - 8, '${F.siteA}', 'closed',
+            ${PAYROLL.accrued}, ${PAYROLL.advanceDeducted}, ${PAYROLL.paid});
   `)
   fixtureMade = true
-  note(`สร้างข้อมูลตัวอย่างชั่วคราว: ไซต์ 2 · รายการ 6 · คนงาน 1 · ลงชื่อ 1 · งวด 2 (ชื่อขึ้นต้นด้วย “${TAG}”)`)
+  note(`สร้างข้อมูลตัวอย่างชั่วคราว: ไซต์ 2 · รายการ 6 · คนงาน 1 · ลงชื่อ 1 · งวด 2 · รอบจ่าย 1 (ชื่อขึ้นต้นด้วย “${TAG}”)`)
 
   // ══ 2 · คีย์ทดสอบ ══════════════════════════════════════════════════
   // สร้างตรงในฐานข้อมูล ไม่ผ่าน UI — ที่ทดสอบคือ endpoint ไม่ใช่ฟอร์ม
@@ -302,6 +310,23 @@ try {
         && (r.html.includes('ยังไม่เคยใช้') || r.html.includes('ใช้ล่าสุด'))
         && r.html.includes('เพิกถอน'),
       `${r.status} · prefix=${r.html.includes(keyPrefix(secret))}`)
+  }
+
+  // ══ 2b · POST /api/settings/mcp-keys — route ที่หน้า /mcp เรียกจริง ═══
+  // 🔴 ทุกคีย์ก่อนหน้านี้ mint ด้วย SQL ตรง ๆ — route นี้เป็น auth path
+  // (ออกคีย์ที่อ่านข้อมูลทั้งบริษัทได้) แต่ไม่เคยถูกยิงจริงสักครั้งในตัวตรวจ
+  {
+    const r = await fetch(`${BASE}/api/settings/mcp-keys`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', cookie: ownerJar },
+      body: JSON.stringify({ label: `${TAG} ผ่าน route จริง` }),
+    })
+    const b = await r.json().catch(() => ({}))
+    if (b?.row?.id) keyIds.push(b.row.id)   // ลบทิ้งใน finally เหมือนคีย์อื่น
+    check('P9-API-01 POST /api/settings/mcp-keys ด้วยเจ้าของ → 201 · key_prefix ที่บันทึกไว้ = 10 ตัวแรกของคีย์ลับที่คืนมาจริง',
+      r.status === 201 && typeof b?.key === 'string' && b.key.length > 10
+        && b?.row?.key_prefix === b.key.slice(0, 10),
+      `${r.status} · เก็บไว้=${b?.row?.key_prefix ?? '(ไม่มี)'} · จากคีย์จริง=${b?.key ? b.key.slice(0, 10) : '(ไม่มี)'}`)
   }
 
   // ══ 3 · ตาราง RLS และ audit ════════════════════════════════════════
@@ -362,6 +387,12 @@ try {
       row.n === 3, `${row.n} แถว`)
   }
   {
+    // 🔴 ตอนนี้ยังไม่มีใครเรียก mainKeyId ผ่าน HTTP เลย (ครั้งแรกคือ Section 5)
+    // ถ้าตารางมี 0 แถว upd===0 && del===0 คือเลขคณิต ไม่ใช่หลักฐาน — ต้องมีแถวให้ลอง
+    // แก้/ลบจริงก่อน แล้วเช็คว่าแถวนั้น**ยังอยู่ครบ**หลังพยายามด้วย
+    await sql(`
+      insert into public.mcp_call_log (key_id, tool, ok, ms, at)
+      values ('${mainKeyId}', '${TAG} ตรวจ RLS', true, 1, now())`)
     const r = await sqlRaw(`
       select set_config('request.jwt.claims',
         json_build_object('sub','${owner.id}','role','authenticated')::text, true);
@@ -369,10 +400,15 @@ try {
       with u as (update public.mcp_call_log set ok = ok where key_id = '${mainKeyId}' returning 1),
            d as (delete from public.mcp_call_log where key_id = '${mainKeyId}' returning 1)
       select (select count(*) from u)::int as upd, (select count(*) from d)::int as del;`)
-    check('P9-DB-06 เจ้าของ UPDATE/DELETE บน mcp_call_log กระทบ 0 แถว — ไม่มี policy ให้ใครแก้ร่องรอย',
-      (r.ok && r.rows[0].upd === 0 && r.rows[0].del === 0)
-        || (!r.ok && /permission denied/i.test(r.message)),
-      r.ok ? `update ${r.rows[0].upd} · delete ${r.rows[0].del}` : 'permission denied (แน่นกว่าที่ขอ)')
+    const [{ n: stillThere }] = await sql(
+      `select count(*)::int as n from public.mcp_call_log where key_id = '${mainKeyId}'`)
+    check('P9-DB-06 เจ้าของ UPDATE/DELETE บน mcp_call_log กระทบ 0 แถว และแถวยังอยู่ครบหลังพยายาม — ไม่มี policy ให้ใครแก้ร่องรอย',
+      ((r.ok && r.rows[0].upd === 0 && r.rows[0].del === 0)
+        || (!r.ok && /permission denied/i.test(r.message)))
+        && stillThere === 1,
+      r.ok
+        ? `update ${r.rows[0].upd} · delete ${r.rows[0].del} · เหลือ ${stillThere} แถว`
+        : `permission denied (แน่นกว่าที่ขอ) · เหลือ ${stillThere} แถว`)
   }
 
   // ══ 4 · ฟังก์ชัน mcp_* ═════════════════════════════════════════════
@@ -635,12 +671,22 @@ try {
       `รอ ${j?.pending_count ?? '—'} รายการ`)
   }
   {
-    const r = await tool(url, 'get_payroll_summary', {})
+    // 🔴 ครึ่ง `runs` เดิมเช็คแค่ Array.isArray([]) ซึ่งจริงตลอดกาลเพราะ fixture ไม่เคย
+    // สร้างแถว payroll_runs เลย — ถ้า subquery ทั้งก้อนพังจนคืน [] ก็ยังเขียว
+    // ใส่ limit สูงสุด (50) กัน fixture ของเราหลุดหน้าถ้าฐานมีรอบจ่ายอื่นอยู่ก่อนแล้ว
+    const r = await tool(url, 'get_payroll_summary', { limit: 50 })
     blob.push(r.text)
     const j = toolJson(r)
-    check('P9-TOOL-07 get_payroll_summary → 200 · parse JSON ได้ · มีทั้ง balances และ runs',
-      r.status === 200 && j !== null && Array.isArray(j.balances) && Array.isArray(j.runs),
-      `ค้างจ่าย ${j?.balances?.length ?? '—'} คน · รอบจ่าย ${j?.runs?.length ?? '—'}`)
+    const found = (j?.runs ?? []).find((x) => x.id === F.run)
+    const numOk = (v, expect) => Number(v).toFixed(2) === expect
+    check('P9-TOOL-07 get_payroll_summary → 200 · balances เป็น array · runs มีรอบจ่ายตัวอย่างที่ใส่ไว้เองครบทุกยอด',
+      r.status === 200 && j !== null && Array.isArray(j.balances)
+        && found !== undefined
+        && found.site_name === `${TAG} ก (ห้ามใช้จริง)`
+        && numOk(found.total_accrued, PAYROLL.accrued)
+        && numOk(found.total_advance_deducted, PAYROLL.advanceDeducted)
+        && numOk(found.total_paid, PAYROLL.paid),
+      `ค้างจ่าย ${j?.balances?.length ?? '—'} คน · รอบจ่าย ${j?.runs?.length ?? '—'} · เจอรอบตัวอย่าง=${found !== undefined}`)
   }
 
   // ── อ่านอย่างเดียวจริงไหม + ฟิลด์ blocklist หลุดไหม ────────────────
@@ -783,6 +829,8 @@ try {
                    delete from public.employees where id in (${ids([F.emp])})`],
     ['site_milestones', `delete from public.site_milestones where id in (${ids([F.ms1, F.ms2])})`],
     ['transactions', `delete from public.transactions where id in (${ids([F.t1, F.t2, F.t3, F.t4, F.t5, F.t6])})`],
+    // payroll_runs.site_id คือ `on delete restrict` — ต้องลบรอบจ่ายก่อนลบไซต์ ไม่งั้นไซต์ลบไม่ออก
+    ['payroll_runs', `delete from public.payroll_runs where id in (${ids([F.run])})`],
     ['sites', `delete from public.site_finance where site_id in (${ids([F.siteA, F.siteB])});
                delete from public.sites where id in (${ids([F.siteA, F.siteB])})`],
   ]
@@ -798,12 +846,13 @@ try {
   const leftRes = await sqlRaw(`
     select (select count(*) from public.sites where name like '${TAG}%')::int as sites,
            (select count(*) from public.employees where full_name like '${TAG}%')::int as emps,
-           (select count(*) from public.mcp_keys where label like '${TAG}%')::int as keys`)
-  const left = leftRes.ok ? leftRes.rows[0] : { sites: -1, emps: -1, keys: -1 }
-  const clean = failed.length === 0 && left.sites === 0 && left.emps === 0 && left.keys === 0
+           (select count(*) from public.mcp_keys where label like '${TAG}%')::int as keys,
+           (select count(*) from public.payroll_runs where id = '${F.run}')::int as runs`)
+  const left = leftRes.ok ? leftRes.rows[0] : { sites: -1, emps: -1, keys: -1, runs: -1 }
+  const clean = failed.length === 0 && left.sites === 0 && left.emps === 0 && left.keys === 0 && left.runs === 0
   note(clean
     ? 'ล้างข้อมูลตัวอย่างครบแล้ว — ฐานข้อมูลกลับไปเหมือนตอนเริ่ม'
-    : `⚠️ ล้างไม่ครบ · ค้าง ไซต์ ${left.sites} · คนงาน ${left.emps} · คีย์ ${left.keys}${failed.length ? ` · ${failed.join(' | ')}` : ''}`)
+    : `⚠️ ล้างไม่ครบ · ค้าง ไซต์ ${left.sites} · คนงาน ${left.emps} · คีย์ ${left.keys} · รอบจ่าย ${left.runs}${failed.length ? ` · ${failed.join(' | ')}` : ''}`)
   if (!clean) {
     results.push({ label: 'ล้างข้อมูลตัวอย่าง', ok: false })
     console.log('  ❌ ล้างข้อมูลตัวอย่างที่สคริปต์นี้สร้างไม่หมด — ลบด้วยมือก่อนรันตัวตรวจอื่น')

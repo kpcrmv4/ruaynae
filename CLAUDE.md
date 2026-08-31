@@ -88,7 +88,7 @@ create type payroll_status as enum ('open','closed');
 | `profiles` | `id → auth.users`, `full_name`, `role`, `pin_hash` (HMAC + pepper, unique), `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
 | `sites` | `name`, `client_name`, `contract_amount`, `start_date`, `end_date`, `status` | owner ทั้งหมด · supervisor อ่านเฉพาะไซต์ที่ดูแล |
 | `site_supervisors` | `site_id`, `profile_id`, **`effective_from`, `effective_to`** | owner เขียน · supervisor อ่านแถวตัวเอง |
-| `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date`, `collected_txn_id` | ตามไซต์ |
+| `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date` — ยังไม่มีคอลัมน์บอกว่างวดไหนเก็บเงินแล้ว (วางแผนไว้เป็น `collected_txn_id` แต่ยังไม่ได้สร้าง รอเฟสหลัง) | ตามไซต์ |
 | `categories` | `name`, `kind`, `is_active`, `sort_order` | อ่านได้ทุก role · เขียนเฉพาะ owner |
 | `employees` | `full_name`, `job_title`, `wage_type`, `daily_rate`, `monthly_salary`, `default_site_id`, `is_active`, **`profile_id`** (NULL = ไม่มีบัญชีล็อกอิน) | owner ทั้งหมด · supervisor อ่านคนที่เคยเข้าไซต์ตัวเอง |
 | `attendance` | `work_date`, `site_id`, `employee_id`, `work_units`, `ot_amount`, **`wage_snapshot`**, `amount` (generated) | supervisor เขียนได้เฉพาะไซต์ตัวเองและวันที่ยังไม่ปิดรอบ |
@@ -375,14 +375,11 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 - [x] **P6 · Audit** — หน้า `/audit` + กรอง + pagination, ตรวจว่าทุกตารางมี trigger จริง
 - [x] **P7 · PWA + push** — manifest, SW, subscribe, ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ, badge
 - [x] **P8 · seed/reset + ตรวจรับ** — ตาม §13 แล้วไล่ acceptance matrix ทุกเฟสให้ปิด
-- [ ] **P9 · ตัวเชื่อม MCP อ่านอย่างเดียว** — `mcp_keys`/`mcp_call_log`, ฟังก์ชัน `mcp_*` 6 ตัวที่
+- [x] **P9 · ตัวเชื่อม MCP อ่านอย่างเดียว** — `mcp_keys`/`mcp_call_log`, ฟังก์ชัน `mcp_*` 6 ตัวที่
       **สวมสิทธิ์เจ้าของแล้วเรียก RPC เงินตัวเดิม** (สูตรอยู่ที่เดียว), tool 7 ตัว + prompt 3 อัน,
       เซิร์ฟเวอร์ Streamable HTTP เขียนเอง (`POST /api/mcp/[key]` + `Authorization: Bearer`),
       หน้า `/mcp` ออก/เพิกถอนคีย์ + คู่มือเชื่อมต่อ · `MCP_KEY_PEPPER` (§18)
       · 🔴 **401 ห้ามมี `WWW-Authenticate`** — header นั้นทำให้ client เริ่ม OAuth discovery แล้วค้าง
-      · **ยังไม่ปิด:** เหลือ 3 แถวแดงใน `docs/test-plan/P9.md` — `P9-TOOL-08` (ไซต์ที่ไม่มีอยู่จริง
-      ตอบออบเจ็กต์ว่างแทน `isError`) · `P9-UI-05` (`mcp/loading.tsx` ไม่ได้ใช้ `<PageSkeleton>`)
-      · `P9-UI-06` (กล่องเตือน localhost ไม่มี `data-testid`)
 
 **เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อไซต์+เตือน · ปันส่วนเงินเดือนเข้าไซต์ตามวัน
 

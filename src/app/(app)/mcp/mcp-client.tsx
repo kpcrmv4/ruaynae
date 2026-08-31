@@ -229,8 +229,8 @@ export function McpClient({
                   </button>
                 </Dialog.Trigger>
                 <Dialog.Portal>
-                  <Dialog.Overlay className="fixed inset-0 bg-black/40" />
-                  <Dialog.Content className="panel fixed left-1/2 top-1/2 w-[min(28rem,92vw)] -translate-x-1/2 -translate-y-1/2 p-5">
+                  <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 animate-fade-in" />
+                  <Dialog.Content className="panel fixed left-1/2 top-1/2 z-50 w-[min(28rem,92vw)] -translate-x-1/2 -translate-y-1/2 p-5 animate-pop-in">
                     <Dialog.Title className="text-base font-bold text-ink">
                       เพิกถอน “{k.label}” ?
                     </Dialog.Title>

@@ -3,7 +3,7 @@ import { Receipt } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
-import { fmtBaht, fmtDate } from '@/lib/format'
+import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
 import { searchTerms } from '@/lib/search-core'
 import {
   INCOME_KIND_LABEL, PAY_METHOD_LABEL, TXN_STATUSES, TXN_STATUS_LABEL, TXN_STATUS_TONE,
@@ -107,6 +107,33 @@ export default async function LedgerPage({
   const page = hasMore ? all.slice(0, PAGE_SIZE) : all
   const last = page[page.length - 1]
 
+  // ── จัดกลุ่มตามวัน — แถวเรียง txn_date desc อยู่แล้ว ไล่ต่อเนื่องได้เลย ──
+  // มือถืออ่านรายการเป็น "วันไหน เกิดอะไร" ไม่ใช่ตารางแบน ๆ ที่วันซ้ำทุกแถว
+  const groups: { date: string; rows: typeof page }[] = []
+  for (const t of page) {
+    const g = groups[groups.length - 1]
+    if (g && g.date === t.txn_date) g.rows.push(t)
+    else groups.push({ date: t.txn_date, rows: [t] })
+  }
+
+  const today = todayInBangkok()
+  const y = new Date(`${today}T00:00:00Z`)
+  y.setUTCDate(y.getUTCDate() - 1)
+  const yesterday = y.toISOString().slice(0, 10)
+  const dayLabel = (d: string) =>
+    d === today ? `วันนี้ · ${fmtDate(d)}` : d === yesterday ? `เมื่อวาน · ${fmtDate(d)}` : fmtDate(d)
+
+  // ยอดสุทธิของวัน — ไม่รวมรายการตีกลับ (มันไม่เข้ายอดไหนแล้ว)
+  const netOf = (dayRows: typeof page) =>
+    dayRows.reduce(
+      (s, t) => (t.status === 'rejected' ? s : s + (t.kind === 'income' ? 1 : -1) * Number(t.amount)),
+      0,
+    )
+  // กลุ่มที่ถูก pagination ตัดกลาง (หัวหน้าที่ต่อจากหน้าก่อน หรือท้ายที่ยังมีต่อ)
+  // ห้ามโชว์ยอด — ยอดครึ่งวันที่ดูเหมือนยอดเต็มวันแย่กว่าไม่มียอด
+  const netTrustworthy = (i: number) =>
+    !(i === 0 && Boolean(sp.after)) && !(i === groups.length - 1 && hasMore)
+
   const filters: FilterChip[] = [
     { key: 'all', label: 'ทั้งหมด', count: counts[0] },
     ...TXN_STATUSES.map((s, i) => ({
@@ -195,7 +222,26 @@ export default async function LedgerPage({
       ) : (
         <>
           <div className="panel">
-            {page.map((t) => (
+            {groups.map((g, gi) => {
+              const net = netOf(g.rows)
+              return [
+                <div
+                  key={`h-${g.date}`}
+                  className="flex items-baseline gap-2 border-b border-line-soft bg-surface-2 px-3.5 py-1.5 md:px-4"
+                >
+                  <span className="text-[13px] font-semibold text-ink-2">{dayLabel(g.date)}</span>
+                  {netTrustworthy(gi) && (
+                    <span
+                      className={`ml-auto text-[13px] font-bold tnum ${
+                        net > 0 ? 'text-income' : net < 0 ? 'text-expense' : 'text-muted-token'
+                      }`}
+                    >
+                      {net > 0 ? '+' : net < 0 ? '−' : ''}
+                      {fmtBaht(Math.abs(net))}
+                    </span>
+                  )}
+                </div>,
+                ...g.rows.map((t) => (
               <div
                 key={t.id}
                 className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
@@ -217,8 +263,9 @@ export default async function LedgerPage({
                       </span>
                     )}
                   </div>
+                  {/* วันที่อยู่ที่หัวกลุ่มแล้ว — meta ต่อแถวเหลือของที่ต่างกันจริงต่อรายการ */}
                   <div className="mt-0.5 truncate text-sm text-muted-token">
-                    {fmtDate(t.txn_date)} · {PAY_METHOD_LABEL[t.pay_method]}
+                    {PAY_METHOD_LABEL[t.pay_method]}
                     {t.income_kind && ` · ${INCOME_KIND_LABEL[t.income_kind]}`}
                     {t.installment_no && ` ${t.installment_no}`}
                     {t.note && ` · ${t.note}`}
@@ -259,7 +306,9 @@ export default async function LedgerPage({
                   </div>
                 </div>
               </div>
-            ))}
+                )),
+              ]
+            })}
           </div>
 
           {hasMore && last && (

@@ -1,31 +1,53 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { LogOut, MoreHorizontal, Plus } from 'lucide-react'
+import { ChevronRight, LogOut, MoreHorizontal, Plus, UserRound } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { BOTTOM_NAV, PRIMARY_ACTION, navFor, type Role } from '@/components/shell/nav'
+import {
+  bottomNavFor,
+  navFor,
+  quickAddFor,
+  type QuickAddTone,
+  type Role,
+} from '@/components/shell/nav'
+import { ThemeToggle } from '@/components/theme-toggle'
 
 /**
- * แถบล่างมือถือ 5 ช่อง
- *  1-2  เมนูหลัก
- *  3    ปุ่มกลมยกลอย — **ไอคอนอย่างเดียว ไม่มีป้าย** (งานที่ทำบ่อยที่สุด)
- *  4    เมนูหลัก
- *  5    "เพิ่มเติม" เสมอ → เปิดแผ่นเลื่อนขึ้นที่มีเมนูที่เหลือ
+ * แถบล่างมือถือ 5 ช่อง — จัดช่องตาม role (DESIGN.md §4.1)
+ *  1    วันนี้ (หน้าแรก)
+ *  2    งานประจำวันของ role นั้น — หัวหน้าไซต์: คนเข้าไซต์ · เจ้าของ: รออนุมัติ (มีตัวเลขค้าง)
+ *  3    ปุ่มกลมยกลอย **ไอคอนอย่างเดียว ไม่มีป้าย** → เปิดแผ่น "บันทึกประจำวัน"
+ *  4    รายการ (/ledger) — คีย์เสร็จแล้วมาดูว่าลงไหม/โดนตีกลับไหม
+ *  5    "เพิ่มเติม" เสมอ → แผ่นเลื่อนขึ้นที่มีเมนูที่เหลือ + ธีม + ออกจากระบบ
  */
-export function BottomNav({ role }: { role: Role }) {
-  // เหตุผลเดียวกับ Sidebar — icon เป็นฟังก์ชัน ส่งข้ามเส้นไม่ได้
+export function BottomNav({
+  role,
+  userName,
+  roleLabel,
+  pendingCount,
+}: {
+  role: Role
+  userName: string
+  roleLabel: string
+  /** จำนวนรายการรออนุมัติ — 0 เสมอสำหรับหัวหน้าไซต์ (ไม่มีช่องที่ใช้มัน) */
+  pendingCount: number
+}) {
+  // เหตุผลเดียวกับ Sidebar — icon เป็นฟังก์ชัน ส่งข้ามเส้น server→client ไม่ได้
   const groups = navFor(role)
+  const slots = bottomNavFor(role)
+  const quickAdd = quickAddFor(role)
   const pathname = usePathname()
   const router = useRouter()
-  const [open, setOpen] = useState(false)
+  const [moreOpen, setMoreOpen] = useState(false)
+  const [addOpen, setAddOpen] = useState(false)
   const [signingOut, setSigningOut] = useState(false)
 
   const isActive = (href: string) => (href === '/' ? pathname === '/' : pathname.startsWith(href))
 
-  // เมนูที่ไม่ได้อยู่ใน 4 ช่องแรก ไปรวมกันใน "เพิ่มเติม"
-  const inBar = new Set(BOTTOM_NAV.map((i) => i.href))
+  // เมนูที่ไม่ได้อยู่ในแถบล่าง ไปรวมกันใน "เพิ่มเติม"
+  const inBar = new Set(slots.map((i) => i.href))
   const overflow = groups.map((g) => ({
     ...g,
     items: g.items.filter((i) => !inBar.has(i.href)),
@@ -49,31 +71,83 @@ export function BottomNav({ role }: { role: Role }) {
         data-nav="bottom"
         className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
-        {BOTTOM_NAV.slice(0, 2).map((i) => (
-          <Slot key={i.href} href={i.href} label={i.label} active={isActive(i.href)}>
+        {slots.slice(0, 2).map((i) => (
+          <Slot
+            key={i.href}
+            href={i.href}
+            label={i.label}
+            active={isActive(i.href)}
+            badge={i.href === '/approvals' ? pendingCount : 0}
+          >
             <i.icon className="size-5.5" strokeWidth={1.8} />
           </Slot>
         ))}
 
-        <Link
-          href={PRIMARY_ACTION.href}
-          aria-label={PRIMARY_ACTION.label}
-          className="relative flex items-center justify-center"
-        >
-          <span className="absolute -top-5.5 flex size-14 items-center justify-center rounded-full border-3 border-surface bg-brand-solid text-white shadow-[0_6px_16px_rgb(0_0_0/0.28)] transition-transform active:scale-90">
-            <Plus className="size-6.5" strokeWidth={2.2} />
-          </span>
-        </Link>
-
-        {BOTTOM_NAV.slice(2).map((i) => (
-          <Slot key={i.href} href={i.href} label={i.label} active={isActive(i.href)}>
-            <i.icon className="size-5.5" strokeWidth={1.8} />
-          </Slot>
-        ))}
-
-        <Dialog.Root open={open} onOpenChange={setOpen}>
+        {/* ── ปุ่มกลาง: แผ่นบันทึกประจำวัน ─────────────────────────────
+            ทุกการบันทึกที่ทำทุกวันอยู่ห่างไม่เกิน 2 แตะจากทุกหน้า
+            ปุ่มใหญ่รายการแรกคือบันทึกรายจ่าย — งานที่ทำบ่อยที่สุดยังเร็วเท่าเดิม */}
+        <Dialog.Root open={addOpen} onOpenChange={setAddOpen}>
           <Dialog.Trigger
-            aria-expanded={open}
+            aria-label="บันทึกประจำวัน"
+            aria-expanded={addOpen}
+            className="relative flex items-center justify-center"
+          >
+            <span className="absolute -top-5.5 flex size-14 items-center justify-center rounded-full border-3 border-surface bg-brand-solid text-white shadow-[0_6px_16px_rgb(0_0_0/0.28)] transition-transform active:scale-90">
+              <Plus className="size-6.5" strokeWidth={2.2} />
+            </span>
+          </Dialog.Trigger>
+
+          <Dialog.Portal>
+            <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45" />
+            <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[80svh] overflow-y-auto rounded-t-xl border-t border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div aria-hidden className="mx-auto mt-2 h-1 w-9 rounded-full bg-line" />
+              <Dialog.Title className="px-5 pt-2.5 text-base font-bold text-ink">
+                บันทึกประจำวัน
+              </Dialog.Title>
+              <Dialog.Description className="px-5 pb-2 text-sm text-muted-token">
+                {role === 'owner'
+                  ? 'ทางลัดงานที่ต้องบันทึกทุกวัน — เริ่มได้จากทุกหน้า'
+                  : 'ทางลัดงานที่ต้องบันทึกทุกวันของไซต์คุณ'}
+              </Dialog.Description>
+
+              {quickAdd.map((i) => (
+                <Link
+                  key={i.href}
+                  href={i.href}
+                  onClick={() => setAddOpen(false)}
+                  className="flex items-center gap-3.5 border-t border-line-soft px-5 py-3.5 transition-colors duration-100 active:bg-surface-2"
+                >
+                  <span
+                    className={`flex size-11 shrink-0 items-center justify-center rounded-lg ${TONE_BOX[i.tone]}`}
+                  >
+                    <i.icon className="size-5.5" strokeWidth={1.8} />
+                  </span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate text-base font-semibold text-ink">
+                      {i.label}
+                    </span>
+                    <span className="block truncate text-xs text-muted-token">{i.sub}</span>
+                  </span>
+                  <ChevronRight className="size-4.5 shrink-0 text-muted-token" strokeWidth={1.8} />
+                </Link>
+              ))}
+
+              <div className="border-t border-line-soft p-4 pb-1">
+                <Dialog.Close className="btn-secondary w-full">ปิด</Dialog.Close>
+              </div>
+            </Dialog.Content>
+          </Dialog.Portal>
+        </Dialog.Root>
+
+        {slots.slice(2).map((i) => (
+          <Slot key={i.href} href={i.href} label={i.label} active={isActive(i.href)}>
+            <i.icon className="size-5.5" strokeWidth={1.8} />
+          </Slot>
+        ))}
+
+        <Dialog.Root open={moreOpen} onOpenChange={setMoreOpen}>
+          <Dialog.Trigger
+            aria-expanded={moreOpen}
             className="flex flex-col items-center justify-center gap-0.5 text-[10.5px] text-muted-token"
           >
             <MoreHorizontal className="size-5.5" strokeWidth={1.8} />
@@ -82,13 +156,25 @@ export function BottomNav({ role }: { role: Role }) {
 
           <Dialog.Portal>
             <Dialog.Overlay className="fixed inset-0 z-50 bg-black/45" />
-            <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[80svh] overflow-y-auto rounded-t-xl border-t border-line bg-surface pb-[env(safe-area-inset-bottom)]">
-              <Dialog.Title className="px-4 pt-4 pb-1 text-base font-semibold text-ink">
-                เพิ่มเติม
-              </Dialog.Title>
-              <Dialog.Description className="px-4 pb-3 text-sm text-muted-token">
-                เมนูที่เหลือทั้งหมด
+            <Dialog.Content className="fixed inset-x-0 bottom-0 z-50 max-h-[80svh] overflow-y-auto rounded-t-xl border-t border-line bg-surface pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+              <div aria-hidden className="mx-auto mt-2 h-1 w-9 rounded-full bg-line" />
+              <Dialog.Title className="sr-only">เพิ่มเติม</Dialog.Title>
+              <Dialog.Description className="sr-only">
+                เมนูที่เหลือทั้งหมด และการตั้งค่าบัญชี
               </Dialog.Description>
+
+              {/* ใครล็อกอินอยู่ เห็นในระดับไหน — บนเดสก์ท็อปมีท้าย sidebar บอก
+                  บนมือถือไม่มี sidebar แผ่นนี้จึงรับหน้าที่นั้นแทน */}
+              <div className="mx-4 mt-3 mb-1 flex items-center gap-3 rounded-lg border border-line bg-surface-2 px-3.5 py-3">
+                <span className="flex size-10 shrink-0 items-center justify-center rounded-full bg-brand-tint text-brand-on-tint">
+                  <UserRound className="size-5" strokeWidth={1.8} />
+                </span>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-sm font-semibold text-ink">{userName}</span>
+                  <span className="block truncate text-xs text-muted-token">{roleLabel}</span>
+                </span>
+                <ThemeToggle />
+              </div>
 
               {overflow.map((g) => (
                 <div key={g.heading}>
@@ -99,8 +185,8 @@ export function BottomNav({ role }: { role: Role }) {
                     <Link
                       key={i.href}
                       href={i.href}
-                      onClick={() => setOpen(false)}
-                      className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 last:border-b-0"
+                      onClick={() => setMoreOpen(false)}
+                      className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 transition-colors duration-100 last:border-b-0 active:bg-surface-2"
                     >
                       <i.icon className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
                       <span className="min-w-0 flex-1">
@@ -109,6 +195,10 @@ export function BottomNav({ role }: { role: Role }) {
                         </span>
                         <span className="block truncate text-xs text-muted-token">{i.sub}</span>
                       </span>
+                      <ChevronRight
+                        className="size-4 shrink-0 text-muted-token"
+                        strokeWidth={1.8}
+                      />
                     </Link>
                   ))}
                 </div>
@@ -131,15 +221,25 @@ export function BottomNav({ role }: { role: Role }) {
   )
 }
 
+/** สีกล่องไอคอนของแผ่นบันทึกประจำวัน — รายจ่าย/รายรับใช้โทเคน MONEY ไม่ยืม status */
+const TONE_BOX: Record<QuickAddTone, string> = {
+  expense: 'bg-expense-bg text-expense',
+  income: 'bg-income-bg text-income',
+  brand: 'bg-brand-tint text-brand-on-tint',
+}
+
 function Slot({
   href,
   label,
   active,
+  badge = 0,
   children,
 }: {
   href: string
   label: string
   active: boolean
+  /** ตัวเลขแดงมุมไอคอน — 0 = ไม่แสดง */
+  badge?: number
   children: React.ReactNode
 }) {
   return (
@@ -150,7 +250,14 @@ function Slot({
         active ? 'font-semibold text-brand' : 'text-muted-token'
       }`}
     >
-      {children}
+      <span className="relative flex">
+        {children}
+        {badge > 0 && (
+          <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-urgent-solid px-1 text-[9.5px] font-bold leading-none text-white tnum">
+            {badge > 99 ? '99+' : badge}
+          </span>
+        )}
+      </span>
       <span className="truncate px-1">{label}</span>
     </Link>
   )

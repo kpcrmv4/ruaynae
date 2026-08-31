@@ -29,9 +29,18 @@ const VALUE_TONE: Record<MetricTone, string> = {
  * Server Component — it takes a `LucideIcon` as a prop, which only works
  * because this file has no 'use client'. Do not add one.
  */
-export function MetricBar({ children }: { children: ReactNode }) {
+export function MetricBar({
+  children,
+  cols = 2,
+}: {
+  children: ReactNode
+  /** จำนวนคอลัมน์บนจอเล็ก — แถบ 3 ช่องใช้ 3 จะได้ไม่เหลือช่องว่างครึ่งแถว */
+  cols?: 2 | 3
+}) {
   return (
-    <div className="mb-6 grid grid-cols-2 overflow-hidden rounded-lg border border-line bg-surface shadow-e1 sm:grid-flow-col sm:grid-cols-[repeat(auto-fit,minmax(0,1fr))]">
+    <div
+      className={`mb-6 grid ${cols === 3 ? 'grid-cols-3' : 'grid-cols-2'} overflow-hidden rounded-lg border border-line bg-surface shadow-e1 sm:grid-flow-col sm:grid-cols-[repeat(auto-fit,minmax(0,1fr))]`}
+    >
       {children}
     </div>
   )

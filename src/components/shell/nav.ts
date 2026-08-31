@@ -1,5 +1,7 @@
 import {
+  Banknote,
   CalendarDays,
+  HandCoins,
   Home,
   Inbox,
   Plug,
@@ -7,6 +9,7 @@ import {
   Settings,
   ShieldCheck,
   Users,
+  Wallet,
   Warehouse,
   type LucideIcon,
 } from 'lucide-react'
@@ -15,8 +18,9 @@ import type { Database } from '@/lib/database.types'
 export type Role = Database['public']['Enums']['user_role']
 
 /**
- * เมนูทั้งหมด — มาจากเดโม่ที่อนุมัติแล้ว (docs/design/DESIGN.md §4)
- * ห้ามคิดใหม่ · เพิ่ม/ลด ต้องกลับไปแก้เดโม่ก่อน
+ * เมนูทั้งหมด — โครงตามเดโม่ที่อนุมัติแล้ว (docs/design/DESIGN.md §4)
+ * ปรับรอบรีดีไซน์มือถือ 31 ส.ค. 2569 ตามคำสั่งเจ้าของ (DESIGN.md §4.1):
+ * หน้าแรกเป็น "วันนี้" · แถบล่างจัดช่องตาม role · ปุ่มกลางเปิดแผ่นบันทึกประจำวัน
  *
  * ที่เก็บเป็นไฟล์เดียว ไม่ใช่เขียนซ้ำใน sidebar กับ bottom nav
  * เพราะสองที่จะเพี้ยนจากกันทันทีที่มีคนเพิ่มเมนูแล้วแก้แค่ที่เดียว
@@ -35,7 +39,7 @@ export const NAV: NavGroup[] = [
   {
     heading: 'หลัก',
     items: [
-      { href: '/', label: 'ภาพรวม', sub: 'สรุปเงินและทุกไซต์', icon: Home },
+      { href: '/', label: 'วันนี้', sub: 'งานประจำวันและสรุปทุกไซต์', icon: Home },
       { href: '/sites', label: 'ไซต์งาน', sub: 'โปรเจ็คที่กำลังทำ', icon: Warehouse },
       { href: '/ledger', label: 'รายรับ-รายจ่าย', sub: 'ทุกรายการ ค้นหาและกรอง', icon: Receipt },
     ],
@@ -101,12 +105,62 @@ export function navFor(role: Role): NavGroup[] {
   })).filter((g) => g.items.length > 0)
 }
 
-/** ปุ่มกลางของแถบล่าง — งานที่ทำบ่อยที่สุดของทั้งสอง role */
-export const PRIMARY_ACTION = { href: '/entry', label: 'บันทึกรายจ่าย' }
+/**
+ * แผ่นบันทึกประจำวัน — เปิดจากปุ่มกลมกลางแถบล่าง
+ *
+ * ทุกการบันทึกที่ต้องทำทุกวันเริ่มได้จากทุกหน้าใน 2 แตะ · ช่องทางเดิม
+ * (เมนู /entry /attendance /payroll) ยังอยู่ครบ อันนี้เป็นทางลัด ไม่ใช่ทางเดียว
+ */
+export type QuickAddTone = 'expense' | 'income' | 'brand'
+export type QuickAddItem = NavItem & { tone: QuickAddTone }
 
-/** 4 ช่องแรกของแถบล่าง (ช่องที่ 5 คือ "เพิ่มเติม" เสมอ) */
-export const BOTTOM_NAV: NavItem[] = [
-  { href: '/', label: 'ภาพรวม', sub: '', icon: Home },
-  { href: '/sites', label: 'ไซต์งาน', sub: '', icon: Warehouse },
-  { href: '/attendance', label: 'คนเข้าไซต์', sub: '', icon: CalendarDays },
+export const QUICK_ADD: QuickAddItem[] = [
+  {
+    href: '/entry',
+    label: 'บันทึกรายจ่าย',
+    sub: 'แนบสลิปได้ · งานที่ทำบ่อยที่สุด',
+    icon: Wallet,
+    tone: 'expense',
+  },
+  {
+    href: '/entry?kind=income',
+    label: 'บันทึกรายรับ',
+    sub: 'มัดจำ · งวดงาน · ค่างานเพิ่ม',
+    icon: Banknote,
+    tone: 'income',
+    ownerOnly: true,
+  },
+  {
+    href: '/attendance',
+    label: 'ลงชื่อคนเข้าไซต์',
+    sub: 'ติ๊กแล้วค่าแรงเข้าต้นทุนไซต์ทันที',
+    icon: CalendarDays,
+    tone: 'brand',
+  },
+  {
+    href: '/payroll',
+    label: 'เบิกล่วงหน้า',
+    sub: 'เลือกคนแล้วระบบเช็คเพดานให้',
+    icon: HandCoins,
+    tone: 'brand',
+    ownerOnly: true,
+  },
+]
+
+export const quickAddFor = (role: Role): QuickAddItem[] =>
+  QUICK_ADD.filter((i) => !i.ownerOnly || role === 'owner')
+
+/**
+ * 3 ช่องเมนูของแถบล่าง (ช่องกลางคือปุ่มบันทึก · ช่องที่ 5 คือ "เพิ่มเติม" เสมอ)
+ *
+ * จัดตาม role เพราะงานประจำวันของสองคนไม่เหมือนกัน — หัวหน้าไซต์ลงชื่อคนเข้าไซต์
+ * ทุกเช้า ส่วนเจ้าของเคลียร์คิวอนุมัติทุกวัน · /ledger อยู่ทั้งคู่เพราะ
+ * "คีย์เสร็จแล้วขอดูว่าลงไหม/โดนตีกลับไหม" คืองานถัดไปของการบันทึกเสมอ
+ */
+export const bottomNavFor = (role: Role): NavItem[] => [
+  { href: '/', label: 'วันนี้', sub: '', icon: Home },
+  role === 'owner'
+    ? { href: '/approvals', label: 'รออนุมัติ', sub: '', icon: Inbox }
+    : { href: '/attendance', label: 'คนเข้าไซต์', sub: '', icon: CalendarDays },
+  { href: '/ledger', label: 'รายการ', sub: '', icon: Receipt },
 ]

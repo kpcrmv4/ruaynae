@@ -61,7 +61,9 @@ export function ApprovalActions({ id, amount }: { id: string; amount: number }) 
   }
 
   return (
-    <div className="flex shrink-0 items-center gap-2">
+    // บนจอเล็กปุ่มขยายเต็มแถวและ "อนุมัติ" ได้ช่องใหญ่กว่า — งานหลักของหน้านี้
+    // คือกดอนุมัติทีละใบด้วยนิ้วโป้ง ปุ่มเล็กชิดกันคือปุ่มที่กดพลาด
+    <div className="grid w-full shrink-0 grid-cols-[1fr_1.4fr] items-center gap-2 sm:flex sm:w-auto">
       <Dialog.Root
         open={open}
         onOpenChange={(v) => {

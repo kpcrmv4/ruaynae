@@ -26,6 +26,14 @@ const dateLongFmt = new Intl.DateTimeFormat(LOCALE, {
   year: 'numeric',
 })
 
+const dateWeekdayFmt = new Intl.DateTimeFormat(LOCALE, {
+  timeZone: TZ,
+  weekday: 'long',
+  day: 'numeric',
+  month: 'long',
+  year: 'numeric',
+})
+
 const moneyFmt = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 })
 
 /** `2026-03-01` → `1 มี.ค. 2569` */
@@ -34,6 +42,11 @@ export const fmtDate = (iso: string | null | undefined): string =>
 
 export const fmtDateLong = (iso: string | null | undefined): string =>
   iso ? dateLongFmt.format(new Date(`${iso}T00:00:00Z`)) : '—'
+
+/** `2026-08-31` → `วันจันทร์ที่ 31 สิงหาคม 2569` — หัวหน้า "วันนี้" ต้องบอกวันในสัปดาห์
+ *  เพราะงานไซต์คิดเป็น จันทร์–เสาร์ ไม่ใช่เลขวันที่ */
+export const fmtDateWithWeekday = (iso: string | null | undefined): string =>
+  iso ? dateWeekdayFmt.format(new Date(`${iso}T00:00:00Z`)) : '—'
 
 /** `1250000` → `1,250,000` — ไม่ใส่ ฿ เพราะบางที่วางไว้เป็นหน่วยแยก */
 export const fmtMoney = (n: number | null | undefined): string => moneyFmt.format(n ?? 0)

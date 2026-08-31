@@ -89,6 +89,7 @@ export default async function AttendancePage({
     { data: rows, error: aErr },
     { data: dayWage },
     { data: prevRows, error: pErr },
+    { data: otherSiteRows, error: oErr },
   ] =
     await Promise.all([
       // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้เลย — หัวหน้าไซต์มีหน้าที่บันทึกว่าใครมาทำงาน
@@ -150,13 +151,38 @@ export default async function AttendancePage({
         .eq('work_date', prevDate)
         .order('created_at', { ascending: true })
         .range(0, PAGE_SIZE - 1),
+      // 🔴 คนหนึ่งคนทำงานได้ไม่เกิน 1 วันต่อวัน — guard ที่ฐานข้อมูลปฏิเสธการลงชื่อ
+      // ที่จะทำให้เกิน · เดิมหน้าจอไม่รู้เรื่องนี้เลย ปุ่ม "เข้าไซต์" จึงโชว์ให้กด
+      // ทั้งที่ยังไงก็ไม่ผ่าน แล้วผู้ใช้เพิ่งรู้ตอนขึ้น error หลังกด
+      // · RLS จำกัดให้เอง: หัวหน้าไซต์เห็นเฉพาะไซต์ที่ตัวเองดูแล — คนที่ไปอยู่ไซต์
+      // ของคนอื่นจะยังกดไม่ผ่านที่ฐานข้อมูลเหมือนเดิม ซึ่งเป็นตาข่ายรองที่ยังอยู่ครบ
+      sb
+        .from('attendance')
+        .select('employee_id, work_units, sites(name)')
+        .eq('work_date', date)
+        .neq('site_id', siteId)
+        .order('employee_id', { ascending: true })
+        .range(0, PAGE_SIZE * 2 - 1),
     ])
 
-  if (eErr || aErr || pErr) {
-    console.error('[attendance] โหลดข้อมูลไม่ได้', eErr?.message ?? aErr?.message ?? pErr?.message)
+  if (eErr || aErr || pErr || oErr) {
+    console.error(
+      '[attendance] โหลดข้อมูลไม่ได้',
+      eErr?.message ?? aErr?.message ?? pErr?.message ?? oErr?.message,
+    )
     return (
       <DataError message="โหลดข้อมูลคนเข้าไซต์ไม่สำเร็จ" />
     )
+  }
+
+  // รวมเป็น "วันนี้คนนี้ถูกลงชื่อที่อื่นไปแล้วกี่วัน และที่ไซต์ไหนบ้าง"
+  const bookedElsewhere: Record<string, { units: number; siteNames: string[] }> = {}
+  for (const r of otherSiteRows ?? []) {
+    const cur = bookedElsewhere[r.employee_id] ?? { units: 0, siteNames: [] }
+    cur.units += Number(r.work_units)
+    const name = r.sites?.name
+    if (name && !cur.siteNames.includes(name)) cur.siteNames.push(name)
+    bookedElsewhere[r.employee_id] = cur
   }
 
   return (
@@ -175,6 +201,7 @@ export default async function AttendancePage({
           employee_id: r.employee_id,
           work_units: Number(r.work_units),
         }))}
+        bookedElsewhere={bookedElsewhere}
       />
     </>
   )

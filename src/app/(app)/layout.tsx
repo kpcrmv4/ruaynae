@@ -1,6 +1,7 @@
 import { AppHeader } from '@/components/shell/app-header'
 import { PwaRegister } from '@/components/shell/pwa-register'
 import { BottomNav } from '@/components/shell/bottom-nav'
+import { InstallBanner } from '@/components/shell/install-banner'
 import { Sidebar } from '@/components/shell/sidebar'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getBranding } from '@/lib/branding'
@@ -68,7 +69,12 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
           items={items ?? []}
           unread={count ?? 0}
         />
-        <main className="mx-auto w-full max-w-5xl flex-1 p-4 lg:p-6">{children}</main>
+        <main className="mx-auto w-full max-w-5xl flex-1 p-4 lg:p-6">
+          {/* คำชวนติดตั้งแอป → หลังติดตั้งแล้วเปลี่ยนเป็นคำชวนเปิดแจ้งเตือน
+              คีย์สาธารณะของ VAPID ถูกฝังใน JS ตามการออกแบบ ไม่ใช่ความลับ */}
+          <InstallBanner vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''} />
+          {children}
+        </main>
         <BottomNav
           role={user.role}
           userName={user.fullName}

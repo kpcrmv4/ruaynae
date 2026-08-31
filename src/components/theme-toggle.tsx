@@ -2,7 +2,7 @@
 
 import { Moon, Sun } from 'lucide-react'
 import { useTheme } from 'next-themes'
-import { useEffect, useState } from 'react'
+import { useIsClient } from '@/lib/use-is-client'
 
 /**
  * ธีมที่ใช้อยู่จริงรู้ได้เฉพาะบนเบราว์เซอร์ — เรนเดอร์ไอคอนตั้งแต่ฝั่งเซิร์ฟเวอร์
@@ -10,9 +10,8 @@ import { useEffect, useState } from 'react'
  * จึงรอ mount ก่อน แล้วค่อยตัดสินใจว่าจะโชว์ดวงอาทิตย์หรือดวงจันทร์
  */
 export function ThemeToggle() {
-  const [mounted, setMounted] = useState(false)
+  const mounted = useIsClient()
   const { resolvedTheme, setTheme } = useTheme()
-  useEffect(() => setMounted(true), [])
 
   const isDark = resolvedTheme === 'dark'
 

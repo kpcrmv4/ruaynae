@@ -58,15 +58,20 @@ const ownerJar = await login('/api/auth/login', {
 })
 const supJar = await login('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN })
 
-// ── P0-UI-01 · sidebar ของเจ้าของมีลิงก์ 8 รายการ และมีรายการ active ────
+// ── P0-UI-01 · sidebar ของเจ้าของมีลิงก์ 9 รายการ และมีรายการ active ────
+// จำนวนเป็น **ตัวเลขที่พิมพ์ไว้** โดยตั้งใจ ไม่ใช่นับจาก `nav.ts`
+// นับจากไฟล์เดียวกับที่แอปอ่าน = เอาโค้ดไปเทียบกับตัวเอง แล้วแถวนี้จะไม่มีวันแดงอีกเลย
+// ต่อให้เมนูหายไปทั้งกลุ่ม · ตัวเลขที่ต้องมาแก้ตอนเพิ่มเมนูคือราคาที่ถูกกว่ามาก
+// (9 = ภาพรวม · ไซต์งาน · รายรับ-รายจ่าย · คนเข้าไซต์ · ค่าแรงและรอบจ่าย · รออนุมัติ
+//  · ประวัติการแก้ไข · ตั้งค่า · เชื่อมต่อ AI — ตัวสุดท้ายเพิ่มมาในเฟส P9)
 {
   const html = await page('/', ownerJar)
   const nav = navBlock(html, 'sidebar')
   const links = nav ? (nav.match(/<a\s/g) ?? []).length : -1
   // รายการที่ตรงกับ URL ปัจจุบันต้องมีคลาส active — ถ้าไม่มี คนจะไม่รู้ว่าอยู่หน้าไหน
   const hasActive = Boolean(nav && nav.includes('bg-sidebar-active-bg'))
-  check('P0-UI-01 sidebar ของเจ้าของมีลิงก์ 8 รายการ และมีรายการที่ active',
-    links === 8 && hasActive, `ลิงก์ ${links} · active ${hasActive}`)
+  check('P0-UI-01 sidebar ของเจ้าของมีลิงก์ 9 รายการ และมีรายการที่ active',
+    links === 9 && hasActive, `ลิงก์ ${links} · active ${hasActive}`)
 }
 
 // ── P0-UI-02a · แถบล่างมี 5 ช่อง · ช่องกลางไม่มีข้อความแต่มี aria-label ──

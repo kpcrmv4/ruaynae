@@ -106,13 +106,10 @@ const countAll = async () => {
   return Object.fromEntries(rows.map((r) => [r.t, r.n]))
 }
 
-/** ฟิลด์ที่ห้ามหลุดออกไปที่คลาวด์ AI ไม่ว่าจะทางไหน (สเปก §7.1)
- *  ⚠️ ไม่ใส่ `address` เป็นสตริงค้นหา — คำสั้นเกินไปจนชนกับข้อความที่ไม่มีพิษภัย
- *  แล้วแถวจะแดงจนคนปิดมันทิ้ง · ใช้ **ค่าจริง** ของที่อยู่ใน fixture แทน ซึ่งตรงกว่า */
-const BLOCKLIST = [
-  'client_phone', 'object_key', 'thumb_key', 'pin_hash', 'key_hash',
-  '@staff.invalid', 'p256dh', 'endpoint', 'tax_id',
-]
+/** ฟิลด์ที่ห้ามหลุดออกไปที่คลาวด์ AI (สเปก §7.1) · ⚠️ ไม่ใส่ `address` เป็นสตริงค้นหา —
+ *  สั้นเกินจนชนข้อความที่ไม่มีพิษภัย แล้วแถวจะแดงจนคนปิดทิ้ง · ใช้ **ค่าจริง** ใน fixture แทน */
+const BLOCKLIST = ['client_phone', 'object_key', 'thumb_key', 'pin_hash', 'key_hash',
+  '@staff.invalid', 'p256dh', 'endpoint', 'tax_id']
 
 // ── fixture ที่สคริปต์นี้สร้างเอง ─────────────────────────────────────
 const TAG = 'ตรวจรับ MCP ชั่วคราว'
@@ -214,6 +211,13 @@ try {
     check('P9-UI-06 เปิด /mcp จาก origin ในบ้าน → มี data-testid="mcp-origin-warning" ใน DOM พร้อมคำว่า localhost',
       r.html.includes('data-testid="mcp-origin-warning"') && r.html.includes('localhost'),
       `testid=${r.html.includes('data-testid="mcp-origin-warning"')} · localhost=${r.html.includes('localhost')}`)
+    // โครงร่างของ segment นี้มาจาก `mcp/loading.tsx` ไฟล์เดียว และ Next สตรีม fallback
+    // ของ Suspense ออกมาก่อนเนื้อหาจริง มันจึงยังอยู่ในบอดี้ที่ได้ · ก่อนแก้ไฟล์นั้นให้ใช้
+    // `<PageSkeleton>` ทั้งสองแอตทริบิวต์นี้ไม่มีอยู่เลย แถวนี้จึงแดงได้จริง
+    const sk = r.html.includes('data-state="skeleton"')
+    const busy = r.html.includes('aria-busy="true"')
+    check('P9-UI-05 สถานะโครงร่างของ /mcp มี data-state="skeleton" และ aria-busy="true" ในบอดี้ที่สตรีมออกมา',
+      sk && busy, `skeleton=${sk} · aria-busy=${busy}`)
   }
 
   // ══ 1 · fixture ════════════════════════════════════════════════════
@@ -229,6 +233,16 @@ try {
   if (!CAT_INSTALLMENT || !CAT_DEPOSIT || !CAT_MATERIAL || !CAT_TRANSPORT) {
     throw new Error('หมวดตั้งต้นหายไปจากตาราง categories — ตรวจ migration ของ P2')
   }
+
+  // 🔴 ยอดบนหน้าภาพรวมเป็นยอด**ทั้งบริษัท** จะเทียบตรง ๆ กับยอดของ fixture ไม่ได้
+  // (เคยเขียนแบบนั้นแล้วแดงทันทีที่มีคนใส่ข้อมูลอื่นเข้าฐาน) · เก็บค่าตั้งต้นไว้ก่อน
+  // แล้ว P9-FN-04 เทียบ **ส่วนต่าง** ซึ่งถูกต้องบนฐานว่างและฐานที่มีข้อมูลอยู่แล้วเท่ากัน
+  const [base] = await sql(`
+    select public.mcp_assume_owner('${owner.id}'::uuid);
+    select total_count, active_count, due_soon_count,
+           active_contract::text as contract, active_income::text as income,
+           active_cost::text as cost, pending_total::text as pending
+    from public.site_overview(date '${TODAY}')`)
 
   await sql(`
     insert into public.sites (id, name, client_name, client_phone, address, status, start_date, end_date, created_by)
@@ -452,11 +466,16 @@ try {
             and (o->>'active_cost')::numeric    > 0
             and (o->>'pending_total')::numeric  > 0)::int as n_alive,
         (select count(*) from mine
-          where (o->>'active_income')::numeric = ${A.incomeApproved}
-            and (o->>'active_cost')::numeric   = ${A.costExpense} + ${A.costWage})::int as n_fix`)
-    check('P9-FN-04 ตัวเลขจาก mcp_overview = ตัวเลขจาก site_overview ทุกคอลัมน์ และไม่ใช่ null/0 ลอย ๆ',
+          where (o->>'total_count')::int     - ${base.total_count}    = 2
+            and (o->>'active_count')::int    - ${base.active_count}   = 1
+            and (o->>'due_soon_count')::int  - ${base.due_soon_count} = 1
+            and (o->>'active_contract')::numeric - ${base.contract} = ${A.contract}
+            and (o->>'active_income')::numeric   - ${base.income}   = ${A.incomeApproved}
+            and (o->>'active_cost')::numeric     - ${base.cost}     = ${A.costExpense} + ${A.costWage}
+            and (o->>'pending_total')::numeric   - ${base.pending}  = ${A.incomePending} + ${A.costPending})::int as n_fix`)
+    check('P9-FN-04 ตัวเลขจาก mcp_overview = ตัวเลขจาก site_overview ทุกคอลัมน์ · ส่วนต่างหลังใส่ fixture ตรงเป๊ะ 7 คอลัมน์',
       cmp.n_diff === 0 && cmp.n_alive === 1 && cmp.n_fix === 1,
-      `ต่าง ${cmp.n_diff} · มีตัวเลขจริง ${cmp.n_alive}/1 · ตรงกับยอดที่ใส่ไว้ ${cmp.n_fix}/1`)
+      `ต่าง ${cmp.n_diff} · มีตัวเลขจริง ${cmp.n_alive}/1 · ส่วนต่างตรง ${cmp.n_fix}/1`)
   }
   {
     const r = await sqlRaw(`select public.mcp_overview('${sup.id}'::uuid, null)`)
@@ -705,11 +724,10 @@ try {
       n === calls.length, `เรียก ${calls.length} ครั้ง · บันทึก ${n} แถว`)
   }
   {
-    // 🔴 pepper ที่หายไปแล้วโปรแกรมยังเดินต่อ = HMAC ที่คำนวณจาก `undefined`
-    // ซึ่งเหมือนกันทุกเครื่องที่ลืมตั้งค่า — เท่ากับไม่มี pepper เลยโดยไม่มีใครรู้
+    // 🔴 pepper หายแล้วยังเดินต่อ = HMAC จาก `undefined` ซึ่งเหมือนกันทุกเครื่องที่ลืมตั้งค่า
     // ตรวจที่ `src/lib/mcp/keys.ts` **ไฟล์จริง** โดยโหลดในลูกโพรเซสที่ไม่มี pepper
-    // (ยิงผ่าน HTTP ไม่ได้ในเครื่องนี้ — ต้องมี dev server ตัวที่สองซึ่งจะแย่ง `.next`
-    //  กับตัวที่รันอยู่ · ดูเหตุผลเต็มในแถว P9-SEC-06 ของ docs/test-plan/P9.md)
+    // (ยิงผ่าน HTTP ไม่ได้ — ต้องมี dev server ตัวที่สองซึ่งจะแย่ง `.next` กับตัวที่รันอยู่
+    //  · เหตุผลเต็มอยู่ในแถว P9-SEC-06 ของ docs/test-plan/P9.md)
     const dir = mkdtempSync(join(tmpdir(), 'verify-mcp-'))
     try {
       const stub = join(dir, 'stub.mjs')
@@ -761,12 +779,12 @@ try {
   const ids = (arr) => arr.map((v) => `'${v}'`).join(',')
   const steps = [
     ['attendance', `delete from public.attendance where id in (${ids([F.att])})`],
-    ['employee_wages', `delete from public.employee_wages where employee_id in (${ids([F.emp])})`],
-    ['employees', `delete from public.employees where id in (${ids([F.emp])})`],
+    ['employees', `delete from public.employee_wages where employee_id in (${ids([F.emp])});
+                   delete from public.employees where id in (${ids([F.emp])})`],
     ['site_milestones', `delete from public.site_milestones where id in (${ids([F.ms1, F.ms2])})`],
     ['transactions', `delete from public.transactions where id in (${ids([F.t1, F.t2, F.t3, F.t4, F.t5, F.t6])})`],
-    ['site_finance', `delete from public.site_finance where site_id in (${ids([F.siteA, F.siteB])})`],
-    ['sites', `delete from public.sites where id in (${ids([F.siteA, F.siteB])})`],
+    ['sites', `delete from public.site_finance where site_id in (${ids([F.siteA, F.siteB])});
+               delete from public.sites where id in (${ids([F.siteA, F.siteB])})`],
   ]
   // mcp_call_log ของคีย์เหล่านี้หายตามเองด้วย on delete cascade
   if (keyIds.length) steps.push(['mcp_keys', `delete from public.mcp_keys where id in (${ids(keyIds)})`])

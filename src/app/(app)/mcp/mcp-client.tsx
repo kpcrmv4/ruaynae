@@ -139,7 +139,10 @@ export function McpClient({
       {/* 🔴 Claude เรียกจากคลาวด์ ไม่ใช่จากเครื่องผู้ใช้ — ไม่เตือนตรงนี้
           เจ้าของจะคัดลอก localhost ไปวางแล้วมาบอกว่าเซิร์ฟเวอร์เสีย */}
       {isLocalOrigin && (
-        <div className="flex gap-3 rounded-lg border border-urgent-ring bg-urgent-bg px-4 py-3">
+        <div
+          data-testid="mcp-origin-warning"
+          className="flex gap-3 rounded-lg border border-urgent-ring bg-urgent-bg px-4 py-3"
+        >
           <AlertTriangle className="size-5 shrink-0 text-urgent" strokeWidth={1.8} />
           <p className="text-sm leading-6 text-ink-2">
             ที่อยู่ตอนนี้เป็น <span className="font-mono">{origin}</span> ซึ่งเป็นเครื่องในบ้าน

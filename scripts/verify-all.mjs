@@ -40,8 +40,22 @@ let fail = 0
 let skip = 0
 const failed = []
 
+/**
+ * 🔴 เว้นจังหวะระหว่างสคริปต์ — Management API ของ Supabase ตอบ
+ * `429 ThrottlerException` เมื่อยิงถี่เกินไป และตอนโดนนั้น `sql()` ของสคริปต์
+ * ส่วนใหญ่คืนผลว่างแทนที่จะโยน → แถวแดงมั่วโดยที่แอปไม่ผิดสักอย่าง
+ *
+ * ที่แย่กว่าคือ **สคริปต์ที่ตายกลางทางไม่ได้ล้างข้อมูลของตัวเอง** ·
+ * เจอจริงเมื่อ 31 ส.ค. 2569: `verify-ship` seed ข้อมูลเดโม่แล้วโดน 429
+ * ตอนกำลังจะล้าง → เหลือ `site_supervisors` ค้างไว้ → รอบถัดไปแดง 32 แถว
+ * เพราะ exclusion constraint ยอมให้หัวหน้าไซต์คนหนึ่งดูแลได้ไซต์เดียวต่อวัน
+ * ทุกสคริปต์ที่มอบหมายหัวหน้าไซต์ให้ไซต์ทดสอบของตัวเองจึงชนกันหมด
+ */
+const PACE_MS = 2500
+
 for (const name of SCRIPTS) {
   await clearAttempts()
+  await new Promise((r) => setTimeout(r, PACE_MS))
   const r = spawnSync('node', [`scripts/${name}.mjs`], { encoding: 'utf8' })
   const out = (r.stdout ?? '') + (r.stderr ?? '')
   const m = out.match(/(\d+) แถว: ผ่าน (\d+) · ตก (\d+)(?: · undecided (\d+))?/)

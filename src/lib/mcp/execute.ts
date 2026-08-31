@@ -63,7 +63,15 @@ export async function executeTool(
     case 'get_site_detail': {
       const site = asUuid(args.site_id)
       if (!site) return { ok: false, message: 'ต้องระบุ site_id เป็น UUID — หาได้จาก list_sites' }
-      return call('mcp_site_detail', { p_site: site })
+      const res = await call('mcp_site_detail', { p_site: site })
+      // 🔴 ไซต์ที่ไม่มีอยู่จริงต้องบอกว่า "ไม่พบ" ไม่ใช่ส่งออบเจ็กต์ว่างกลับไป
+      // `mcp_site_detail` ไม่ raise เมื่อหาไม่เจอ มันคืน `{"site": null, …}` พร้อม
+      // อาร์เรย์ว่างครบทุกคีย์ · โมเดลอ่านชุดนี้ว่า "ไซต์นี้มีอยู่แต่ยังไม่มีข้อมูล"
+      // แล้วรายงานให้เจ้าของฟังด้วยความมั่นใจ — คำตอบผิดที่ฟังดูถูก ไม่มี error ที่ไหนเลย
+      if (res.ok && (res.data as { site?: unknown } | null)?.site == null) {
+        return { ok: false, message: 'ไม่พบไซต์ตาม site_id นี้ — ใช้ list_sites เพื่อดู site_id ที่ถูกต้อง' }
+      }
+      return res
     }
 
     case 'search_transactions': {

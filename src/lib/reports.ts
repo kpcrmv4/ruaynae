@@ -121,3 +121,20 @@ export const bucketLabel = (isoDate: string, grain: 'day' | 'month'): string => 
  */
 export const pctChange = (now: number, before: number): number | null =>
   before === 0 ? null : Math.round(((now - before) / Math.abs(before)) * 100)
+
+/**
+ * ทุกวันในช่วง (`YYYY-MM-DD` ค.ศ.) — ใช้เป็นคอลัมน์ของตารางการทำงาน
+ *
+ * เดินด้วย `Date.UTC` ทีละวันเหมือนที่อื่นในไฟล์นี้ ไม่แตะเขตเวลาเครื่อง ·
+ * มีเพดานกันลูปหลุดเมื่อมีคนส่งช่วงยาวผิดปกติเข้ามา
+ */
+export function daysInRange(from: string, to: string, max = 366): string[] {
+  const out: string[] = []
+  const end = Date.parse(`${to}T00:00:00Z`)
+  let cur = Date.parse(`${from}T00:00:00Z`)
+  while (cur <= end && out.length < max) {
+    out.push(new Date(cur).toISOString().slice(0, 10))
+    cur += 86_400_000
+  }
+  return out
+}

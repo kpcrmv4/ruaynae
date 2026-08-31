@@ -12,6 +12,8 @@ type Row = {
   employee_id: string
   full_name: string
   job_title: string | null
+  /** วันแรงที่ยังไม่ถูกปิดรอบ (เต็มวัน = 1 · ครึ่งวัน = 0.5) */
+  days: number
   accrued: number
   advanced: number
   balance: number
@@ -158,6 +160,12 @@ export function PayrollBoard({
                 </div>
 
                 <dl className="flex shrink-0 gap-4 text-right text-sm">
+                  {/* เจ้าของสั่งให้เห็นทั้ง "กี่วัน" และ "กี่บาท" — ยอดเงินอย่างเดียว
+                      ตอบไม่ได้ว่าคนนี้มาทำงานกี่วัน ซึ่งเป็นตัวเลขที่ใช้เถียงกันจริง */}
+                  <div>
+                    <dt className="text-xs text-muted-token">ค้างจ่าย</dt>
+                    <dd className="tnum font-semibold text-ink">{r.days} วัน</dd>
+                  </div>
                   <div>
                     <dt className="text-xs text-muted-token">ค่าแรง</dt>
                     <dd className="tnum font-semibold text-ink">{fmtBaht(r.accrued)}</dd>

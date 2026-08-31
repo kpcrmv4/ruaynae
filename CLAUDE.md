@@ -319,6 +319,7 @@ src/
     (app)/page.tsx            ภาพรวม
     (app)/sites/[id]/page.tsx · (app)/ledger · (app)/entry
     (app)/attendance · (app)/employees · (app)/approvals · (app)/audit · (app)/settings
+    (app)/reports            รายงานสรุป (เจ้าของ) — RPC `report_*` รวมยอดในฐานข้อมูล
     (app)/settings/users     ผู้ใช้ระบบ (มี login) · `?tab=workers` = คนงาน (ไม่มี login)
 #                            เข้าจาก **สองปุ่มแยกกัน** บนหน้าตั้งค่า ไม่มีแถบแท็บแล้ว
     (app)/settings/branding  ชื่อบริษัท + โลโก้

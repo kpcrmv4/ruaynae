@@ -1116,6 +1116,79 @@ export type Database = {
           job_title: string
         }[]
       }
+      report_by_category: {
+        Args: { p_from: string; p_site?: string; p_to: string }
+        Returns: {
+          category_id: string
+          item_count: number
+          kind: Database["public"]["Enums"]["txn_kind"]
+          name: string
+          total: number
+        }[]
+      }
+      report_by_site: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          cost_total: number
+          expense: number
+          income: number
+          name: string
+          profit: number
+          site_id: string
+          wage: number
+        }[]
+      }
+      report_labor: {
+        Args: { p_from: string; p_site?: string; p_to: string }
+        Returns: {
+          advance_paid: number
+          ot_total: number
+          payroll_paid: number
+          wage_total: number
+          work_units: number
+          worker_count: number
+        }[]
+      }
+      report_series: {
+        Args: {
+          p_from: string
+          p_grain?: string
+          p_site?: string
+          p_to: string
+        }
+        Returns: {
+          bucket: string
+          expense: number
+          income: number
+          wage: number
+        }[]
+      }
+      report_summary: {
+        Args: { p_from: string; p_site?: string; p_to: string }
+        Returns: {
+          advance_paid: number
+          cost_total: number
+          expense_approved: number
+          expense_cash: number
+          expense_pending: number
+          expense_transfer: number
+          income_approved: number
+          income_pending: number
+          payroll_paid: number
+          profit: number
+          txn_count: number
+          wage_cost: number
+        }[]
+      }
+      report_top_workers: {
+        Args: { p_from: string; p_site?: string; p_to: string }
+        Returns: {
+          employee_id: string
+          full_name: string
+          wage_total: number
+          work_units: number
+        }[]
+      }
       save_employee: {
         Args: {
           p_daily: number

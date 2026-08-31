@@ -1,5 +1,6 @@
 import {
   Banknote,
+  BarChart3,
   CalendarDays,
   HandCoins,
   Home,
@@ -67,6 +68,13 @@ export const NAV: NavGroup[] = [
         label: 'รออนุมัติ',
         sub: 'รายจ่ายที่หัวหน้าไซต์คีย์',
         icon: Inbox,
+        ownerOnly: true,
+      },
+      {
+        href: '/reports',
+        label: 'รายงาน',
+        sub: 'สรุปเงิน คน และไซต์ ตามเดือน/ปี',
+        icon: BarChart3,
         ownerOnly: true,
       },
       {

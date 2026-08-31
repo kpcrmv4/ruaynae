@@ -2,6 +2,7 @@
 
 import * as Dialog from '@radix-ui/react-dialog'
 import { KeyRound, Loader2, Plus, ShieldCheck, UserRound, UserX } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -102,7 +103,10 @@ export function UsersClient({ meId, users }: { meId: string; users: Row[] }) {
         <div className="min-w-0 flex-1">
           <h1 className="text-lg font-bold text-ink">ผู้ใช้ระบบ</h1>
           <p className="mt-0.5 text-sm text-muted-token">
-            คนที่ล็อกอินเข้าระบบได้ · คนงานที่มีแค่ค่าแรงอยู่ที่แท็บคนงาน
+            คนที่ล็อกอินเข้าระบบได้ ·{' '}
+            <Link href="/settings/users?tab=workers" className="font-medium text-brand hover:underline">
+              คนงานที่มีแค่ค่าแรงอยู่ที่นี่
+            </Link>
           </p>
         </div>
         <button onClick={() => setAdding((v) => !v)} className="btn-primary shrink-0">

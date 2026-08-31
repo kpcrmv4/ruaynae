@@ -1,6 +1,7 @@
 'use client'
 
 import { HardHat, Loader2, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -122,10 +123,15 @@ export function EmployeesClient({
     <div className="space-y-4">
       <div className="flex flex-wrap items-start gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="text-lg font-bold text-ink">คนงาน</h2>
+          {/* h1 เพราะตอนนี้เป็นหน้าของตัวเอง ไม่ได้อยู่ใต้แท็บของหน้าผู้ใช้ระบบแล้ว —
+              หน้าที่หัวเรื่องหลักเป็น h2 คือหน้าที่ข้ามลำดับหัวข้อไปหนึ่งขั้น */}
+          <h1 className="text-lg font-bold text-ink">คนงาน</h1>
           <p className="mt-0.5 text-sm text-muted-token">
             ทุกคนที่มีค่าแรงต้องจ่าย · <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span>{' '}
-            และไม่มี role — คนที่ล็อกอินได้อยู่แท็บผู้ใช้ระบบ
+            และไม่มี role ·{' '}
+            <Link href="/settings/users" className="font-medium text-brand hover:underline">
+              คนที่ล็อกอินได้อยู่ที่นี่
+            </Link>
           </p>
         </div>
         <button

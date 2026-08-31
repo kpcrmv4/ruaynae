@@ -319,7 +319,8 @@ src/
     (app)/page.tsx            ภาพรวม
     (app)/sites/[id]/page.tsx · (app)/ledger · (app)/entry
     (app)/attendance · (app)/employees · (app)/approvals · (app)/audit · (app)/settings
-    (app)/settings/users     ผู้ใช้ระบบ (มี login) + คนงาน (ไม่มี login) — สองแท็บ หน้าเดียว
+    (app)/settings/users     ผู้ใช้ระบบ (มี login) · `?tab=workers` = คนงาน (ไม่มี login)
+#                            เข้าจาก **สองปุ่มแยกกัน** บนหน้าตั้งค่า ไม่มีแถบแท็บแล้ว
     (app)/settings/branding  ชื่อบริษัท + โลโก้
     api/auth/pin/route.ts
     api/branding/route.ts    ← ไม่ต้องล็อกอิน · หน้า login เรียกใช้
@@ -356,6 +357,12 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 5. seed ต้อง idempotent (`on conflict do nothing`) และ deterministic
 6. **ยอดที่ seed ไว้ต้องเท่ากับยอดที่แอปคำนวณเอง** — ถ้าเดโม่โชว์สองตัวเลขที่ขัดกัน คนดูจะเลิกเชื่อทั้งหน้า
 7. หลังรีเซ็ต ผู้ใช้ที่ยัง log in ค้างอยู่ต้องไม่ติดวนระหว่าง `/` กับ `/login`
+8. **`node scripts/remove-demo-data.mjs`** — เอาชุดเดโม่ออกโดยไม่แตะข้อมูลจริง
+   · ไม่ใส่ `--confirm` = แสดงว่าจะลบอะไรเฉย ๆ · ลบตาม**ชื่อที่ seed สร้าง** ไม่ใช่ตามช่วงเวลา
+   🔴 **ต้องรันหลัง `npm run verify:all` บนฐานที่มีข้อมูลจริง** — `verify-ship` เรียก seed
+   เมื่อฐานยังว่าง แล้วไม่เก็บกวาด · แถว `site_supervisors` ช่วงเปิดที่มันทิ้งไว้
+   ไปชน exclusion constraint กับแถวที่สคริปต์ตรวจตัวอื่นต้อง insert ให้คนเดียวกัน
+   → หัวหน้าไซต์ไม่ได้สิทธิ์ในไซต์ทดสอบ → **ตกยกชุด 30 แถวโดยที่แอปไม่ได้ผิดอะไร**
 
 ## 14. เฟสการสร้าง
 
@@ -368,7 +375,8 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 - [x] **P1 · ไซต์ + ภาพรวม** — CRUD ไซต์, `site_supervisors` มีช่วงเวลา, การ์ด 3 แถบ, ป้ายเตือนต้นทุนแซงรายรับ, หน้าไซต์
 - [x] **P2 · รายรับ-รายจ่าย + R2** — หมวด, ฟอร์มบันทึก, ผูกไซต์/ส่วนกลาง, บีบรูป, presigned PUT/GET, `upload_intents` + sweep, `/ledger` + ค้นหา/กรอง + pagination
 - [x] **P3 · อนุมัติ + แจ้งเตือนในแอป** — คิวอนุมัติ, ตีกลับ+เหตุผล, guard triggers, กระดิ่ง + realtime broadcast
-- [x] **P4 · พนักงาน + คนเข้าไซต์** — CRUD คนงานเป็นแท็บที่สองใน `/settings/users` (ไม่มี login ไม่มี role),
+- [x] **P4 · พนักงาน + คนเข้าไซต์** — CRUD คนงานที่ `/settings/users?tab=workers` (ไม่มี login ไม่มี role)
+      · มีปุ่มของตัวเองบนหน้าตั้งค่า ต่อจากปุ่มผู้ใช้ระบบ,
       ตั้งค่าแรง**รายคน** (รายวัน/รายเดือน + เรตของแต่ละคน), ผูก `profile_id` ได้ถ้าคนนั้นล็อกอินด้วย,
       ลงชื่อรายวัน + `wage_snapshot`, ยอดค่าแรงวันนี้, ต้นทุนไซต์ขึ้นทันที
 - [x] **P5 · เบิก + รอบจ่าย** — `advances` + trigger เพดาน, `payroll_runs`/`payroll_lines`, ปิดรอบ, สรุปค่าแรงรายคน

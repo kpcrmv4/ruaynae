@@ -1,4 +1,3 @@
-import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
@@ -7,13 +6,26 @@ import { PAGE_SIZE } from '@/lib/constants'
 import { UsersClient } from './users-client'
 import { EmployeesClient } from './employees-client'
 
-export const metadata = { title: 'ผู้ใช้ระบบและคนงาน' }
+const isWorkers = (tab?: string) => tab === 'workers'
+
+/** ชื่อบนแท็บเบราว์เซอร์ต้องบอกว่ากำลังดูรายการไหน ไม่ใช่ชื่อรวมของทั้งสองอย่าง */
+export async function generateMetadata({
+  searchParams,
+}: {
+  searchParams: Promise<{ tab?: string }>
+}) {
+  return { title: isWorkers((await searchParams).tab) ? 'คนงาน' : 'ผู้ใช้ระบบ' }
+}
 
 /**
- * สองแท็บ หน้าเดียว (CLAUDE.md §12)
+ * สองรายการ หนึ่งเส้นทาง — เข้าจากปุ่มคนละปุ่มบนหน้าตั้งค่า
  *
- * 🔴 แท็บอยู่ใน URL ไม่ใช่ใน state — แชร์ลิงก์ได้ กดปุ่มย้อนกลับได้
- * และหลังบันทึกแล้ว `router.refresh()` จะกลับมาที่แท็บเดิม ไม่ใช่เด้งกลับแท็บแรก
+ * เดิมมีแถบแท็บอยู่บนหัวหน้านี้ · เจ้าของขอให้ย้ายคนงานออกไปเป็นปุ่มของตัวเอง
+ * บน `/settings` แถบแท็บจึงถูกเอาออก — เหลือสองที่ที่บอกเรื่องเดียวกันคือ
+ * สองที่ที่วันหนึ่งจะไม่ตรงกัน · ทางลัดข้ามไปมายังอยู่ในคำอธิบายใต้หัวเรื่อง
+ *
+ * 🔴 `?tab=workers` ยังใช้ได้เหมือนเดิม — ลิงก์ที่แชร์กันไว้แล้วต้องไม่ตาย
+ * และ `router.refresh()` หลังบันทึกต้องกลับมาที่รายการเดิม ไม่ใช่เด้งไปรายการแรก
  */
 export default async function UsersPage({
   searchParams,
@@ -62,31 +74,8 @@ export default async function UsersPage({
     )
   }
 
-  const TABS = [
-    { key: 'users', label: 'ผู้ใช้ระบบ', href: '/settings/users', count: profiles?.length ?? 0 },
-    { key: 'workers', label: 'คนงาน', href: '/settings/users?tab=workers', count: employees?.length ?? 0 },
-  ] as const
-
   return (
     <div className="space-y-4">
-      <nav data-tabs="users" className="flex gap-1.5">
-        {TABS.map((t) => (
-          <Link
-            key={t.key}
-            href={t.href}
-            aria-current={tab === t.key ? 'page' : undefined}
-            className={`rounded-sm border px-3 py-1.5 text-sm font-medium transition-colors duration-100 ${
-              tab === t.key
-                ? 'border-ink bg-ink text-canvas'
-                : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2 hover:text-ink'
-            }`}
-          >
-            {t.label}
-            <span className="ml-1.5 text-xs tnum opacity-70">{t.count}</span>
-          </Link>
-        ))}
-      </nav>
-
       {tab === 'users' ? (
         <UsersClient meId={me.id} users={profiles ?? []} />
       ) : (

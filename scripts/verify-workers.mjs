@@ -45,7 +45,7 @@ const sql = async (q) => {
   return { rows: JSON.parse(t) }
 }
 
-console.log('\n── P4 · แท็บคนงาน ───────────────────────────────────────────')
+console.log('\n── P4 · หน้าคนงาน ───────────────────────────────────────────')
 
 const ownerJar = jarOf(await req('POST', '/api/auth/login', {
   email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }))
@@ -144,24 +144,29 @@ try {
       r.status === 404 && b.error === 'NOT_FOUND', `${r.status} ${b.error}`)
   }
 
-  // ── P4-UI-01 · แท็บคนงานแสดงข้อมูลครบ ─────────────────────────────
+  // ── P4-UI-01 · หน้าคนงานแสดงข้อมูลครบ ─────────────────────────────
   {
     const html = await page('/settings/users?tab=workers', ownerJar)
     const want = [`${MARK} สมชาย`, 'ช่างปูน', 'รายวัน', '฿600']
     const missing = want.filter((w) => !html.includes(w))
-    check('P4-UI-01 แท็บคนงานแสดงชื่อ ตำแหน่ง ประเภทค่าแรง และเรต ครบ',
+    check('P4-UI-01 หน้าคนงานแสดงชื่อ ตำแหน่ง ประเภทค่าแรง และเรต ครบ',
       missing.length === 0, missing.length ? `ขาด: ${missing.join(', ')}` : `${want.length}/${want.length}`)
   }
 
-  // ── P4-UI-01b · สองแท็บแยกกันจริง ─────────────────────────────────
-  // 🔴 ฝั่งบวกและฝั่งลบในหน้าเดียวกัน — แท็บที่แสดงทุกอย่างเสมอคือแท็บที่ไม่มีอยู่จริง
+  // ── P4-UI-01b · สองรายการแยกกันจริง ─────────────────────────────────
+  // 🔴 ฝั่งบวกและฝั่งลบคู่กัน — รายการที่แสดงทุกอย่างเสมอคือรายการที่ไม่ได้กรองอะไรเลย
   {
     const users = await page('/settings/users', ownerJar)
     const workers = await page('/settings/users?tab=workers', ownerJar)
-    check('P4-UI-01b แท็บผู้ใช้ระบบไม่แสดงคนงาน และแท็บคนงานไม่แสดงหัวข้อผู้ใช้ระบบ',
+    // แถบแท็บถูกเอาออกแล้ว (เจ้าของขอให้คนงานเป็นปุ่มของตัวเองบนหน้าตั้งค่า)
+    // → ต้องยังข้ามไปมาได้ ไม่งั้นการดูทั้งสองรายการกลายเป็นเดินย้อนกลับทุกครั้ง
+    const crossLinked = /href="\/settings\/users\?tab=workers"/.test(users)
+      && /href="\/settings\/users"/.test(workers)
+    check('P4-UI-01b หน้าผู้ใช้ระบบไม่แสดงคนงาน และหน้าคนงานไม่แสดงรายชื่อผู้ใช้ระบบ · ข้ามไปมาได้',
       !users.includes(`${MARK} สมชาย`) && workers.includes(`${MARK} สมชาย`)
-      && users.includes('เพิ่มผู้ใช้') && workers.includes('เพิ่มคนงาน'),
-      `users มีคนงาน=${users.includes(`${MARK} สมชาย`)} · workers มีคนงาน=${workers.includes(`${MARK} สมชาย`)}`)
+      && users.includes('เพิ่มผู้ใช้') && workers.includes('เพิ่มคนงาน')
+      && crossLinked,
+      `users มีคนงาน=${users.includes(`${MARK} สมชาย`)} · workers มีคนงาน=${workers.includes(`${MARK} สมชาย`)} · ลิงก์ข้าม=${crossLinked}`)
   }
 
   // ── P4-UI-01c · คนงานมีปุ่มของตัวเองบนหน้าตั้งค่า ─────────────────
@@ -187,7 +192,7 @@ try {
     const loc = r.headers.get('location') ?? ''
     // ฝั่งบวก: หน้าที่เขาเข้าได้ยังเข้าได้อยู่
     const settings = await page('/settings', supJar)
-    check('P4-UI-02 หัวหน้าไซต์เปิดแท็บคนงาน → ถูก redirect ออก · /settings ยังเข้าได้',
+    check('P4-UI-02 หัวหน้าไซต์เปิดหน้าคนงาน → ถูก redirect ออก · /settings ยังเข้าได้',
       r.status === 307 && !loc.includes('/users') && settings.length > 500,
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }

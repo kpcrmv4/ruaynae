@@ -72,10 +72,17 @@ console.log('\n── P0 ที่ค้างอยู่ ───────
 // จะกลายเป็นรายการรหัสผ่านพร้อมใช้ — ผู้โจมตีไม่ต้องเดา PIN เลย
 {
   const pin = env.SEED_SUPERVISOR1_PIN
+  // 🔴 ต้องเจาะจง **คนที่เป็นเจ้าของ PIN ที่กำลังทดสอบ** ไม่ใช่ `limit 1`
+  // เดิมเป็น `limit 1` ไม่มี `order by` → Postgres คืนแถวไหนก็ได้ตามที่มันอยู่
+  // ใน heap · พอสคริปต์อื่นเพิ่ม/ลบผู้ใช้ ลำดับเปลี่ยน แถวนี้เลยหยิบหัวหน้าไซต์
+  // คนที่สองมาเทียบกับ PIN ของคนที่หนึ่ง แล้วแดงโดยที่แอปไม่ได้ผิดอะไรเลย
+  // (เจอจริง 31 ส.ค. 2569 — แดงเฉพาะบางรอบ ซึ่งแย่กว่าแดงตลอด)
   const rows = await sql(`
     select p.id, p.pin_hash, u.email
     from public.profiles p join auth.users u on u.id = p.id
-    where p.pin_hash is not null and p.is_active limit 1`)
+    where p.pin_hash is not null and p.is_active
+      and p.full_name = '${(env.SEED_SUPERVISOR1_NAME ?? '').replace(/'/g, "''")}'
+    limit 1`)
   const row = rows[0]
 
   if (!row || !pin) {

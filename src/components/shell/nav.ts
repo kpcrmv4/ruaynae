@@ -2,6 +2,7 @@ import {
   CalendarDays,
   Home,
   Inbox,
+  Plug,
   Receipt,
   Settings,
   ShieldCheck,
@@ -72,6 +73,18 @@ export const NAV: NavGroup[] = [
         ownerOnly: true,
       },
       { href: '/settings', label: 'ตั้งค่า', sub: 'แบรนด์ ผู้ใช้ หมวดค่าใช้จ่าย', icon: Settings },
+    ],
+  },
+  {
+    heading: 'เชื่อมต่อ',
+    items: [
+      {
+        href: '/mcp',
+        label: 'เชื่อมต่อ AI',
+        sub: 'ให้ Claude/ChatGPT อ่านข้อมูล',
+        icon: Plug,
+        ownerOnly: true,
+      },
     ],
   },
 ]

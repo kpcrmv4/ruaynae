@@ -1,5 +1,6 @@
 import 'server-only'
 
+import { after } from 'next/server'
 import { getSupabaseAdmin } from '@/lib/supabase/admin'
 import { hashKey, isValidKey } from '@/lib/mcp/keys-core'
 
@@ -55,13 +56,19 @@ export async function resolveKey(raw: string | null): Promise<McpAuth | null> {
   if (!prof?.is_active || prof.role !== 'owner') return null
 
   // ไม่ await — เวลาที่ใช้ล่าสุดพลาดไปหนึ่งครั้งไม่คุ้มกับการหน่วงทุกคำขอ
-  void admin
-    .from('mcp_keys')
-    .update({ last_used_at: new Date().toISOString() })
-    .eq('id', data.id)
-    .then(({ error: e }) => {
-      if (e) console.error('[mcp] อัปเดต last_used_at ไม่ได้', e.message)
-    })
+  // แต่ promise ลอย ๆ (`void ...`) บน serverless อาจไม่ได้รันเลย เพราะ instance
+  // ถูกแช่แข็งหรือทำลายทิ้งได้ทันทีที่ response ถูกส่งออกไปแล้ว — ผลคือคอลัมน์
+  // "ใช้ล่าสุด" หน้า /mcp โชว์ "ยังไม่เคยใช้" ตลอดไป ทั้งที่มีคนเรียกทุกวัน
+  // `after()` การันตีว่างานนี้รันจริงในช่วงอายุของ request แต่ยังไม่บล็อก response
+  after(() => {
+    void admin
+      .from('mcp_keys')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', data.id)
+      .then(({ error: e }) => {
+        if (e) console.error('[mcp] อัปเดต last_used_at ไม่ได้', e.message)
+      })
+  })
 
   return { keyId: data.id, actorId: data.created_by }
 }

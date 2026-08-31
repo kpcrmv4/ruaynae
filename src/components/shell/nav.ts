@@ -165,6 +165,35 @@ export const quickAddFor = (role: Role): QuickAddItem[] =>
  * ทุกเช้า ส่วนเจ้าของเคลียร์คิวอนุมัติทุกวัน · /ledger อยู่ทั้งคู่เพราะ
  * "คีย์เสร็จแล้วขอดูว่าลงไหม/โดนตีกลับไหม" คืองานถัดไปของการบันทึกเสมอ
  */
+/**
+ * ตัวเลข "ของค้างต้องทำ" ต่อเมนู — คีย์คือ `href` ของเมนูนั้น
+ *
+ * 🔴 นับในฐานข้อมูลที่ `(app)/layout.tsx` ด้วย `head: true, count: 'exact'`
+ * เสมอ ห้ามดึงแถวมานับใน JS (CLAUDE.md §7) — เมนูอยู่ทุกหน้า ค่าใช้จ่ายของ
+ * การนับผิดวิธีจึงคูณด้วยจำนวนหน้าที่เปิดทั้งวัน
+ *
+ * ป้ายที่เป็น 0 **ไม่วาดเลย** ไม่ใช่วาดเป็นเลขศูนย์ — ป้ายแดงที่ติดอยู่
+ * ตลอดเวลาคือป้ายที่คนเลิกมอง แล้ววันที่มีของค้างจริงก็จะไม่มีใครเห็น
+ */
+export type NavBadges = Record<string, number>
+
+export const badgeOf = (badges: NavBadges, href: string) => badges[href] ?? 0
+
+/**
+ * รวมตัวเลขของเมนูกลุ่มหนึ่ง — ใช้กับปุ่ม "เพิ่มเติม" ของแถบล่าง
+ *
+ * 🔴 เมนูที่ไม่ได้อยู่บนแถบล่างถูกซ่อนอยู่ในแผ่นนั้น · ถ้าไม่รวมยอดขึ้นมา
+ * ตัวเลขของค้างที่อยู่ข้างในจะไม่มีใครเห็นจนกว่าจะบังเอิญกดเปิด
+ */
+export const badgeTotal = (groups: NavGroup[], badges: NavBadges) =>
+  groups.reduce(
+    (sum, g) => sum + g.items.reduce((s, i) => s + badgeOf(badges, i.href), 0),
+    0,
+  )
+
+/** เลขบนป้าย — เกิน 99 ตัดเป็น "99+" ไม่งั้นป้ายกว้างจนดันเมนูเสียรูป */
+export const badgeText = (n: number) => (n > 99 ? '99+' : String(n))
+
 export const bottomNavFor = (role: Role): NavItem[] => [
   { href: '/', label: 'วันนี้', sub: '', icon: Home },
   role === 'owner'

@@ -3,7 +3,7 @@
 import { HardHat } from 'lucide-react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
-import { navFor, type Role } from '@/components/shell/nav'
+import { badgeOf, badgeText, navFor, type NavBadges, type Role } from '@/components/shell/nav'
 import { SignOutButton } from '@/components/shell/sign-out-button'
 
 /**
@@ -17,15 +17,15 @@ export function Sidebar({
   roleLabel,
   companyName,
   logoUrl,
-  pendingCount,
+  badges,
 }: {
   role: Role
   userName: string
   roleLabel: string
   companyName: string
   logoUrl: string | null
-  /** จำนวนรายการรออนุมัติ — โชว์เป็นป้ายแดงท้ายเมนู "รออนุมัติ" (เจ้าของเท่านั้นที่มีเมนูนี้) */
-  pendingCount: number
+  /** ตัวเลขของค้างต่อเมนู (คีย์ = href) — 0 หรือไม่มีคีย์ = ไม่วาดป้าย */
+  badges: NavBadges
 }) {
   // 🔴 คำนวณเมนูในฝั่ง client เอง ห้ามรับเป็น prop จาก Server Component
   // เพราะ icon เป็นคอมโพเนนต์ (ฟังก์ชัน) ซึ่งข้ามเส้น server→client ไม่ได้
@@ -64,11 +64,15 @@ export function Sidebar({
           </div>
           {g.items.map((item) => {
             const active = isActive(item.href)
+            const badge = badgeOf(badges, item.href)
             return (
               <Link
                 key={item.href}
                 href={item.href}
                 aria-current={active ? 'page' : undefined}
+                // ป้ายตัวเลขเป็นข้อมูล ไม่ใช่ของประดับ — โปรแกรมอ่านหน้าจอ
+                // ต้องได้ยินว่า "ค้าง 3 รายการ" ไม่ใช่ได้ยินแค่ชื่อเมนู
+                aria-label={badge > 0 ? `${item.label} · ค้าง ${badge} รายการ` : undefined}
                 className={`mb-px flex items-center gap-2.5 rounded-md px-2.5 py-2.5 text-sm transition-colors ${
                   active
                     ? 'bg-sidebar-active-bg font-semibold text-sidebar-active-fg'
@@ -88,9 +92,12 @@ export function Sidebar({
                     {item.sub}
                   </span>
                 </span>
-                {item.href === '/approvals' && pendingCount > 0 && (
-                  <span className="ml-auto shrink-0 rounded-full bg-urgent-solid px-1.5 py-px text-[11px] font-bold leading-tight text-white tnum">
-                    {pendingCount > 99 ? '99+' : pendingCount}
+                {badge > 0 && (
+                  <span
+                    data-badge={badge}
+                    className="ml-auto shrink-0 rounded-full bg-urgent-solid px-1.5 py-px text-[11px] font-bold leading-tight text-white tnum"
+                  >
+                    {badgeText(badge)}
                   </span>
                 )}
               </Link>

@@ -6,9 +6,13 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
+  badgeOf,
+  badgeText,
+  badgeTotal,
   bottomNavFor,
   navFor,
   quickAddFor,
+  type NavBadges,
   type QuickAddTone,
   type Role,
 } from '@/components/shell/nav'
@@ -18,22 +22,25 @@ import { ThemeToggle } from '@/components/theme-toggle'
 /**
  * แถบล่างมือถือ 5 ช่อง — จัดช่องตาม role (DESIGN.md §4.1)
  *  1    วันนี้ (หน้าแรก)
- *  2    งานประจำวันของ role นั้น — หัวหน้าไซต์: คนเข้าไซต์ · เจ้าของ: รออนุมัติ (มีตัวเลขค้าง)
+ *  2    งานประจำวันของ role นั้น — หัวหน้าไซต์: คนเข้าไซต์ · เจ้าของ: รออนุมัติ
  *  3    ปุ่มกลมยกลอย **ไอคอนอย่างเดียว ไม่มีป้าย** → เปิดแผ่น "บันทึกประจำวัน"
  *  4    รายการ (/ledger) — คีย์เสร็จแล้วมาดูว่าลงไหม/โดนตีกลับไหม
  *  5    "เพิ่มเติม" เสมอ → แผ่นเลื่อนขึ้นที่มีเมนูที่เหลือ + ธีม + ออกจากระบบ
+ *
+ * ทุกช่องรับป้ายตัวเลขของค้างจาก `badges` (คีย์ = href) · ปุ่ม "เพิ่มเติม"
+ * แสดง **ผลรวม**ของเมนูที่ถูกซ่อนอยู่ข้างใน
  */
 export function BottomNav({
   role,
   userName,
   roleLabel,
-  pendingCount,
+  badges,
 }: {
   role: Role
   userName: string
   roleLabel: string
-  /** จำนวนรายการรออนุมัติ — 0 เสมอสำหรับหัวหน้าไซต์ (ไม่มีช่องที่ใช้มัน) */
-  pendingCount: number
+  /** ตัวเลขของค้างต่อเมนู (คีย์ = href) — 0 หรือไม่มีคีย์ = ไม่วาดป้าย */
+  badges: NavBadges
 }) {
   // เหตุผลเดียวกับ Sidebar — icon เป็นฟังก์ชัน ส่งข้ามเส้น server→client ไม่ได้
   const groups = navFor(role)
@@ -52,6 +59,10 @@ export function BottomNav({
     items: g.items.filter((i) => !inBar.has(i.href)),
   })).filter((g) => g.items.length > 0)
 
+  // 🔴 ของค้างที่อยู่ในเมนูซึ่งถูกซ่อนไว้ในแผ่น "เพิ่มเติม" ต้องโผล่ที่ปุ่มด้วย
+  // ไม่งั้นตัวเลขจะนอนรออยู่หลังปุ่มที่ไม่มีเหตุให้ใครกด
+  const moreBadge = badgeTotal(overflow, badges)
+
   return (
     <>
       <nav
@@ -64,7 +75,7 @@ export function BottomNav({
             href={i.href}
             label={i.label}
             active={isActive(i.href)}
-            badge={i.href === '/approvals' ? pendingCount : 0}
+            badge={badgeOf(badges, i.href)}
           >
             <i.icon className="size-5.5" strokeWidth={1.8} />
           </Slot>
@@ -127,7 +138,13 @@ export function BottomNav({
         </Dialog.Root>
 
         {slots.slice(2).map((i) => (
-          <Slot key={i.href} href={i.href} label={i.label} active={isActive(i.href)}>
+          <Slot
+            key={i.href}
+            href={i.href}
+            label={i.label}
+            active={isActive(i.href)}
+            badge={badgeOf(badges, i.href)}
+          >
             <i.icon className="size-5.5" strokeWidth={1.8} />
           </Slot>
         ))}
@@ -135,9 +152,20 @@ export function BottomNav({
         <Dialog.Root open={moreOpen} onOpenChange={setMoreOpen}>
           <Dialog.Trigger
             aria-expanded={moreOpen}
+            aria-label={moreBadge > 0 ? `เพิ่มเติม · ค้าง ${moreBadge} รายการ` : undefined}
             className="flex flex-col items-center justify-center gap-0.5 text-[10.5px] text-muted-token"
           >
-            <MoreHorizontal className="size-5.5" strokeWidth={1.8} />
+            <span className="relative flex">
+              <MoreHorizontal className="size-5.5" strokeWidth={1.8} />
+              {moreBadge > 0 && (
+                <span
+                  data-badge={moreBadge}
+                  className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-urgent-solid px-1 text-[9.5px] font-bold leading-none text-white tnum"
+                >
+                  {badgeText(moreBadge)}
+                </span>
+              )}
+            </span>
             เพิ่มเติม
           </Dialog.Trigger>
 
@@ -168,26 +196,40 @@ export function BottomNav({
                   <div className="px-4 pt-2 pb-1 text-xs font-medium text-muted-token">
                     {g.heading}
                   </div>
-                  {g.items.map((i) => (
-                    <Link
-                      key={i.href}
-                      href={i.href}
-                      onClick={() => setMoreOpen(false)}
-                      className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 transition-colors duration-100 last:border-b-0 active:bg-surface-2"
-                    >
-                      <i.icon className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm font-medium text-ink">
-                          {i.label}
+                  {g.items.map((i) => {
+                    const badge = badgeOf(badges, i.href)
+                    return (
+                      <Link
+                        key={i.href}
+                        href={i.href}
+                        onClick={() => setMoreOpen(false)}
+                        aria-label={badge > 0 ? `${i.label} · ค้าง ${badge} รายการ` : undefined}
+                        className="flex items-center gap-3 border-b border-line-soft px-4 py-3.5 transition-colors duration-100 last:border-b-0 active:bg-surface-2"
+                      >
+                        <i.icon className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+                        <span className="min-w-0 flex-1">
+                          <span className="block truncate text-sm font-medium text-ink">
+                            {i.label}
+                          </span>
+                          <span className="block truncate text-xs text-muted-token">{i.sub}</span>
                         </span>
-                        <span className="block truncate text-xs text-muted-token">{i.sub}</span>
-                      </span>
-                      <ChevronRight
-                        className="size-4 shrink-0 text-muted-token"
-                        strokeWidth={1.8}
-                      />
-                    </Link>
-                  ))}
+                        {/* ในแผ่นนี้ป้ายอยู่ในแถว ไม่ใช่มุมไอคอน — แถวกว้างเต็มจอ
+                            ป้ายมุมไอคอนจะลอยอยู่กลางที่ว่างโดยไม่เกาะกับอะไร */}
+                        {badge > 0 && (
+                          <span
+                            data-badge={badge}
+                            className="shrink-0 rounded-full bg-urgent-solid px-1.5 py-px text-[11px] font-bold leading-tight text-white tnum"
+                          >
+                            {badgeText(badge)}
+                          </span>
+                        )}
+                        <ChevronRight
+                          className="size-4 shrink-0 text-muted-token"
+                          strokeWidth={1.8}
+                        />
+                      </Link>
+                    )
+                  })}
                 </div>
               ))}
 
@@ -230,6 +272,7 @@ function Slot({
     <Link
       href={href}
       aria-current={active ? 'page' : undefined}
+      aria-label={badge > 0 ? `${label} · ค้าง ${badge} รายการ` : undefined}
       className={`flex min-w-0 flex-col items-center justify-center gap-0.5 text-[10.5px] ${
         active ? 'font-semibold text-brand' : 'text-muted-token'
       }`}
@@ -237,8 +280,11 @@ function Slot({
       <span className="relative flex">
         {children}
         {badge > 0 && (
-          <span className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-urgent-solid px-1 text-[9.5px] font-bold leading-none text-white tnum">
-            {badge > 99 ? '99+' : badge}
+          <span
+            data-badge={badge}
+            className="absolute -right-2 -top-1.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-urgent-solid px-1 text-[9.5px] font-bold leading-none text-white tnum"
+          >
+            {badgeText(badge)}
           </span>
         )}
       </span>

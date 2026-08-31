@@ -12,6 +12,10 @@
  *   - `aria-expanded` หลังกด (ต้องมีการโต้ตอบ)
  *   - ปุ่ม disabled ระหว่างส่ง และการกดซ้ำ
  * แถวพวกนั้นถูกลดเป็น 👤 ในตาราง ไม่ใช่ปล่อยติ๊กค้างไว้
+ *
+ * ท้ายไฟล์มีแถว **R5-NAV-*** — ป้ายตัวเลขของค้างบนเมนู ซึ่งเซิร์ฟเวอร์
+ * เรนเดอร์มาในตัว HTML จึงตัดสินได้ที่นี่เหมือนกัน · fixture คืนค่าใน `finally`
+ * และทุกตัวเลขวัด **เทียบกับค่าตั้งต้นของฐานที่รันอยู่** ไม่ใช่ล้างให้เหลือศูนย์ก่อนวัด
  */
 import { readFileSync } from 'node:fs'
 
@@ -42,6 +46,20 @@ const login = async (path, body) => {
 const page = async (path, cookie) =>
   (await fetch(`${BASE}${path}`, { headers: { cookie } })).text()
 
+const sql = async (q) => {
+  const r = await fetch(
+    `https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/database/query`,
+    {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${env.SUPABASE_ACCESS_TOKEN}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: q }),
+    },
+  )
+  const text = await r.text()
+  if (!r.ok) return { error: text, rows: [] }
+  return { rows: JSON.parse(text) }
+}
+
 /** ตัดเอาเฉพาะ <nav data-nav="…"> … </nav> — อ่านค่าจากธาตุที่เป็นเจ้าของค่า
  *  ไม่ใช่จากทั้งหน้า · นับ <a> ทั้งหน้าจะได้ลิงก์ใน sidebar ปนกับลิงก์ในเนื้อหา */
 function navBlock(html, name) {
@@ -49,6 +67,29 @@ function navBlock(html, name) {
   if (open === -1) return null
   const close = html.indexOf('</nav>', open)
   return close === -1 ? null : html.slice(open, close)
+}
+
+/**
+ * ป้ายตัวเลขของเมนูหนึ่ง — `null` = ไม่เจอเมนูนั้น · `0` = มีเมนูแต่ไม่มีป้าย
+ *
+ * 🔴 สองค่านี้ต้องแยกกัน · ถ้ายุบ "ไม่มีเมนู" กับ "ไม่มีป้าย" เป็นค่าเดียว
+ * แถวที่เช็คว่า "ป้าย 0 ต้องไม่ถูกวาด" จะเขียวทั้งที่เมนูหายไปทั้งอัน
+ */
+function badgeOfHref(navHtml, href) {
+  if (!navHtml) return null
+  const part = navHtml.split('<a ').find((p) => p.includes(`href="${href}"`))
+  if (!part) return null
+  const m = /data-badge="(\d+)"/.exec(part)
+  return m ? Number(m[1]) : 0
+}
+
+/** ป้ายบนปุ่ม "เพิ่มเติม" ของแถบล่าง (เป็น <button> ไม่ใช่ <a>) */
+function moreBadge(navHtml) {
+  if (!navHtml) return null
+  const part = navHtml.split('<button').find((p) => p.includes('เพิ่มเติม'))
+  if (!part) return null
+  const m = /data-badge="(\d+)"/.exec(part)
+  return m ? Number(m[1]) : 0
 }
 
 console.log(`\n── P0-UI · โครงหน้าจอที่วัดจาก HTML ได้ (${BASE}) ──────────`)
@@ -95,6 +136,97 @@ const supJar = await login('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN })
   }
   check('P0-UI-03a ช่องที่ 5 ของแถบล่างคือ "เพิ่มเติม" ทั้งสอง role',
     rows.every((r) => r.endsWith(':true')), rows.join(' · '))
+}
+
+// ══════════════════════════════════════════════════════════════════════
+// R5-NAV · ตัวเลขของค้างบนเมนู
+// ══════════════════════════════════════════════════════════════════════
+console.log('\n── R5-NAV · ป้ายตัวเลขของค้างบนเมนู ────────────────────────')
+
+// 🔴 วัดเทียบกับ **ค่าตั้งต้นของฐานที่รันอยู่** ไม่ใช่คาดว่าจะเป็น 0
+// ฐานของลูกค้ามีของค้างอยู่แล้วได้ · สคริปต์ที่ล้างให้เหลือ 0 ก่อนวัด
+// คือสคริปต์ที่ลบงานค้างจริงของเจ้าของทิ้ง (CLAUDE.md §17 ข้อ 14)
+const base = (await sql(`select
+    (select count(*)::int from public.transactions where status='pending')  as pending,
+    (select count(*)::int from public.transactions where status='rejected') as rejected`)).rows[0]
+
+const [sup1] = (await sql(
+  `select id from public.profiles where full_name = '${env.SEED_SUPERVISOR1_NAME}'`)).rows
+const [expCat] = (await sql(
+  "select id from public.categories where kind='expense' order by sort_order limit 1")).rows
+const today = new Intl.DateTimeFormat('en-CA', {
+  timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit',
+}).format(new Date())
+
+let navSite = null
+try {
+  ;[{ id: navSite }] = (await sql(
+    "insert into public.sites(name) values ('ทดสอบ R5 ป้ายเมนู') returning id")).rows
+  await sql(`insert into public.site_supervisors(site_id, profile_id, effective_from)
+             values ('${navSite}','${sup1.id}', current_date - 1)`)
+  const mk = (status, amount) => sql(
+    `insert into public.transactions
+       (kind, site_id, category_id, amount, txn_date, pay_method, status, created_by)
+     values ('expense','${navSite}','${expCat.id}',${amount},'${today}','cash','${status}','${sup1.id}')`)
+  await mk('pending', 101)
+  await mk('pending', 102)
+  await mk('rejected', 103)
+
+  const ownerHtml = await page('/', ownerJar)
+  const side = navBlock(ownerHtml, 'sidebar')
+  const bar = navBlock(ownerHtml, 'bottom')
+
+  // ── R5-NAV-01 · รออนุมัติ — เจ้าของ เห็นทั้งสองแถบ ──────────────────
+  {
+    const want = base.pending + 2
+    check('R5-NAV-01 ป้าย "รออนุมัติ" ตรงกับจำนวนที่ค้างจริง ทั้ง sidebar และแถบล่าง',
+      badgeOfHref(side, '/approvals') === want && badgeOfHref(bar, '/approvals') === want,
+      `ต้องการ ${want} · sidebar ${badgeOfHref(side, '/approvals')} · แถบล่าง ${badgeOfHref(bar, '/approvals')}`)
+  }
+
+  // ── R5-NAV-02 · รายการที่ถูกตีกลับ — เมนูรายรับ-รายจ่าย ─────────────
+  {
+    const want = base.rejected + 1
+    check('R5-NAV-02 ป้ายเมนู "รายรับ-รายจ่าย" = จำนวนรายการที่ถูกตีกลับและยังค้าง',
+      badgeOfHref(side, '/ledger') === want && badgeOfHref(bar, '/ledger') === want,
+      `ต้องการ ${want} · sidebar ${badgeOfHref(side, '/ledger')} · แถบล่าง ${badgeOfHref(bar, '/ledger')}`)
+  }
+
+  // ── R5-NAV-03 · ห้ามนับซ้ำ และห้ามวาดป้ายให้เมนูที่ไม่มีของค้าง ──────
+  // เมนูที่อยู่บนแถบล่างแล้วต้องไม่ถูกรวมเข้าปุ่ม "เพิ่มเติม" อีกรอบ
+  // (อาการของบั๊กนี้คือเลขเดียวกันโผล่สองที่ แล้วไม่มีใครรู้ว่าอันไหนจริง)
+  {
+    check('R5-NAV-03 เมนูที่อยู่บนแถบล่างแล้วไม่ถูกนับซ้ำที่ปุ่ม "เพิ่มเติม" · เมนูที่ไม่มีของค้างไม่มีป้าย',
+      moreBadge(bar) === 0 && badgeOfHref(side, '/sites') === 0 && badgeOfHref(bar, '/sites') === null,
+      `เพิ่มเติม ${moreBadge(bar)} · ไซต์งาน(sidebar) ${badgeOfHref(side, '/sites')}`)
+  }
+
+  // ── R5-NAV-04 · หัวหน้าไซต์ ────────────────────────────────────────
+  {
+    const supBar = navBlock(await page('/', supJar), 'bottom')
+    check('R5-NAV-04 หัวหน้าไซต์เห็นป้ายของที่ถูกตีกลับบนช่อง "รายการ" · ไม่มีช่องรออนุมัติให้ติดป้าย',
+      badgeOfHref(supBar, '/ledger') >= 1 && badgeOfHref(supBar, '/approvals') === null,
+      `รายการ ${badgeOfHref(supBar, '/ledger')} · รออนุมัติ ${badgeOfHref(supBar, '/approvals')}`)
+  }
+} finally {
+  if (navSite) {
+    await sql(`delete from public.transactions where site_id = '${navSite}'`)
+    await sql(`delete from public.site_supervisors where site_id = '${navSite}'`)
+    await sql(`delete from public.sites where id = '${navSite}'`)
+  }
+  console.log('  (ลบข้อมูลทดสอบแล้ว)')
+}
+
+// ── R5-NAV-05 · ป้ายต้องหายไปเมื่อของค้างหมด ───────────────────────────
+// วัดหลังเก็บกวาดแล้ว — ป้ายต้องกลับไปเท่าค่าตั้งต้น และถ้าตั้งต้นเป็น 0
+// ต้องไม่มี `data-badge` เลยสักตัว ไม่ใช่มีป้ายที่เขียนว่า 0
+{
+  const bar = navBlock(await page('/', ownerJar), 'bottom')
+  const pending = badgeOfHref(bar, '/approvals')
+  const rejected = badgeOfHref(bar, '/ledger')
+  check('R5-NAV-05 ป้ายกลับไปเท่าค่าตั้งต้นหลังของค้างหมด · ค่า 0 ไม่ถูกวาดเป็นป้าย',
+    pending === base.pending && rejected === base.rejected,
+    `รออนุมัติ ${pending}/${base.pending} · ตีกลับ ${rejected}/${base.rejected}`)
 }
 
 console.log('\n══════════════════════════════════════════════')

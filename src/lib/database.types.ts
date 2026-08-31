@@ -434,6 +434,85 @@ export type Database = {
         }
         Relationships: []
       }
+      mcp_call_log: {
+        Row: {
+          at: string
+          error: string | null
+          id: string
+          key_id: string
+          ms: number | null
+          ok: boolean
+          tool: string
+        }
+        Insert: {
+          at?: string
+          error?: string | null
+          id?: string
+          key_id: string
+          ms?: number | null
+          ok: boolean
+          tool: string
+        }
+        Update: {
+          at?: string
+          error?: string | null
+          id?: string
+          key_id?: string
+          ms?: number | null
+          ok?: boolean
+          tool?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_call_log_key_id_fkey"
+            columns: ["key_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_keys"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mcp_keys: {
+        Row: {
+          created_at: string
+          created_by: string
+          id: string
+          key_hash: string
+          key_prefix: string
+          label: string
+          last_used_at: string | null
+          revoked_at: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by: string
+          id?: string
+          key_hash: string
+          key_prefix: string
+          label: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string
+          id?: string
+          key_hash?: string
+          key_prefix?: string
+          label?: string
+          last_used_at?: string | null
+          revoked_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mcp_keys_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notifications: {
         Row: {
           body: string | null

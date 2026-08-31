@@ -47,6 +47,7 @@ export function AttendanceBoard({
   canSeeMoney,
   dayWage,
   yesterdaySignIns,
+  bookedElsewhere,
 }: {
   date: string
   today: string
@@ -60,6 +61,14 @@ export function AttendanceBoard({
   dayWage?: number
   /** ใครเข้าไซต์นี้เมื่อวาน (วันก่อนวันที่เลือก) — ป้อนปุ่ม "เหมือนเมื่อวาน" */
   yesterdaySignIns: { employee_id: string; work_units: number }[]
+  /**
+   * วันนี้ใครถูกลงชื่อ "ที่ไซต์อื่น" ไปแล้วกี่วัน และไซต์ไหนบ้าง
+   *
+   * เพดานคือ 1 วันต่อคนต่อวัน (guard ที่ฐานข้อมูล) — ค่านี้ทำให้หน้าจอบอกล่วงหน้า
+   * แทนที่จะปล่อยให้กดแล้วเจอ error · ว่างเปล่าไม่ได้แปลว่าคนนั้นว่าง มันแปลว่า
+   * "เท่าที่คนดูมีสิทธิ์เห็น" — ฐานข้อมูลยังเป็นตัวตัดสินสุดท้ายเสมอ
+   */
+  bookedElsewhere: Record<string, { units: number; siteNames: string[] }>
 }) {
   const router = useRouter()
   const params = useSearchParams()
@@ -72,10 +81,18 @@ export function AttendanceBoard({
   const inSite = employees.filter((e) => byEmployee.has(e.id))
   const notIn = employees.filter((e) => !byEmployee.has(e.id))
 
-  // ชุดของเมื่อวานที่ยังไม่ถูกลงวันนี้ และคนยังอยู่ในรายชื่อ (ไม่ถูกปิดใช้งาน)
+  /** เหลือลงได้อีกกี่วันสำหรับคนนี้ (เพดาน 1 วันต่อวัน หักที่ลงไว้ที่ไซต์อื่นแล้ว) */
+  const capacityOf = (employeeId: string) =>
+    Math.max(0, 1 - (bookedElsewhere[employeeId]?.units ?? 0))
+
+  // ชุดของเมื่อวานที่ยังไม่ถูกลงวันนี้ คนยังอยู่ในรายชื่อ และยังมีโควตาเหลือ
+  // — คนที่เต็มวันอยู่ไซต์อื่นแล้วต้องไม่ถูกนับในปุ่ม ไม่งั้นตัวเลขบนปุ่มโกหก
   const employeeIds = new Set(employees.map((e) => e.id))
   const copyFromYesterday = yesterdaySignIns.filter(
-    (r) => employeeIds.has(r.employee_id) && !byEmployee.has(r.employee_id),
+    (r) =>
+      employeeIds.has(r.employee_id) &&
+      !byEmployee.has(r.employee_id) &&
+      capacityOf(r.employee_id) > 0,
   )
 
   /** เปลี่ยนวันหรือไซต์ = เปลี่ยน URL — แชร์ลิงก์ได้ กดย้อนกลับได้ */
@@ -111,9 +128,11 @@ export function AttendanceBoard({
   async function signIn(employeeId: string) {
     if (busy || bulkBusy) return
     setBusy(employeeId)
+    // ลงครึ่งวันที่ไซต์อื่นไปแล้ว = เหลือโควตาแค่ครึ่งวัน ส่งเต็มวันไปก็โดนปฏิเสธ
+    const cap = capacityOf(employeeId)
     const code = await postSignIn(
       employeeId,
-      half[employeeId] ? 0.5 : 1,
+      half[employeeId] || cap < 1 ? 0.5 : 1,
       Number(ot[employeeId] ?? 0) || 0,
     )
     if (code === null) {
@@ -137,7 +156,10 @@ export function AttendanceBoard({
     let ok = 0
     let skipped = 0
     for (const r of copyFromYesterday) {
-      const code = await postSignIn(r.employee_id, r.work_units === 0.5 ? 0.5 : 1, 0)
+      // ตัดยอดให้พอดีโควตาที่เหลือ — เมื่อวานเต็มวันแต่วันนี้ไปครึ่งวันที่อื่นแล้ว
+      // ก็ลงได้แค่ครึ่งวัน · ไม่ใช่ยิงเต็มวันไปให้ถูกปฏิเสธแล้วนับเป็น "ข้าม"
+      const units = Math.min(r.work_units === 0.5 ? 0.5 : 1, capacityOf(r.employee_id))
+      const code = units > 0 ? await postSignIn(r.employee_id, units, 0) : 'WORK_UNITS_EXCEEDED'
       if (code === null) ok += 1
       else skipped += 1
     }
@@ -285,56 +307,93 @@ export function AttendanceBoard({
           </p>
         ) : (
           <ul>
-            {notIn.map((e) => (
-              <li
-                key={e.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-3.5 py-2.5 last:border-b-0 md:px-4"
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-medium text-ink">{e.full_name}</div>
-                  <div className="truncate text-xs text-muted-token">
-                    {e.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
-                  </div>
-                </div>
-
-                <label className="flex shrink-0 items-center gap-1.5 text-sm text-ink-2">
-                  <input
-                    type="checkbox"
-                    checked={Boolean(half[e.id])}
-                    onChange={(ev) => setHalf((h) => ({ ...h, [e.id]: ev.target.checked }))}
-                    className="size-4 accent-brand"
-                  />
-                  ครึ่งวัน
-                </label>
-
-                {/* ช่อง OT เป็นเงิน — เจ้าของเท่านั้นที่เห็นและกรอกได้ */}
-                {canSeeMoney && (
-                  <input
-                    type="text"
-                    inputMode="decimal"
-                    value={ot[e.id] ?? ''}
-                    onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
-                    placeholder="OT ฿"
-                    aria-label={`ค่า OT ของ ${e.full_name}`}
-                    className="input-base w-24 shrink-0 tnum"
-                  />
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => signIn(e.id)}
-                  disabled={busy !== null || bulkBusy}
-                  className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+            {notIn.map((e) => {
+              // เต็มโควตาที่ไซต์อื่นแล้ว = กดยังไงก็ไม่ผ่าน · เหลือครึ่งวัน = ลงได้แค่ครึ่งวัน
+              const other = bookedElsewhere[e.id]
+              const cap = capacityOf(e.id)
+              const full = Boolean(other) && cap <= 0
+              const halfOnly = Boolean(other) && cap > 0 && cap < 1
+              const where = other?.siteNames.join(' · ')
+              return (
+                <li
+                  key={e.id}
+                  className={`flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-3.5 py-2.5 last:border-b-0 md:px-4 ${
+                    full ? 'bg-surface-2' : ''
+                  }`}
                 >
-                  {busy === e.id ? (
-                    <Loader2 className="size-4 animate-spin" />
+                  <div className="min-w-0 flex-1">
+                    <div className={`truncate font-medium ${full ? 'text-muted-token' : 'text-ink'}`}>
+                      {e.full_name}
+                    </div>
+                    <div className="truncate text-xs text-muted-token">
+                      {e.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
+                      {/* บอกตั้งแต่ก่อนกด ไม่ใช่ให้กดแล้วค่อยขึ้น error */}
+                      {other && (
+                        <>
+                          {' · '}
+                          <span className={full ? 'font-medium text-urgent' : 'text-status-progress'}>
+                            {where ? `วันนี้อยู่ ${where}` : 'วันนี้ลงชื่อที่ไซต์อื่นแล้ว'}
+                            {full ? ' (เต็มวัน)' : ' (ครึ่งวัน)'}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  </div>
+
+                  {full ? (
+                    <span className="chip shrink-0 bg-status-pending-bg text-status-pending ring-status-pending-ring">
+                      ลงครบวันแล้ว
+                    </span>
                   ) : (
-                    <Check className="size-4" />
+                    <>
+                      {halfOnly ? (
+                        // โควตาเหลือครึ่งวัน — ไม่ให้เลือกเป็นอย่างอื่น เพราะเลือกไปก็ถูกปฏิเสธ
+                        <span className="chip shrink-0 bg-status-progress-bg text-status-progress ring-status-progress-ring">
+                          ลงได้ครึ่งวัน
+                        </span>
+                      ) : (
+                        <label className="flex shrink-0 items-center gap-1.5 text-sm text-ink-2">
+                          <input
+                            type="checkbox"
+                            checked={Boolean(half[e.id])}
+                            onChange={(ev) => setHalf((h) => ({ ...h, [e.id]: ev.target.checked }))}
+                            className="size-4 accent-brand"
+                          />
+                          ครึ่งวัน
+                        </label>
+                      )}
+
+                      {/* ช่อง OT เป็นเงิน — เจ้าของเท่านั้นที่เห็นและกรอกได้ */}
+                      {canSeeMoney && (
+                        <input
+                          type="text"
+                          inputMode="decimal"
+                          value={ot[e.id] ?? ''}
+                          onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
+                          placeholder="OT ฿"
+                          aria-label={`ค่า OT ของ ${e.full_name}`}
+                          className="input-base w-24 shrink-0 tnum"
+                        />
+                      )}
+
+                      <button
+                        type="button"
+                        onClick={() => signIn(e.id)}
+                        disabled={busy !== null || bulkBusy}
+                        className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+                      >
+                        {busy === e.id ? (
+                          <Loader2 className="size-4 animate-spin" />
+                        ) : (
+                          <Check className="size-4" />
+                        )}
+                        เข้าไซต์
+                      </button>
+                    </>
                   )}
-                  เข้าไซต์
-                </button>
-              </li>
-            ))}
+                </li>
+              )
+            })}
           </ul>
         )}
       </section>

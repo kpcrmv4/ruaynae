@@ -9,7 +9,7 @@ import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'บันทึกรายรับ-รายจ่าย' }
 
-type Search = { kind?: string }
+type Search = { kind?: string; site?: string }
 
 export default async function EntryPage({ searchParams }: { searchParams: Promise<Search> }) {
   const [me, sp] = await Promise.all([getCurrentUser(), searchParams])
@@ -59,6 +59,11 @@ export default async function EntryPage({ searchParams }: { searchParams: Promis
   const dayExpense = daySum('expense')
   const dayIncome = daySum('income')
 
+  // 🔴 `?site=` ต้องอยู่ในลิสต์ที่ RLS คืนมาจริงเท่านั้น — ไม่เชื่อค่าจาก URL
+  // ตรง ๆ · ไซต์ที่ปิดงานแล้วหรือไซต์ที่คนนี้ไม่ได้ดูแลจะตกไปใช้ค่าเริ่มต้นเดิม
+  // (กล่องเลือกไซต์ในฟอร์มแสดงชื่อไซต์ที่จะบันทึกจริงเสมอ)
+  const requestedSite = (sites ?? []).some((s) => s.id === sp.site) ? sp.site : undefined
+
   return (
     <>
       <EntryForm
@@ -67,6 +72,7 @@ export default async function EntryPage({ searchParams }: { searchParams: Promis
         sites={sites ?? []}
         categories={categories ?? []}
         initialKind={isOwner && sp.kind === 'income' ? 'income' : 'expense'}
+        initialSiteId={requestedSite}
       />
 
       {/* ── ที่คีย์ไปแล้ววันนี้ — จังหวะ "บันทึกต่อเนื่อง" ────────────────

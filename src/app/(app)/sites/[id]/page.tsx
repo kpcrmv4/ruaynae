@@ -1,6 +1,16 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
-import { ArrowLeft, CalendarDays, Phone, MapPin, UserRound } from 'lucide-react'
+import {
+  ArrowLeft,
+  Banknote,
+  CalendarDays,
+  Phone,
+  MapPin,
+  Receipt,
+  UserRound,
+  Wallet,
+  type LucideIcon,
+} from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -85,6 +95,9 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   ])
 
   const today = todayInBangkok()
+  // สถานะที่ปลายทางของปุ่มลัดยอมรับไซต์นี้ — ต้องตรงกับกล่องเลือกไซต์ของสองหน้านั้น
+  const canRecord = ['planning', 'active', 'paused'].includes(site.status)
+  const canAttend = ['planning', 'active'].includes(site.status)
   const progress = timeProgress(site.start_date, site.end_date, today)
   const plannedTotal = (milestones ?? []).reduce((sum, m) => sum + Number(m.planned_amount), 0)
   const bars = moneyBars(money)
@@ -121,6 +134,48 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           />
         )}
       </div>
+
+      {/* ── ปุ่มลัดของไซต์นี้ ─────────────────────────────────────────
+          เปิดหน้าไซต์แล้วงานถัดไปเกือบทุกครั้งคือ "บันทึกของไซต์นี้" —
+          เดิมต้องถอยออกไปเมนูรวมแล้วเลือกไซต์เดิมซ้ำอีกรอบ · ทุกปุ่มพาไปหน้าเดิม
+          ของระบบพร้อมไซต์นี้ถูกเลือกไว้ให้แล้ว (สิทธิ์และลอจิกปลายทางเหมือนเดิมทุกอย่าง)
+
+          🔴 ปุ่มบันทึก/ลงชื่อโผล่เฉพาะสถานะที่ปลายทาง**รับไซต์นี้ได้จริง** —
+          กล่องเลือกไซต์ของ `/entry` มีแค่ planning/active/paused และของ
+          `/attendance` มีแค่ active/planning · ถ้าโชว์ปุ่มบนไซต์ที่ปิดงานแล้ว
+          กดไปจะเด้งไปไซต์อื่นเงียบ ๆ แล้วคนคีย์ลงผิดไซต์โดยไม่มีอะไรเตือน */}
+      <nav aria-label="ทางลัดของไซต์นี้" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {canRecord && (
+          <SiteAction
+            href={`/entry?site=${site.id}`}
+            icon={Wallet}
+            tone="expense"
+            label="บันทึกรายจ่าย"
+          />
+        )}
+        {canRecord && isOwner && (
+          <SiteAction
+            href={`/entry?site=${site.id}&kind=income`}
+            icon={Banknote}
+            tone="income"
+            label="บันทึกรายรับ"
+          />
+        )}
+        {canAttend && (
+          <SiteAction
+            href={`/attendance?site=${site.id}`}
+            icon={CalendarDays}
+            tone="brand"
+            label="ลงชื่อคนเข้าไซต์"
+          />
+        )}
+        <SiteAction
+          href={`/ledger?site=${site.id}`}
+          icon={Receipt}
+          tone="brand"
+          label="รายการของไซต์นี้"
+        />
+      </nav>
 
       {/* ── ความคืบหน้า — สามแถบ (DESIGN.md §5.1) ─────────────────────
           เวลา · เก็บเงินแล้ว · ต้นทุนที่จ่ายจริง
@@ -313,5 +368,39 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
       </section>
     </>
+  )
+}
+
+/** สีกล่องไอคอนของปุ่มลัด — คำศัพท์เดียวกับแผ่น "บันทึกประจำวัน" ของแถบล่าง */
+const ACTION_TONE = {
+  expense: 'bg-expense-bg text-expense',
+  income: 'bg-income-bg text-income',
+  brand: 'bg-brand-tint text-brand-on-tint',
+} as const
+
+/** ปุ่มลัดหนึ่งช่อง — ทั้งช่องเป็นลิงก์ สูงพอสำหรับนิ้วโป้ง (≥56px) */
+function SiteAction({
+  href,
+  icon: Icon,
+  tone,
+  label,
+}: {
+  href: string
+  icon: LucideIcon
+  tone: keyof typeof ACTION_TONE
+  label: string
+}) {
+  return (
+    <Link
+      href={href}
+      className="flex min-h-14 min-w-0 items-center gap-2.5 rounded-lg border border-line bg-surface px-3 py-2.5 shadow-e1 transition-colors duration-100 hover:border-brand active:bg-surface-2"
+    >
+      <span
+        className={`flex size-9 shrink-0 items-center justify-center rounded-md ${ACTION_TONE[tone]}`}
+      >
+        <Icon className="size-4.5" strokeWidth={1.8} />
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm font-semibold text-ink">{label}</span>
+    </Link>
   )
 }

@@ -3,6 +3,7 @@ import { PwaRegister } from '@/components/shell/pwa-register'
 import { BottomNav } from '@/components/shell/bottom-nav'
 import { InstallBanner } from '@/components/shell/install-banner'
 import { Sidebar } from '@/components/shell/sidebar'
+import type { NavBadges } from '@/components/shell/nav'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getBranding } from '@/lib/branding'
 import { getSupabaseServer } from '@/lib/supabase/server'
@@ -24,8 +25,12 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
   // แต่ `.order()` + `.range()` ยังต้องมีเสมอ ไม่พึ่งค่าเริ่มต้นของ PostgREST
   // 🔴 ตัวเลขบนกระดิ่งนับในฐานข้อมูล ไม่ใช่ `items.filter().length`
   // ซึ่งจะหยุดเพิ่มที่ 20 แล้วคนจะเชื่อว่าค้างอยู่แค่นั้น
-  const [{ data: items, error: nErr }, { count, error: cErr }, { count: pendingCount, error: pErr }] =
-    await Promise.all([
+  const [
+    { data: items, error: nErr },
+    { count, error: cErr },
+    { count: pendingCount, error: pErr },
+    { count: rejectedCount, error: rErr },
+  ] = await Promise.all([
       sb
         .from('notifications')
         .select('id, kind, title, body, link, read_at, created_at')
@@ -40,11 +45,27 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
       user.role === 'owner'
         ? sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'pending')
         : Promise.resolve({ count: 0, error: null }),
+      // ตัวเลขของค้างบนเมนู "รายรับ-รายจ่าย" = รายการที่ถูกตีกลับและยังไม่ถูกแก้
+      // 🔴 ไม่มีเงื่อนไข role — RLS เป็นคนกำหนดขอบเขตให้เอง: เจ้าของเห็นทุกใบ
+      // ที่ตีกลับไปแล้วยังค้าง · หัวหน้าไซต์เห็นเฉพาะของไซต์ตัวเองซึ่งเป็นใบ
+      // ที่ต้องแก้แล้วส่งใหม่ · ทั้งสองคนอ่านได้ประโยคเดียวกันว่า "ค้างอยู่"
+      sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
     ])
 
-  if (nErr || cErr || pErr) {
+  if (nErr || cErr || pErr || rErr) {
     // กระดิ่ง/ตัวเลขเมนูพังต้องไม่ทำให้ทั้งแอปพัง — บันทึกไว้แล้วแสดงเป็นค่าว่าง
-    console.error('[shell] อ่านแจ้งเตือนไม่ได้', nErr?.message ?? cErr?.message ?? pErr?.message)
+    console.error(
+      '[shell] อ่านแจ้งเตือนไม่ได้',
+      nErr?.message ?? cErr?.message ?? pErr?.message ?? rErr?.message,
+    )
+  }
+
+  // ป้ายตัวเลขของทุกเมนู อยู่ที่เดียว — sidebar กับแถบล่างอ่านชุดเดียวกัน
+  // เพิ่มเมนูที่มีของค้างในอนาคตให้เติมคีย์ตรงนี้ที่เดียว แล้วมันจะไปโผล่
+  // ครบทั้งสองแถบ และถูกรวมยอดขึ้นปุ่ม "เพิ่มเติม" ให้เองถ้าเมนูนั้นถูกซ่อน
+  const navBadges: NavBadges = {
+    '/approvals': pendingCount ?? 0,
+    '/ledger': rejectedCount ?? 0,
   }
 
   return (
@@ -57,7 +78,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
         roleLabel={ROLE_LABEL[user.role]}
         companyName={branding.companyName}
         logoUrl={branding.logoUrl}
-        pendingCount={pendingCount ?? 0}
+        badges={navBadges}
       />
       {/* min-w-0 บนคอลัมน์เนื้อหา ไม่งั้นตารางกว้าง ๆ จะดันทั้งหน้าให้เลื่อนออกด้านข้าง
           แทนที่จะเลื่อนอยู่ในกล่องของตัวเอง */}
@@ -79,7 +100,7 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
           role={user.role}
           userName={user.fullName}
           roleLabel={ROLE_LABEL[user.role]}
-          pendingCount={pendingCount ?? 0}
+          badges={navBadges}
         />
       </div>
     </div>

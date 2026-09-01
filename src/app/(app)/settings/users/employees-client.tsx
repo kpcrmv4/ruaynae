@@ -1,6 +1,6 @@
 'use client'
 
-import { HardHat, Loader2, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
+import { ArrowRight, HardHat, Loader2, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -11,6 +11,7 @@ import {
 } from '@/lib/employees'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
+import { EmployeeDelete, type DeleteInfo } from './employee-delete'
 
 export type EmployeeRow = {
   id: string
@@ -23,6 +24,9 @@ export type EmployeeRow = {
   is_active: boolean
   profile_id: string | null
 }
+
+/** แถวจาก RPC `employees_delete_info()` — ตัวเลขที่กล่องยืนยันการลบต้องใช้ */
+export type DeleteInfoRow = DeleteInfo & { employee_id: string }
 
 type Site = { id: string; name: string }
 type Person = { id: string; full_name: string }
@@ -41,11 +45,14 @@ export function EmployeesClient({
   employees,
   sites,
   people,
+  deleteInfo,
 }: {
   employees: EmployeeRow[]
   sites: Site[]
   people: Person[]
+  deleteInfo: DeleteInfoRow[]
 }) {
+  const infoOf = new Map(deleteInfo.map((d) => [d.employee_id, d]))
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [editing, setEditing] = useState<string | null>(null)
@@ -121,31 +128,40 @@ export function EmployeesClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
+      {/* 🔴 บนจอ 390 คำอธิบายสองบรรทัดครึ่งถูกบีบอยู่ข้างปุ่มกว้าง 140px
+          จนขึ้นบรรทัดใหม่สี่รอบและอ่านเหมือนกำแพงตัวหนังสือ (เจ้าของแจ้ง 1 ก.ย. 2569)
+          · แยกเป็นสามชั้นแทน: หัวเรื่อง+ปุ่มบรรทัดเดียว · คำอธิบายเต็มความกว้าง
+          · ทางลัดไปหน้าผู้ใช้ระบบเป็นลิงก์ของตัวเองที่แตะได้เต็มบรรทัด
+          — บนจอกว้างยังเป็นสองคอลัมน์เหมือนเดิม */}
+      <div>
+        <div className="flex items-center gap-3">
           {/* h1 เพราะตอนนี้เป็นหน้าของตัวเอง ไม่ได้อยู่ใต้แท็บของหน้าผู้ใช้ระบบแล้ว —
               หน้าที่หัวเรื่องหลักเป็น h2 คือหน้าที่ข้ามลำดับหัวข้อไปหนึ่งขั้น */}
-          <h1 className="text-lg font-bold text-ink">คนงาน</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            ทุกคนที่มีค่าแรงต้องจ่าย · <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span>{' '}
-            และไม่มี role ·{' '}
-            <Link href="/settings/users" className="font-medium text-brand hover:underline">
-              คนที่ล็อกอินได้อยู่ที่นี่
-            </Link>
-          </p>
+          <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-ink">คนงาน</h1>
+          <button
+            onClick={() => {
+              setEditing(null)
+              setForm(EMPTY)
+              setFieldError('')
+              setAdding((v) => !v)
+            }}
+            className="btn-primary shrink-0"
+          >
+            <Plus className="size-4" />
+            เพิ่มคนงาน
+          </button>
         </div>
-        <button
-          onClick={() => {
-            setEditing(null)
-            setForm(EMPTY)
-            setFieldError('')
-            setAdding((v) => !v)
-          }}
-          className="btn-primary shrink-0"
+        <p className="mt-1 text-sm leading-6 text-muted-token">
+          ทุกคนที่มีค่าแรงต้องจ่าย · <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span>{' '}
+          และไม่มี role
+        </p>
+        <Link
+          href="/settings/users"
+          className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
         >
-          <Plus className="size-4" />
-          เพิ่มคนงาน
-        </button>
+          คนที่ล็อกอินได้อยู่ที่นี่
+          <ArrowRight className="size-4" />
+        </Link>
       </div>
 
       {formOpen && (
@@ -332,6 +348,14 @@ export function EmployeesClient({
                     <UserCheck className="size-4" />
                   )}
                 </button>
+                {/* ปิดใช้งาน ≠ ลบ — ปิดคือ "ไม่ทำงานกับเราแล้ว แต่ประวัติยังอยู่"
+                    ส่วนลบคือเอาออกจากระบบจริง ๆ พร้อมประวัติที่ยังไม่ได้จ่ายเงิน */}
+                <EmployeeDelete
+                  id={e.id}
+                  fullName={e.full_name}
+                  info={infoOf.get(e.id)}
+                  disabled={busy !== null}
+                />
               </div>
             </div>
           ))}

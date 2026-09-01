@@ -1107,12 +1107,24 @@ export type Database = {
           paid: number
         }[]
       }
+      delete_employee: { Args: { p_id: string }; Returns: Json }
       employee_balance: {
         Args: { p_employee: string }
         Returns: {
           accrued: number
           advanced: number
           balance: number
+        }[]
+      }
+      employees_delete_info: {
+        Args: never
+        Returns: {
+          advance_count: number
+          employee_id: string
+          open_advance: number
+          payroll_lines: number
+          unpaid_wage: number
+          work_days: number
         }[]
       }
       is_owner: { Args: never; Returns: boolean }

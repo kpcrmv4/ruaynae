@@ -45,7 +45,7 @@ const sql = async (q) => {
   return { rows: JSON.parse(t) }
 }
 
-console.log('\n── P4 · หน้าคนงาน ───────────────────────────────────────────')
+console.log('\n── P4 · หน้าคนงาน · R7 · ลบคนงาน ────────────────────────────')
 
 const ownerJar = jarOf(await req('POST', '/api/auth/login', {
   email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }))
@@ -183,6 +183,80 @@ try {
       posUsers >= 0 && posWorkers > posUsers && ownerSettings.includes('คนงาน')
         && !linkRe.test(supSettings),
       `เจ้าของ: ผู้ใช้ระบบ@${posUsers} · คนงาน@${posWorkers} · หัวหน้าไซต์เห็นปุ่ม=${linkRe.test(supSettings)}`)
+  }
+
+  // ── R7 · ลบคนงาน ─────────────────────────────────────────────────
+  // 🔴 ทุกแถวเช็ค **สถานะข้อมูลหลังจากนั้น** ไม่ใช่แค่รหัสสถานะ · 403 ที่มาพร้อม
+  // แถวที่ถูกลบไปแล้วคือการปฏิเสธที่มาช้าไปหนึ่งก้าว
+  {
+    // คนที่ไม่มีประวัติอะไรเลย → ลบได้จริง
+    const r0 = await req('POST', '/api/employees', {
+      fullName: `${MARK} ลบได้`, wageType: 'daily', dailyRate: '500',
+    }, ownerJar)
+    const b0 = await r0.json().catch(() => ({}))
+    const id = b0.employee?.id ?? b0.id
+    if (id) made.push(id)
+    const del = await req('DELETE', `/api/employees/${id}`, undefined, ownerJar)
+    const gone = (await sql(`select count(*)::int n from public.employees where id = '${id}'`)).rows[0].n
+    check('R7-API-01 เจ้าของลบคนงานที่ไม่มีประวัติ → 200 · แถวหายจริง',
+      del.status === 200 && Number(gone) === 0, `${del.status} · เหลือ ${gone} แถว`)
+  }
+  {
+    // คนที่ลงชื่อเข้าไซต์ไว้ (ยังไม่ปิดรอบ) → ลบได้ และประวัติหายตามไปด้วย
+    const r0 = await req('POST', '/api/employees', {
+      fullName: `${MARK} มีประวัติ`, wageType: 'daily', dailyRate: '400',
+    }, ownerJar)
+    const id = (await r0.json().catch(() => ({}))).employee?.id
+    if (id) made.push(id)
+    const site = (await sql(`select id from public.sites order by created_at limit 1`)).rows[0]?.id
+    await sql(`
+      insert into public.attendance (site_id, employee_id, work_date, work_units)
+      values ('${site}', '${id}', (now() at time zone 'Asia/Bangkok')::date, 1)`)
+    const info = (await sql(`
+      select unpaid_wage::text, work_days::text from public.employees_delete_info()
+      where employee_id = '${id}'`)).rows[0]
+    const del = await req('DELETE', `/api/employees/${id}`, undefined, ownerJar)
+    const body = await del.json().catch(() => ({}))
+    const left = (await sql(`
+      select (select count(*) from public.employees where id = '${id}')
+           + (select count(*) from public.attendance where employee_id = '${id}') as n`)).rows[0].n
+    check('R7-API-02 ลบคนที่ยังค้างจ่ายค่าแรง → สำเร็จ · คืนยอดที่หายไป · ประวัติลงชื่อถูกลบตาม',
+      del.status === 200 && Number(body.deleted?.unpaid_wage) > 0 && Number(left) === 0,
+      `${del.status} · ค้างจ่ายก่อนลบ ${info?.unpaid_wage ?? '—'} · เหลือ ${left} แถว`)
+  }
+  {
+    // ⚠️ แถวนี้ต้องมีคนที่อยู่ในรอบจ่ายที่ปิดแล้วจริง — ถ้าฐานยังไม่มี ให้ข้าม
+    // แทนที่จะเขียวลอย ๆ · `0 === 0` ที่ไม่มีวันแดงแย่กว่าไม่มีแถวนี้เลย
+    const paid = (await sql(`
+      select pl.employee_id::text as id from public.payroll_lines pl limit 1`)).rows[0]
+    if (!paid) {
+      console.log('  ⚠️  R7-API-03 ข้าม — ยังไม่มีใครอยู่ในรอบจ่ายที่ปิดแล้วในฐานนี้')
+    } else {
+      const del = await req('DELETE', `/api/employees/${paid.id}`, undefined, ownerJar)
+      const b = await del.json().catch(() => ({}))
+      const still = (await sql(
+        `select count(*)::int n from public.employees where id = '${paid.id}'`)).rows[0].n
+      check('R7-API-03 ลบคนที่อยู่ในรอบจ่ายที่ปิดแล้ว → 409 EMPLOYEE_IN_PAYROLL · แถวยังอยู่ครบ',
+        del.status === 409 && b.error === 'EMPLOYEE_IN_PAYROLL' && Number(still) === 1,
+        `${del.status} ${b.error} · เหลือ ${still} แถว`)
+    }
+  }
+  {
+    const r0 = await req('POST', '/api/employees', {
+      fullName: `${MARK} หัวหน้าไซต์ลบไม่ได้`, wageType: 'daily', dailyRate: '500',
+    }, ownerJar)
+    const id = (await r0.json().catch(() => ({}))).employee?.id
+    if (id) made.push(id)
+    const del = await req('DELETE', `/api/employees/${id}`, undefined, supJar)
+    const still = (await sql(`select count(*)::int n from public.employees where id = '${id}'`)).rows[0].n
+    check('R7-API-04 หัวหน้าไซต์ยิง DELETE → 403 · แถวยังอยู่',
+      del.status === 403 && Number(still) === 1, `${del.status} · เหลือ ${still} แถว`)
+  }
+  {
+    const rows = (await sql(`
+      select count(*)::int n from public.employees_delete_info()`)).rows[0].n
+    check('R7-DB-05 employees_delete_info() เรียกด้วยสิทธิ์ที่ไม่ใช่เจ้าของ (service ไม่มี auth.uid) → 0 แถว',
+      Number(rows) === 0, `${rows} แถว`)
   }
 
   // ── P4-UI-02 · หัวหน้าไซต์เข้าไม่ได้ ──────────────────────────────

@@ -128,7 +128,7 @@ export async function handleMcpPost(req: Request, keyFromPath: string | null): P
       }
 
       const t0 = Date.now()
-      const res = await executeTool(auth.actorId, name, args)
+      const res = await executeTool(auth.actorId, auth.keyId, name, args)
       const ms = Date.now() - t0
 
       // ⚠️ บันทึกเฉพาะชื่อ tool กับผล — ห้ามบันทึก args เพราะอาจมีชื่อลูกค้า

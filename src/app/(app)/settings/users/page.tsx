@@ -40,8 +40,12 @@ export default async function UsersPage({
   const sb = await getSupabaseServer()
 
   // .order() + .range() เสมอ ไม่พึ่งค่าเริ่มต้นของ PostgREST ที่ตัดที่ 1,000 แถวเงียบ ๆ
-  const [{ data: profiles, error: pErr }, { data: employees, error: eErr }, { data: sites }] =
-    await Promise.all([
+  const [
+    { data: profiles, error: pErr },
+    { data: employees, error: eErr },
+    { data: sites },
+    { data: deleteInfo, error: dErr },
+  ] = await Promise.all([
       getSupabaseAdmin()
         .from('profiles')
         .select('id, full_name, role, is_active, created_at')
@@ -62,7 +66,14 @@ export default async function UsersPage({
         .select('id, name')
         .order('name', { ascending: true })
         .range(0, PAGE_SIZE - 1),
+      // 🔴 ตัวเลขค้างจ่ายต้องมาพร้อมหน้า ไม่ใช่ไปถามตอนกดปุ่มลบ — กล่องยืนยัน
+      // ที่ค้างรอเน็ตก่อนบอกว่ากำลังจะเสียอะไร คือกล่องที่ถูกกดผ่านโดยไม่อ่าน
+      // · รวมทั้งตารางในฐานข้อมูลด้วย RPC ตัวเดียว ไม่ใช่ยิงทีละคน
+      sb.rpc('employees_delete_info'),
     ])
+
+  // dErr ไม่ทำให้ทั้งหน้าพัง — ปุ่มลบจะเตือนแบบไม่มีตัวเลขแทน
+  if (dErr) console.error('[users] อ่านข้อมูลประกอบการลบไม่ได้', dErr.message)
 
   if (pErr || eErr) {
     console.error('[users] อ่านรายชื่อไม่ได้', pErr?.message ?? eErr?.message)
@@ -92,6 +103,7 @@ export default async function UsersPage({
             monthly_salary: e.employee_wages?.monthly_salary ?? null,
           }))}
           sites={sites ?? []}
+          deleteInfo={deleteInfo ?? []}
           // ผูกได้เฉพาะบัญชีที่ยังใช้งานอยู่ — ผูกกับบัญชีที่ปิดไปแล้วคือการสร้าง
           // ความสัมพันธ์ที่ไม่มีวันได้ใช้
           people={(profiles ?? []).filter((p) => p.is_active).map(

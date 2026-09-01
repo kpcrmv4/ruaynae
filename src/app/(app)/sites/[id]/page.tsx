@@ -113,7 +113,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
       .from('transactions')
       .select(`
         id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no,
-        rejected_reason, site_id, created_by, category_id, sites(name), categories(name),
+        rejected_reason, site_id, created_by, category_id, mcp_key_id, sites(name), categories(name),
         attachments(id)
       `)
       .eq('site_id', id)

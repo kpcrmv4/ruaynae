@@ -1,12 +1,15 @@
 import 'server-only'
 
-import { getSupabaseAdmin } from '@/lib/supabase/admin'
-import { clampLimit, clampOffset, parseIsoDate, pickEnum } from '@/lib/mcp/args-core'
+import { asUuid, clampLimit, clampOffset, parseIsoDate, pickEnum } from '@/lib/mcp/args-core'
+import { callMcpRpc, type ExecResult } from '@/lib/mcp/rpc'
 import { searchTerms } from '@/lib/search-core'
 import { METRIC_DEFINITIONS } from '@/lib/mcp/tools'
+import { isWriteTool } from '@/lib/mcp/tool-names'
+import { executeLookupTool, executeWriteTool } from '@/lib/mcp/write'
 
 /**
- * เรียกฟังก์ชัน `mcp_*` — ที่เดียวที่แตะฐานข้อมูลของฝั่ง MCP
+ * ทางเข้าเดียวของ `tools/call` — แจกไปยังฝั่งอ่าน (ในไฟล์นี้) ฝั่งค้นหา id
+ * และฝั่งเขียน (`write.ts`) · การคุยกับฐานข้อมูลอยู่ที่ `rpc.ts` ที่เดียว
  *
  * 🔴 พารามิเตอร์ทุกตัวถูกบีบให้อยู่ในกรอบ **ก่อน** ถึงฐานข้อมูล
  * โมเดลส่ง `limit: "ทั้งหมด"` หรือ `from: "2569-01-01"` มาได้ และมันไม่รู้ตัว
@@ -15,39 +18,30 @@ import { METRIC_DEFINITIONS } from '@/lib/mcp/tools'
  * ⚠️ ความล้มเหลวคืนเป็นข้อความ ไม่ใช่ throw — คนเรียกต้องแปลงเป็น
  * `isError: true` ใน 200 เพื่อให้โมเดลอธิบายให้ผู้ใช้ฟังได้ ไม่ใช่ให้เซสชันตาย
  */
-export type ExecResult = { ok: true; data: unknown } | { ok: false; message: string }
+export type { ExecResult }
 
 const SITE_STATUS = ['planning', 'active', 'paused', 'done', 'cancelled'] as const
 const TXN_KIND = ['income', 'expense'] as const
 const TXN_STATUS = ['pending', 'approved', 'rejected'] as const
 
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-const asUuid = (v: unknown): string | null =>
-  typeof v === 'string' && UUID_RE.test(v.trim()) ? v.trim() : null
-
 export async function executeTool(
   actorId: string,
+  keyId: string,
   tool: string,
   args: Record<string, unknown>,
 ): Promise<ExecResult> {
   // ไม่แตะฐานข้อมูลเลย — เป็นคำอธิบายกติกา ไม่ใช่ข้อมูล
   if (tool === 'get_metric_definitions') return { ok: true, data: METRIC_DEFINITIONS }
 
-  const admin = getSupabaseAdmin()
-
-  const call = async (fn: string, params: Record<string, unknown>): Promise<ExecResult> => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any -- ชื่อ RPC เป็นค่าที่คำนวณ
-    const { data, error } = await (admin.rpc as any)(fn, { p_actor: actorId, ...params })
-    if (error) {
-      console.error(`[mcp] ${fn} ล้มเหลว`, error.message)
-      // ข้อความจากฐานข้อมูลอาจมีรายละเอียดภายใน — ส่งกลับเฉพาะสิ่งที่โมเดลใช้ได้
-      if (error.message.includes('MCP_ACTOR_NOT_OWNER')) {
-        return { ok: false, message: 'คีย์นี้ไม่มีสิทธิ์อ่านข้อมูลแล้ว กรุณาออกคีย์ใหม่' }
-      }
-      return { ok: false, message: 'อ่านข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง' }
-    }
-    return { ok: true, data }
+  // 🔴 ฝั่งเขียนอยู่คนละไฟล์และรับ `keyId` ไปด้วยเสมอ — ทุกแถวที่ AI คีย์
+  // ต้องมีร่องรอยว่ามาจากคีย์ใบไหน ไม่ใช่แค่ว่ามาจากเจ้าของ (R6)
+  if (isWriteTool(tool)) return executeWriteTool(actorId, keyId, tool, args)
+  if (tool === 'list_categories' || tool === 'list_employees') {
+    return executeLookupTool(actorId, tool, args)
   }
+
+  const call = (fn: string, params: Record<string, unknown>): Promise<ExecResult> =>
+    callMcpRpc(fn, { p_actor: actorId, ...params }, 'อ่านข้อมูลไม่สำเร็จ กรุณาลองใหม่อีกครั้ง')
 
   switch (tool) {
     case 'get_company_overview':

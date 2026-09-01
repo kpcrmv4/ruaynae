@@ -78,3 +78,42 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   return NextResponse.json({ ok: true, employee: { id } })
 }
+
+/**
+ * DELETE /api/employees/[id] — ลบคนงานทิ้งถาวร (เจ้าของเท่านั้น)
+ *
+ * 🔴 กติกาอยู่ใน `delete_employee()` ที่ฐานข้อมูล ไม่ใช่ที่นี่ — route นี้แค่
+ * แปลรหัสให้เป็นข้อความไทย · เส้นแบ่งคือ **เงินที่จ่ายออกไปแล้ว**: เคยอยู่ใน
+ * รอบจ่ายที่ปิดแล้ว = ลบไม่ได้ตลอดไป (ยอดของรอบนั้นจะอ้างถึงคนที่ไม่มีอยู่)
+ * ส่วนคนที่ยังไม่เคยปิดรอบ ลบได้พร้อมประวัติลงชื่อและใบเบิกในทรานแซกชันเดียว
+ *
+ * ⚠️ กล่องยืนยันบนหน้าจอต้องบอก **ยอดค้างจ่ายที่กำลังจะหายไป** ก่อนกด —
+ * ตัวเลขนั้นมาจาก `employees_delete_info()` ที่หน้าคนงานโหลดมาพร้อมรายชื่อแล้ว
+ */
+export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
+  const me = await getCurrentUserOrNull()
+  if (!me) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
+  if (me.role !== 'owner') return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+
+  const { id } = await ctx.params
+  const sb = await getSupabaseServer()
+  const { data, error } = await sb.rpc('delete_employee', { p_id: id })
+
+  if (error) {
+    const msg = error.message ?? ''
+    if (msg.includes('EMPLOYEE_IN_PAYROLL')) {
+      return NextResponse.json({ error: 'EMPLOYEE_IN_PAYROLL' }, { status: 409 })
+    }
+    if (msg.includes('NOT_FOUND')) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
+    if (msg.includes('FORBIDDEN')) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
+    // 23503 = ยังมีตารางอื่นอ้างถึงคนนี้อยู่ (on delete restrict) — ของที่เพิ่ม
+    // วันหน้าจะมาโผล่ตรงนี้ ไม่ใช่กลายเป็น 500 ที่อ่านไม่รู้เรื่อง
+    if (error.code === '23503') {
+      return NextResponse.json({ error: 'EMPLOYEE_HAS_HISTORY' }, { status: 409 })
+    }
+    console.error('[employees] ลบคนงานไม่สำเร็จ', msg)
+    return NextResponse.json({ error: 'DELETE_FAILED' }, { status: 500 })
+  }
+
+  return NextResponse.json({ ok: true, deleted: data })
+}

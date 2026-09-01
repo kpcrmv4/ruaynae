@@ -1,3 +1,4 @@
+import { Sparkles } from 'lucide-react'
 import { fmtBaht, fmtDate } from '@/lib/format'
 import {
   INCOME_KIND_LABEL, PAY_METHOD_LABEL, TXN_STATUS_LABEL, TXN_STATUS_TONE,
@@ -26,6 +27,8 @@ export type TxnRowData = {
   rejected_reason: string | null
   site_id: string | null
   created_by: string | null
+  /** มีค่า = คีย์ MCP ใบนั้นเป็นคนบันทึกผ่าน AI · null = คนคีย์เองในแอป */
+  mcp_key_id: string | null
   category_id: string
   sites: { name: string } | null
   categories: { name: string } | null
@@ -66,6 +69,15 @@ export function TxnRow({
                 ส่วนกลาง
               </span>
             ))}
+          {/* 🔴 เจ้าของต้องแยกออกในแวบเดียวว่าแถวไหนตัวเองคีย์ แถวไหน AI คีย์ให้
+              — ทั้งสองแถวมี `created_by` เป็นเจ้าของเหมือนกัน เพราะคีย์ที่ AI
+              ใช้เป็นของเจ้าของ ป้ายนี้จึงเป็นทางเดียวที่ดูออกจากหน้ารายการ */}
+          {t.mcp_key_id && (
+            <span className="chip border border-dashed border-line-strong text-muted-token ring-0">
+              <Sparkles className="size-3" strokeWidth={2} aria-hidden />
+              บันทึกผ่าน AI
+            </span>
+          )}
         </div>
         <div className="mt-0.5 truncate text-sm text-muted-token">
           {showDate && `${fmtDate(t.txn_date)} · `}

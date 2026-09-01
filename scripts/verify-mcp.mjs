@@ -1,9 +1,12 @@
 #!/usr/bin/env node
 /**
- * verify-mcp.mjs — ปิดแถว P9-* (ตัวเชื่อม MCP อ่านอย่างเดียว)
+ * verify-mcp.mjs — ปิดแถว P9-* (ตัวเชื่อม MCP ฝั่งอ่าน)
  *
- * 🔴 P9-SEC-04 "อ่านอย่างเดียวจริง" สำคัญที่สุด — tool ที่เขียนข้อมูลได้โดยไม่มีใคร
- * ตั้งใจจะไม่มีอาการเลยจนกว่าจะสาย · นับแถวก่อน/หลังเท่านั้นที่พิสูจน์ได้
+ * ⚠️ **R6 เพิ่ม tool ฝั่งเขียนเข้ามาแล้ว** (`record_*` · `update_*` · `delete_*`)
+ * สคริปต์นี้ยังคุมเฉพาะ 7 ตัวฝั่งอ่าน ส่วนฝั่งเขียนอยู่ที่ `verify-mcp-write.mjs`
+ *
+ * 🔴 P9-SEC-04 "7 ตัวนี้ไม่เขียนอะไรเลย" สำคัญที่สุด — tool ฝั่งอ่านที่เผลอเขียน
+ * ข้อมูลจะไม่มีอาการเลยจนกว่าจะสาย · นับแถวก่อน/หลังเท่านั้นที่พิสูจน์ได้
  * การอ่านโค้ดแล้วบอกว่า "ไม่มี insert" ไม่ใช่หลักฐาน
  *
  * 🔴 สคริปต์นี้ **สร้างข้อมูลตัวอย่างของตัวเอง** แล้วลบทิ้งใน `finally` ไม่ใช่พึ่ง seed
@@ -574,8 +577,10 @@ try {
     const r = await call(url, 'tools/list', {})
     const tools = r.result?.tools ?? []
     const bad = tools.filter((t) => !t.inputSchema || typeof t.inputSchema !== 'object')
-    check('P9-PROTO-07 tools/list คืน 7 ตัวพอดี ทุกตัวมี inputSchema เป็น object',
-      r.status === 200 && tools.length === 7 && bad.length === 0,
+    // ⚠️ 7 ตัวของ P9 + 7 ตัวฝั่งเขียนของ R6 · จำนวนที่เขียนไว้ตรงนี้ต้องขยับ
+    // ทุกครั้งที่เพิ่ม tool โดยตั้งใจ — ตัวเลขที่ปรับตามอัตโนมัติจะไม่มีวันแดง
+    check('P9-PROTO-07 tools/list คืน 14 ตัวพอดี ทุกตัวมี inputSchema เป็น object',
+      r.status === 200 && tools.length === 14 && bad.length === 0,
       `${tools.length} ตัว · ไม่มี schema ${bad.length}`)
   }
   {
@@ -695,7 +700,7 @@ try {
     const leaked = BLOCKLIST.filter((f) => all.includes(f))
     if (all.includes(SECRET_PHONE)) leaked.push(`ค่าเบอร์โทร ${SECRET_PHONE}`)
     if (all.includes(SECRET_ADDR)) leaked.push(`ค่าที่อยู่ ${SECRET_ADDR}`)
-    check('P9-SEC-03 ยิงครบทั้ง 7 tool แล้วไม่มีฟิลด์ใน blocklist (หรือค่าของมัน) หลุดออกไปแม้แต่ตัวเดียว',
+    check('P9-SEC-03 ยิงครบทั้ง 7 tool ฝั่งอ่าน แล้วไม่มีฟิลด์ใน blocklist (หรือค่าของมัน) หลุดออกไปแม้แต่ตัวเดียว',
       leaked.length === 0,
       leaked.length ? `หลุด: ${leaked.join(', ')}` : `สะอาด (${all.length} ตัวอักษร)`)
   }
@@ -703,7 +708,7 @@ try {
     const after = await countAll()
     const changed = READONLY_TABLES.filter((t) => before[t] !== after[t])
     const [{ n: logAfter }] = await sql('select count(*)::int as n from public.mcp_call_log')
-    check('P9-SEC-04 ยิงครบทั้ง 7 tool แล้วไม่มีตารางไหนแถวเปลี่ยน ยกเว้น mcp_call_log ที่ต้องเพิ่ม',
+    check('P9-SEC-04 ยิงครบทั้ง 7 tool ฝั่งอ่าน แล้วไม่มีตารางไหนแถวเปลี่ยน ยกเว้น mcp_call_log ที่ต้องเพิ่ม',
       changed.length === 0 && logAfter > logBefore,
       changed.length
         ? `เปลี่ยน: ${changed.map((t) => `${t} ${before[t]}→${after[t]}`).join(', ')}`

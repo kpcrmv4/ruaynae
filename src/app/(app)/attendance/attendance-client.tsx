@@ -1,10 +1,11 @@
 'use client'
 
-import { Check, History, Loader2, UserRound, X } from 'lucide-react'
+import { Check, History, LayoutGrid, List, Loader2, UserRound, X } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht } from '@/lib/format'
+import { PickGrid, type PickItem } from './pick-grid'
 
 type Employee = {
   id: string
@@ -78,6 +79,15 @@ export function AttendanceBoard({
   const [ot, setOt] = useState<Record<string, string>>({})
   // คนที่ติ๊กไว้รอบันทึก — ลงชื่อทีเดียวทั้งชุด ไม่ใช่กดทีละคน
   const [picked, setPicked] = useState<Record<string, boolean>>({})
+  /**
+   * มุมมองของรายชื่อ "ยังไม่เข้า" — การ์ดเป็นค่าเริ่มต้นเพราะงานจริงคือยืนกลางไซต์
+   * ถือมือถือมือเดียวแล้วไล่แตะชื่อ (เจ้าของสั่งไว้ 1 ก.ย. 2569)
+   *
+   * ⚠️ ไม่จำค่าไว้ใน localStorage โดยตั้งใจ — ค่าที่ฝั่งเซิร์ฟเวอร์ไม่มีทางรู้
+   * ต้องอ่านผ่าน `useSyncExternalStore` เท่านั้น (CLAUDE.md §17 ข้อ 16)
+   * การจำมุมมองไม่คุ้มกับความเสี่ยงที่จะได้ hydration ที่ไม่ตรงกัน
+   */
+  const [view, setView] = useState<'card' | 'list'>('card')
 
   const byEmployee = new Map(signedIn.map((r) => [r.employee_id, r]))
   const inSite = employees.filter((e) => byEmployee.has(e.id))
@@ -126,6 +136,28 @@ export function AttendanceBoard({
       return 'NETWORK'
     }
   }
+
+  /**
+   * ข้อมูลของการ์ดแต่ละใบ — คิดจาก `capacityOf` / `bookedElsewhere` ตัวเดียว
+   * กับมุมมองรายชื่อ · สองมุมมองที่คิดเงื่อนไขเองคนละชุดคือสองมุมมองที่วันหนึ่ง
+   * จะบอกคนละเรื่องกับคนคนเดียวกัน
+   */
+  const pickItems: PickItem[] = notIn.map((e) => {
+    const other = bookedElsewhere[e.id]
+    const cap = capacityOf(e.id)
+    const full = Boolean(other) && cap <= 0
+    return {
+      id: e.id,
+      name: e.full_name,
+      jobTitle: e.job_title,
+      full,
+      halfOnly: Boolean(other) && cap > 0 && cap < 1,
+      where: other?.siteNames.join(' · ') ?? null,
+      picked: Boolean(picked[e.id]) && !full,
+      half: Boolean(half[e.id]),
+      ot: Number(ot[e.id] ?? 0) || 0,
+    }
+  })
 
   /** คนที่เลือกได้จริง — คนเต็มโควตาที่ไซต์อื่นแล้วกดยังไงก็ไม่ผ่าน */
   const selectable = notIn.filter((e) => capacityOf(e.id) > 0)
@@ -321,6 +353,17 @@ export function AttendanceBoard({
           <span className="ml-auto text-xs font-normal tnum text-muted-token">
             {notIn.length} คน
           </span>
+          {notIn.length > 0 && (
+            <button
+              type="button"
+              onClick={() => setView((v) => (v === 'card' ? 'list' : 'card'))}
+              aria-label={view === 'card' ? 'สลับเป็นมุมมองรายชื่อ' : 'สลับเป็นมุมมองการ์ด'}
+              className="btn-ghost -my-1 shrink-0"
+            >
+              {view === 'card' ? <List className="size-4" /> : <LayoutGrid className="size-4" />}
+              <span className="hidden sm:inline">{view === 'card' ? 'รายชื่อ' : 'การ์ด'}</span>
+            </button>
+          )}
           {selectable.length > 0 && (
             <button
               type="button"
@@ -338,6 +381,23 @@ export function AttendanceBoard({
               ? 'ยังไม่มีคนงานในระบบ — เจ้าของเพิ่มได้ที่หน้าตั้งค่า แท็บคนงาน'
               : 'ทุกคนถูกลงชื่อครบแล้ว'}
           </p>
+        ) : view === 'card' ? (
+          <>
+            <PickGrid
+              items={pickItems}
+              disabled={bulkBusy}
+              onToggle={toggle}
+              onToggleHalf={(id, next) => setHalf((h) => ({ ...h, [id]: next }))}
+            />
+            {/* ช่อง OT ใส่ในการ์ดขนาดนี้ไม่ได้โดยไม่ทำให้ทั้งใบกดยาก —
+                บอกทางไปแทนที่จะซ่อนความสามารถไว้เฉย ๆ · หัวหน้าไซต์ไม่เห็นบรรทัดนี้
+                เพราะเขาไม่มีสิทธิ์ตั้ง OT อยู่แล้ว */}
+            {canSeeMoney && (
+              <p className="border-t border-line-soft px-3.5 pb-3 pt-2.5 text-xs text-muted-token md:px-4">
+                ตั้งค่า OT ได้ในมุมมองรายชื่อ
+              </p>
+            )}
+          </>
         ) : (
           <ul>
             {notIn.map((e) => {

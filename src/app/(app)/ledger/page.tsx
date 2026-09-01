@@ -46,7 +46,7 @@ export default async function LedgerPage({
     .from('transactions')
     .select(`
       id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no, rejected_reason,
-      site_id, created_by, category_id, sites(name), categories(name),
+      site_id, created_by, category_id, mcp_key_id, sites(name), categories(name),
       attachments(id)
     `)
   if (status !== 'all') listQuery = listQuery.eq('status', status)

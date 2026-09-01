@@ -39,7 +39,9 @@ export default async function AuditPage({
   const action = isAuditAction(sp.action) ? sp.action : 'all'
   const table = typeof sp.table === 'string' && /^[a-z_]{1,40}$/.test(sp.table) ? sp.table : 'all'
 
-  let q = sb.from('audit_log').select('id, table_name, row_id, action, actor, before, after, at')
+  let q = sb
+    .from('audit_log')
+    .select('id, table_name, row_id, action, actor, before, after, at, mcp_key_id')
   if (action !== 'all') q = q.eq('action', action)
   if (table !== 'all') q = q.eq('table_name', table)
 
@@ -171,6 +173,10 @@ export default async function AuditPage({
                           ไม่งั้นคนอ่านจะคิดว่าข้อมูลหาย */}
                       {r.actor ? (names.get(r.actor) ?? 'ผู้ใช้ที่ถูกลบแล้ว') : 'ระบบ'}
                     </span>
+                    {/* 🔴 แถวที่ AI ทำแทนมี actor เป็นเจ้าของเหมือนกันทุกประการ
+                        เพราะฟังก์ชัน MCP สวมสิทธิ์เจ้าของก่อนเขียน — ถ้าไม่บอกตรงนี้
+                        ประวัติจะอ่านว่าเจ้าของนั่งกดเองทั้งที่สั่งผ่านแชท */}
+                    {r.mcp_key_id && <span className="text-ink-2"> · ผ่านการเชื่อมต่อ AI</span>}
                   </div>
 
                   {changes.length > 0 && (

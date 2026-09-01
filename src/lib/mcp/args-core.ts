@@ -51,3 +51,15 @@ export function pickEnum<T extends string>(raw: unknown, allowed: readonly T[]):
   if (typeof raw !== 'string') return null
   return (allowed as readonly string[]).includes(raw) ? (raw as T) : null
 }
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
+/**
+ * uuid ที่โมเดลส่งมา — ไม่ผ่านคืน `null`
+ *
+ * 🔴 โมเดลแต่ง uuid ที่หน้าตาถูกต้องขึ้นมาเองได้ทุกเมื่อ (มันเห็นรูปแบบมาแล้ว
+ * เป็นล้านครั้ง) · ตัวตรวจนี้กันได้แค่ "ไม่ใช่ uuid" ส่วน "uuid ที่ไม่มีจริง"
+ * ฐานข้อมูลเป็นคนปฏิเสธด้วย FK แล้วเราแปลเป็นข้อความให้โมเดลไปหา id ที่ถูก
+ */
+export const asUuid = (v: unknown): string | null =>
+  typeof v === 'string' && UUID_RE.test(v.trim()) ? v.trim() : null

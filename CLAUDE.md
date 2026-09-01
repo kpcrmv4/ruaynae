@@ -91,14 +91,14 @@ create type payroll_status as enum ('open','closed');
 | `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date` — ยังไม่มีคอลัมน์บอกว่างวดไหนเก็บเงินแล้ว (วางแผนไว้เป็น `collected_txn_id` แต่ยังไม่ได้สร้าง รอเฟสหลัง) | ตามไซต์ |
 | `categories` | `name`, `kind`, `is_active`, `sort_order` | อ่านได้ทุก role · เขียนเฉพาะ owner |
 | `employees` | `full_name`, `job_title`, `wage_type`, `daily_rate`, `monthly_salary`, `default_site_id`, `is_active`, **`profile_id`** (NULL = ไม่มีบัญชีล็อกอิน) | owner ทั้งหมด · supervisor อ่านคนที่เคยเข้าไซต์ตัวเอง |
-| `attendance` | `work_date`, `site_id`, `employee_id`, `work_units`, `ot_amount`, **`wage_snapshot`**, `amount` (generated) | supervisor เขียนได้เฉพาะไซต์ตัวเองและวันที่ยังไม่ปิดรอบ |
-| `transactions` | `kind`, `site_id` (NULL = ส่วนกลาง), `category_id`, `amount`, `txn_date`, `pay_method`, `status`, `income_kind`, `installment_no` | supervisor เขียน `pending` ของไซต์ตัวเอง · **แก้เป็น `approved` ได้เฉพาะ owner** |
+| `attendance` | `work_date`, `site_id`, `employee_id`, `work_units`, `ot_amount`, **`wage_snapshot`**, `amount` (generated), `mcp_key_id` | supervisor เขียนได้เฉพาะไซต์ตัวเองและวันที่ยังไม่ปิดรอบ |
+| `transactions` | `kind`, `site_id` (NULL = ส่วนกลาง), `category_id`, `amount`, `txn_date`, `pay_method`, `status`, `income_kind`, `installment_no`, **`mcp_key_id`** (NULL = คนคีย์เอง · มีค่า = AI คีย์ผ่านคีย์ใบนั้น) | supervisor เขียน `pending` ของไซต์ตัวเอง · **แก้เป็น `approved` ได้เฉพาะ owner** |
 | `attachments` | `transaction_id`, `object_key`, `thumb_key`, `byte_size`, `content_type` | ตาม transaction |
 | `upload_intents` | `object_key`, `thumb_key`, `created_by`, `site_id`, `expires_at`, `consumed_at` | ของตัวเองเท่านั้น |
-| `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date`, `pay_method`, `site_id`, `payroll_run_id` | supervisor เขียนของไซต์ตัวเอง |
+| `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date`, `pay_method`, `site_id`, `payroll_run_id`, `mcp_key_id` | supervisor เขียนของไซต์ตัวเอง |
 | `payroll_runs` | `period_start`, `period_end`, `site_id`, `status`, `total_accrued`, `total_advance_deducted`, `total_paid` | **owner เท่านั้น** |
 | `payroll_lines` | `run_id`, `employee_id`, `days`, `accrued`, `advance_deducted`, `net_paid` | ตาม run |
-| `audit_log` | `table_name`, `row_id`, `action`, `actor`, `before` jsonb, `after` jsonb, `at` | **อ่านได้เฉพาะ owner · ไม่มี policy ให้ UPDATE/DELETE กับใครทั้งนั้น** |
+| `audit_log` | `table_name`, `row_id`, `action`, `actor`, `before` jsonb, `after` jsonb, `at`, **`mcp_key_id`** (มีค่า = AI ทำแทนเจ้าของ · **ไม่มี FK** โดยตั้งใจ ดู §17 ข้อ 19) | **อ่านได้เฉพาะ owner · ไม่มี policy ให้ UPDATE/DELETE กับใครทั้งนั้น** |
 | `notifications` | `user_id`, `kind`, `title`, `body`, `link`, `read_at` | ของตัวเอง |
 | `push_subscriptions` | `user_id`, `endpoint` (unique), `p256dh`, `auth`, `last_ok_at` | ของตัวเอง |
 
@@ -347,6 +347,9 @@ src/
 #                            ledger/txn-edit.tsx (กล่องแก้ไข/ลบ — ตัวเดียวต่อหน้า)
   lib/supabase/{browser,server,admin,middleware}.ts
   lib/{r2,constants,dates,money,database.types}.ts
+  lib/mcp/{keys-core,keys,args-core,tools,tool-names,rpc,execute,write,handler}.ts
+#                            rpc.ts = ที่เดียวที่คุยกับฐานข้อมูล · write.ts = ฝั่งเขียน (R6)
+#                            tool-names.ts = รายชื่อ tool ฝั่งเขียน ใช้ร่วมกับหน้า /mcp
   lib/{attachments,slip-upload}.ts   ← ผูกสลิปฝั่งเซิร์ฟเวอร์ / บีบ+อัปฝั่งเบราว์เซอร์
   proxy.ts
 supabase/migrations/*.sql
@@ -399,11 +402,20 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 - [x] **P6 · Audit** — หน้า `/audit` + กรอง + pagination, ตรวจว่าทุกตารางมี trigger จริง
 - [x] **P7 · PWA + push** — manifest, SW, subscribe, ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ, badge
 - [x] **P8 · seed/reset + ตรวจรับ** — ตาม §13 แล้วไล่ acceptance matrix ทุกเฟสให้ปิด
-- [x] **P9 · ตัวเชื่อม MCP อ่านอย่างเดียว** — `mcp_keys`/`mcp_call_log`, ฟังก์ชัน `mcp_*` 6 ตัวที่
+- [x] **P9 · ตัวเชื่อม MCP อ่านอย่างเดียว** (ฝั่งเขียนมาเพิ่มใน R6 ข้างล่าง) — `mcp_keys`/`mcp_call_log`, ฟังก์ชัน `mcp_*` 6 ตัวที่
       **สวมสิทธิ์เจ้าของแล้วเรียก RPC เงินตัวเดิม** (สูตรอยู่ที่เดียว), tool 7 ตัว + prompt 3 อัน,
       เซิร์ฟเวอร์ Streamable HTTP เขียนเอง (`POST /api/mcp/[key]` + `Authorization: Bearer`),
       หน้า `/mcp` ออก/เพิกถอนคีย์ + คู่มือเชื่อมต่อ · `MCP_KEY_PEPPER` (§18)
       · 🔴 **401 ห้ามมี `WWW-Authenticate`** — header นั้นทำให้ client เริ่ม OAuth discovery แล้วค้าง
+
+- [x] **R6 · MCP เขียนข้อมูลได้** — `mcp_key_id` บนสี่ตาราง + `audit_row()` แยก "AI ทำแทน",
+      ฟังก์ชัน `mcp_*` ฝั่งเขียน 7 ตัว (สวมสิทธิ์เจ้าของแล้ว insert ลงตารางจริง — guard trigger
+      เดิมทุกตัวยังบังคับครบ), tool ใหม่ 7 ตัว (`list_categories` `list_employees` `record_transaction`
+      `update_transaction` `delete_transaction` `record_attendance` `record_advance`),
+      ป้าย "บันทึกผ่าน AI" ที่ `/ledger` · หน้าไซต์ · `/audit`
+      · 🔴 **การยืนยันเกิดในแชท** — รายการเข้าเป็น `approved` ทันที ไม่มีคิวอนุมัติรับต่อ
+      คำอธิบาย tool คือด่านเดียวที่บังคับให้ AI สรุปแล้วถามก่อนบันทึก
+      · 🔴 **รูปในแชทไม่ถูกเก็บเข้าระบบ** (MCP รับแต่ JSON) เก็บเฉพาะตัวเลขที่อ่านได้
 
 **เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อไซต์+เตือน · ปันส่วนเงินเดือนเข้าไซต์ตามวัน
 
@@ -543,6 +555,23 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    ใบเก่าค้างไว้ในระบบตลอดไป · อาการฝั่งผู้ใช้คือกดแล้ว "สำเร็จ" แต่ไม่มีอะไรเปลี่ยน
    (RLS ตัดเหลือ 0 แถว แล้ว PostgREST ตอบ 200) · **ทุกประโยคบนหน้าจอที่บอกว่า
    "ทำได้" คือข้อกำหนดหนึ่งข้อที่ต้องมีแถวตรวจรับรองรับ ไม่ใช่คำโฆษณา**
+
+19. **audit trigger ที่มี FK ล้มการเขียนของธุรกิจได้ — และมันจะล้มในวันที่คุณไม่ได้ดู**
+   ตอนเพิ่ม `audit_log.mcp_key_id` ใส่ `references mcp_keys(id)` ไปด้วยตามสัญชาตญาณ
+   · ซ้อมกับฐานจริงแล้วเจอทันที: id ที่ไม่มีในตาราง ทำให้ `update categories` ล้ม
+   ทั้งคำสั่งด้วย `23503` — **ความล้มเหลวมาจากตัวบันทึกร่องรอย ไม่ใช่จากงานที่ทำ**
+   · `audit_row()` ติดกับทุกตารางในระบบ อะไรก็ตามที่ทำให้มันโยน exception ได้
+   คือสิ่งที่หยุดคนทำงานทั้งบริษัทได้ · ร่องรอยที่ชี้ไปแถวที่ถูกลบแล้วยังมีค่ากว่ามาก
+   → คอลัมน์นี้เป็น uuid เปล่า ๆ ไม่มี FK ส่วนอีกสามตาราง (`transactions` ·
+   `attendance` · `advances`) มี FK ได้เพราะค่าที่ใส่มาจากคีย์ที่กำลังเรียกอยู่จริง ๆ
+
+20. **ป้ายที่บอกที่มาของแถว ต้องล็อกไม่ให้แก้ ไม่งั้นมันเป็นแค่ของประดับ**
+   `mcp_key_id` ที่ใครก็ PATCH ทับได้ ตอบคำถาม "แถวนี้ AI คีย์หรือคนคีย์" ไม่ได้เลย
+   · trigger `keep_mcp_key` (before update ทั้งสามตาราง) ดันค่าเดิมกลับเสมอ
+   แบบเดียวกับที่ `guard_transaction` ทำกับ `created_by`
+   · ⚠️ และเมื่อฟังก์ชัน MCP **สวมสิทธิ์เจ้าของจริง ๆ** `audit_log.actor` จะเป็น
+   เจ้าของทุกแถวไม่ว่าจะมาจากมือหรือจากแชท — ถ้าไม่แยกไว้อีกคอลัมน์
+   ประวัติจะอ่านว่าเจ้าของนั่งกดเองทั้งหมด ซึ่งเป็นความจริงครึ่งเดียวที่ไล่ต่อไม่ได้
 
 ## 18. ตัวแปรสภาพแวดล้อม
 

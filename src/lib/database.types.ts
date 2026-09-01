@@ -22,6 +22,7 @@ export type Database = {
           created_by: string | null
           employee_id: string
           id: string
+          mcp_key_id: string | null
           note: string | null
           pay_method: Database["public"]["Enums"]["pay_method"]
           payroll_run_id: string | null
@@ -35,6 +36,7 @@ export type Database = {
           created_by?: string | null
           employee_id: string
           id?: string
+          mcp_key_id?: string | null
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
           payroll_run_id?: string | null
@@ -48,6 +50,7 @@ export type Database = {
           created_by?: string | null
           employee_id?: string
           id?: string
+          mcp_key_id?: string | null
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
           payroll_run_id?: string | null
@@ -67,6 +70,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "advances_mcp_key_id_fkey"
+            columns: ["mcp_key_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_keys"
             referencedColumns: ["id"]
           },
           {
@@ -159,6 +169,7 @@ export type Database = {
           created_by: string | null
           employee_id: string
           id: string
+          mcp_key_id: string | null
           note: string | null
           site_id: string
           updated_at: string
@@ -170,6 +181,7 @@ export type Database = {
           created_by?: string | null
           employee_id: string
           id?: string
+          mcp_key_id?: string | null
           note?: string | null
           site_id: string
           updated_at?: string
@@ -181,6 +193,7 @@ export type Database = {
           created_by?: string | null
           employee_id?: string
           id?: string
+          mcp_key_id?: string | null
           note?: string | null
           site_id?: string
           updated_at?: string
@@ -200,6 +213,13 @@ export type Database = {
             columns: ["employee_id"]
             isOneToOne: false
             referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_mcp_key_id_fkey"
+            columns: ["mcp_key_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_keys"
             referencedColumns: ["id"]
           },
           {
@@ -254,6 +274,7 @@ export type Database = {
           at: string
           before: Json | null
           id: number
+          mcp_key_id: string | null
           row_id: string | null
           table_name: string
         }
@@ -264,6 +285,7 @@ export type Database = {
           at?: string
           before?: Json | null
           id?: number
+          mcp_key_id?: string | null
           row_id?: string | null
           table_name: string
         }
@@ -274,6 +296,7 @@ export type Database = {
           at?: string
           before?: Json | null
           id?: number
+          mcp_key_id?: string | null
           row_id?: string | null
           table_name?: string
         }
@@ -918,6 +941,7 @@ export type Database = {
           income_kind: Database["public"]["Enums"]["income_kind"] | null
           installment_no: number | null
           kind: Database["public"]["Enums"]["txn_kind"]
+          mcp_key_id: string | null
           note: string | null
           pay_method: Database["public"]["Enums"]["pay_method"]
           rejected_reason: string | null
@@ -938,6 +962,7 @@ export type Database = {
           income_kind?: Database["public"]["Enums"]["income_kind"] | null
           installment_no?: number | null
           kind: Database["public"]["Enums"]["txn_kind"]
+          mcp_key_id?: string | null
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
           rejected_reason?: string | null
@@ -958,6 +983,7 @@ export type Database = {
           income_kind?: Database["public"]["Enums"]["income_kind"] | null
           installment_no?: number | null
           kind?: Database["public"]["Enums"]["txn_kind"]
+          mcp_key_id?: string | null
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
           rejected_reason?: string | null
@@ -986,6 +1012,13 @@ export type Database = {
             columns: ["created_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_mcp_key_id_fkey"
+            columns: ["mcp_key_id"]
+            isOneToOne: false
+            referencedRelation: "mcp_keys"
             referencedColumns: ["id"]
           },
           {
@@ -1084,6 +1117,52 @@ export type Database = {
       }
       is_owner: { Args: never; Returns: boolean }
       mcp_assume_owner: { Args: { p_actor: string }; Returns: undefined }
+      mcp_begin_write: {
+        Args: { p_actor: string; p_key: string }
+        Returns: undefined
+      }
+      mcp_categories: {
+        Args: { p_actor: string; p_kind?: string }
+        Returns: Json
+      }
+      mcp_create_advance: {
+        Args: {
+          p_actor: string
+          p_amount: number
+          p_date: string
+          p_employee: string
+          p_key: string
+          p_note?: string
+          p_pay_method?: string
+          p_site?: string
+        }
+        Returns: Json
+      }
+      mcp_create_transaction: {
+        Args: {
+          p_actor: string
+          p_amount: number
+          p_category: string
+          p_client_ref?: string
+          p_date: string
+          p_income_kind?: string
+          p_installment_no?: number
+          p_key: string
+          p_kind: string
+          p_note?: string
+          p_pay_method?: string
+          p_site?: string
+        }
+        Returns: Json
+      }
+      mcp_delete_transaction: {
+        Args: { p_actor: string; p_id: string; p_key: string }
+        Returns: Json
+      }
+      mcp_employees: {
+        Args: { p_actor: string; p_limit?: number; p_on?: string }
+        Returns: Json
+      }
       mcp_overview: { Args: { p_actor: string; p_on?: string }; Returns: Json }
       mcp_payroll: {
         Args: { p_actor: string; p_limit?: number }
@@ -1091,6 +1170,16 @@ export type Database = {
       }
       mcp_pending: {
         Args: { p_actor: string; p_limit?: number }
+        Returns: Json
+      }
+      mcp_record_attendance: {
+        Args: {
+          p_actor: string
+          p_date: string
+          p_entries: Json
+          p_key: string
+          p_site: string
+        }
         Returns: Json
       }
       mcp_site_detail: {
@@ -1118,6 +1207,10 @@ export type Database = {
           p_terms?: string[]
           p_to?: string
         }
+        Returns: Json
+      }
+      mcp_update_transaction: {
+        Args: { p_actor: string; p_id: string; p_key: string; p_patch: Json }
         Returns: Json
       }
       payroll_balances: {

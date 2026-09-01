@@ -11,8 +11,10 @@ import {
   KeyRound,
   Layers,
   Loader2,
+  Pencil,
   Plus,
   Smartphone,
+  Sparkles,
   Trash2,
   X,
 } from 'lucide-react'
@@ -22,6 +24,7 @@ import { toast } from 'sonner'
 import { EmptyState } from '@/components/ui/states'
 import { PageHeader } from '@/components/ui/page-header'
 import { LOCALE, TZ } from '@/lib/constants'
+import { isWriteTool } from '@/lib/mcp/tool-names'
 
 type KeyRow = {
   id: string
@@ -133,8 +136,39 @@ export function McpClient({
     <div className="space-y-5">
       <PageHeader
         title="เชื่อมต่อ AI"
-        subtitle="ให้ Claude หรือ ChatGPT อ่านตัวเลขของคุณเพื่อตอบคำถาม — อ่านอย่างเดียว แก้ไขอะไรไม่ได้"
+        subtitle="ให้ Claude หรือ ChatGPT อ่านตัวเลขของคุณ และบันทึกรายการให้ได้จากในแชท"
       />
+
+      {/* 🔴 หน้านี้เคยเขียนว่า "อ่านอย่างเดียว แก้ไขอะไรไม่ได้" — ตอนนี้ไม่จริงแล้ว
+          ประโยคที่ล้าสมัยบนหน้าจอแย่กว่าไม่มีประโยคเลย เพราะเจ้าของจะแจก URL
+          ให้คนอื่นด้วยความเข้าใจว่ามันดูได้อย่างเดียว */}
+      <section className="panel">
+        <div className="panel-head">
+          <Sparkles className="size-4 text-brand" strokeWidth={2} />
+          AI ทำอะไรได้บ้าง
+        </div>
+        <div className="space-y-3 p-4 text-sm leading-6 text-ink-2">
+          <p>
+            <span className="font-semibold text-ink">ถามได้:</span> ยอดของแต่ละไซต์ ·
+            กำไรคงเหลือ · รายการที่รออนุมัติ · ค่าแรงค้างจ่าย
+          </p>
+          <p>
+            <span className="font-semibold text-ink">บันทึกให้ได้:</span> รายรับ-รายจ่าย
+            (ส่งรูปสลิปในแชทให้อ่านได้เลย) · ลงชื่อคนเข้าไซต์ · เบิกล่วงหน้า ·
+            แก้หรือลบรายการที่บันทึกไปแล้ว
+          </p>
+          <p className="text-muted-token">
+            ก่อนบันทึกทุกครั้ง AI จะสรุปให้อ่านแล้วถามว่าใช่ไหม —
+            รายการเข้าระบบเป็น <span className="font-medium text-ink-2">อนุมัติแล้ว</span>{' '}
+            ทันทีเมื่อคุณตอบว่าใช่ ไม่ได้ไปรอในคิวอนุมัติ ·
+            ทุกแถวที่บันทึกทางนี้ติดป้าย “บันทึกผ่าน AI” ในหน้ารายการ และย้อนดูได้ที่หน้าประวัติการแก้ไข
+          </p>
+          <p className="text-muted-token">
+            <span className="font-medium text-ink-2">รูปที่ส่งในแชทไม่ได้ถูกเก็บเข้าระบบ</span>{' '}
+            — ระบบเก็บแต่ตัวเลขที่อ่านได้ ถ้าอยากให้มีสลิปติดรายการไว้ ต้องแนบเองในแอป
+          </p>
+        </div>
+      </section>
 
       {/* 🔴 Claude เรียกจากคลาวด์ ไม่ใช่จากเครื่องผู้ใช้ — ไม่เตือนตรงนี้
           เจ้าของจะคัดลอก localhost ไปวางแล้วมาบอกว่าเซิร์ฟเวอร์เสีย */}
@@ -178,6 +212,12 @@ export function McpClient({
           <div className="mt-4 rounded-lg border border-brand bg-surface-2 p-3">
             <p className="mb-2 text-sm font-bold text-ink">
               คัดลอกเก็บไว้ตอนนี้ — ปิดหน้านี้แล้วจะไม่เห็นค่านี้อีก
+            </p>
+            {/* URL นี้ทำได้ทุกอย่างที่เจ้าของทำได้ ไม่ใช่แค่ดู — คนที่เห็นภาพหน้าจอนี้
+                บันทึกและลบรายการได้ทันทีโดยไม่ต้องรู้รหัสผ่านอะไรเลย */}
+            <p className="mb-2 text-sm leading-6 text-urgent">
+              ถือ URL นี้เหมือนรหัสผ่าน — ใครมีค่านี้ดูตัวเลขได้ทั้งหมด
+              และบันทึกหรือลบรายการได้ด้วย
             </p>
             {/* URL ยาวมาก ต้อง break ไม่ใช่ดันหน้าจอกว้างออกไป */}
             <p className="mb-3 break-all rounded-xs bg-surface px-3 py-2 font-mono text-xs leading-5 text-ink-2">
@@ -316,6 +356,13 @@ export function McpClient({
               <span className="text-xs text-muted-token">
                 ค่าเริ่มต้นหลังกด Add คือ “Needs approval” เจ้าของส่วนใหญ่เห็นข้อความนี้แล้วเข้าใจว่า
                 เชื่อมต่อพัง — สลับเป็น Always allow แล้วถามคำถามได้ตามปกติทันที
+                <br />
+                ปลอดภัยแม้กับเครื่องมือที่บันทึกข้อมูล เพราะ AI ถูกสั่งให้สรุปแล้วถามคุณในแชท
+                ก่อนบันทึกทุกครั้งอยู่แล้ว · ถ้าอยากให้มีด่านซ้ำอีกชั้น ปล่อยเฉพาะตัวที่ขึ้นต้นด้วย
+                <span className="font-mono"> record_ </span>
+                <span className="font-mono">update_ </span>
+                <span className="font-mono">delete_ </span>
+                ไว้เป็น Needs approval ได้
               </span>
             </li>
           </ol>
@@ -373,6 +420,14 @@ export function McpClient({
                   <X className="size-4 shrink-0 text-urgent" strokeWidth={2} aria-label="ล้มเหลว" />
                 )}
                 <span className="min-w-0 flex-1 truncate font-mono text-sm text-ink">{c.tool}</span>
+                {/* การอ่านกับการเขียนต้องแยกออกจากกันในแวบเดียว — รายชื่อ tool
+                    เป็นภาษาอังกฤษล้วน เจ้าของอ่านไม่ออกว่าอันไหนแตะข้อมูล */}
+                {isWriteTool(c.tool) && (
+                  <span className="chip shrink-0 border border-line-strong text-ink-2 ring-0">
+                    <Pencil className="size-3" strokeWidth={2} aria-hidden />
+                    บันทึก
+                  </span>
+                )}
                 <span className="shrink-0 text-xs tnum text-muted-token">
                   {c.ms != null ? `${c.ms} ms` : '—'}
                 </span>

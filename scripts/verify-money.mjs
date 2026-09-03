@@ -107,13 +107,13 @@ try {
       ('income','${B}','${incCat.id}', 100000, '${today}', 'transfer', 'approved', 'เงินทดสอบ B รับแล้ว', 'deposit'),
       ('expense','${B}','${expCat.id}', 500000, '${today}', 'cash', 'approved', 'ต้นทุนทดสอบ B', null)`)
 
-  // ── P2-CALC-01 · เก็บเงินแล้ว = เฉพาะ approved ──────────────────────
+  // ── P2-CALC-01 · เบิกเงินสะสม = เฉพาะ approved ──────────────────────
   // 🔴 400,000 approved + 100,000 pending → ต้องได้ 40% ไม่ใช่ 50%
   // ถ้านับ pending ด้วย ตัวเลขจะเปลี่ยนตอนกดอนุมัติ ทั้งที่ไม่มีเงินเข้าจริง
   {
     const card = cardOf(await page('/', ownerJar), A)
-    const paid = card && /เก็บเงินแล้ว[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(card)
-    check('P2-CALC-01 เก็บเงินแล้วนับเฉพาะ approved — ฿400,000 · 40% (ไม่ใช่ 50%)',
+    const paid = card && /เบิกเงินสะสม[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(card)
+    check('P2-CALC-01 เบิกเงินสะสมนับเฉพาะ approved — ฿400,000 · 40% (ไม่ใช่ 50%)',
       Boolean(paid) && paid[1] === '400,000' && paid[2] === '40',
       card ? `อ่านได้ ฿${paid?.[1]} · ${paid?.[2]}%` : 'ไม่พบการ์ดโครงการ A')
   }
@@ -121,7 +121,7 @@ try {
   // ── P2-CALC-02 · ต้นทุน + กำไรคงเหลือ ───────────────────────────────
   {
     const card = cardOf(await page('/', ownerJar), A)
-    const cost = card && /ต้นทุนที่จ่ายจริง[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(card)
+    const cost = card && /ต้นทุนสะสม[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(card)
     const profit = card && /กำไรคงเหลือ[\s\S]{0,200}?฿([\d,]+)/.exec(card)
     check('P2-CALC-02 ต้นทุน ฿300,000 · 30% และกำไรคงเหลือ ฿700,000',
       Boolean(cost) && cost[1] === '300,000' && cost[2] === '30'
@@ -133,13 +133,13 @@ try {
   // วัดก่อน–หลัง แทนที่จะดูแค่ว่าเลขสุดท้ายถูก · เลขที่ถูกอาจถูกด้วยเหตุผลอื่น
   {
     const before = cardOf(await page('/', ownerJar), A)
-    const b = /ต้นทุนที่จ่ายจริง[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(before ?? '')
+    const b = /ต้นทุนสะสม[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(before ?? '')
     await sql(`insert into public.transactions
       (kind, site_id, category_id, amount, txn_date, pay_method, status, note, rejected_reason)
       values ('expense','${A}','${expCat.id}', 999999, '${today}', 'cash', 'rejected',
               'ต้นทุนทดสอบ A ที่ถูกตีกลับ', 'ตีกลับเพื่อทดสอบ')`)
     const after = cardOf(await page('/', ownerJar), A)
-    const a = /ต้นทุนที่จ่ายจริง[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(after ?? '')
+    const a = /ต้นทุนสะสม[\s\S]{0,300}?฿([\d,]+) · (\d+)%/.exec(after ?? '')
     check('P2-CALC-05 รายการที่ถูกตีกลับไม่ถูกนับ — ยอดก่อนและหลังเท่ากันที่ ฿300,000',
       Boolean(a) && a[1] === '300,000' && b?.[1] === a[1],
       `ก่อน ฿${b?.[1]} → หลัง ฿${a?.[1]}`)
@@ -148,13 +148,13 @@ try {
   // ── P2-CALC-04 · รายจ่ายส่วนกลางไม่เข้าโครงการไหน ──────────────────────
   {
     const before = cardOf(await page('/', ownerJar), A)
-    const b = /ต้นทุนที่จ่ายจริง[\s\S]{0,300}?฿([\d,]+)/.exec(before ?? '')
+    const b = /ต้นทุนสะสม[\s\S]{0,300}?฿([\d,]+)/.exec(before ?? '')
     await sql(`insert into public.transactions
       (kind, site_id, category_id, amount, txn_date, pay_method, status, note)
       values ('expense', null, '${expCat.id}', 50000, '${today}', 'cash', 'approved',
               'ค่าน้ำมันทดสอบส่วนกลาง')`)
     const after = cardOf(await page('/', ownerJar), A)
-    const a = /ต้นทุนที่จ่ายจริง[\s\S]{0,300}?฿([\d,]+)/.exec(after ?? '')
+    const a = /ต้นทุนสะสม[\s\S]{0,300}?฿([\d,]+)/.exec(after ?? '')
     check('P2-CALC-04 รายจ่ายส่วนกลาง (site_id is null) ไม่ขยับต้นทุนของโครงการใด',
       Boolean(a) && a[1] === '300,000' && b?.[1] === a[1],
       `ก่อน ฿${b?.[1]} → หลัง ฿${a?.[1]}`)
@@ -210,7 +210,7 @@ try {
   // แม้หน้าจะว่างเปล่าเพราะเหตุอื่น (เช่นโดน 404)
   {
     const html = await page(`/sites/${A}`, supJar)
-    const leaks = ['เก็บเงินแล้ว', 'กำไรคงเหลือ', 'ค่างานตามสัญญา', 'ต้นทุนที่จ่ายจริง',
+    const leaks = ['เบิกเงินสะสม', 'กำไรคงเหลือ', 'ค่างานตามสัญญา', 'ต้นทุนสะสม',
       'ต้นทุนโครงการนี้', '1,000,000', '400,000', '300,000']
       .filter((w) => html.includes(w))
     // ฝั่งบวก: ยังเปิดหน้าโครงการตัวเองได้ และยังเห็นรายจ่ายที่ตัวเองคีย์ที่ /ledger

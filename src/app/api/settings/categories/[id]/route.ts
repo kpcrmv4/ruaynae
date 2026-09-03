@@ -24,7 +24,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const sb = await getSupabaseServer()
 
   const { data: existing, error: rErr } = await sb
-    .from('categories').select('id').eq('id', id).maybeSingle()
+    .from('categories').select('id, kind').eq('id', id).maybeSingle()
   if (rErr) {
     console.error('[categories] อ่านหมวดไม่ได้', rErr.message)
     return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
@@ -40,6 +40,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
       patch.name = name
     }
     if (typeof b?.isActive === 'boolean') patch.is_active = b.isActive
+    // 🔴 "หมวดนี้คือค่าวัสดุ" มีความหมายเฉพาะฝั่งรายจ่าย — ฐานข้อมูลมี check
+    // กันไว้อีกชั้น แต่ต้องปฏิเสธที่นี่ด้วย ไม่งั้นผู้ใช้จะเจอ error ดิบของ
+    // Postgres ที่อ่านไม่รู้เรื่องแทนประโยคไทยที่เราเขียนไว้
+    if (typeof b?.isMaterial === 'boolean') {
+      if (b.isMaterial && existing.kind !== 'expense') {
+        return NextResponse.json({ error: 'MATERIAL_EXPENSE_ONLY' }, { status: 400 })
+      }
+      patch.is_material = b.isMaterial
+    }
     if (b?.sortOrder !== undefined && b?.sortOrder !== null && b?.sortOrder !== '') {
       const n = Number(b.sortOrder)
       if (!Number.isInteger(n) || n < 1 || n > 999) {
@@ -59,7 +68,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .from('categories')
     .update(patch)
     .eq('id', id)
-    .select('id, name, kind, sort_order, is_active')
+    .select('id, name, kind, sort_order, is_active, is_material')
     .maybeSingle()
 
   if (error) {

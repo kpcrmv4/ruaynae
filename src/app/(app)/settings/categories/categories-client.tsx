@@ -14,6 +14,8 @@ type Row = {
   kind: TxnKind
   sort_order: number
   is_active: boolean
+  /** นับเข้าช่อง "ค่าวัสดุ" ของแถบต้นทุนในหน้าโครงการ — เฉพาะฝั่งรายจ่าย */
+  is_material: boolean
 }
 
 export function CategoriesClient({ categories }: { categories: Row[] }) {
@@ -66,7 +68,9 @@ export function CategoriesClient({ categories }: { categories: Row[] }) {
         </Link>
         <h1 className="mt-1 text-2xl font-bold text-ink">หมวดรายรับ-รายจ่าย</h1>
         <p className="mt-0.5 text-sm text-muted-token">
-          หมวดที่ปิดจะหายจากฟอร์มบันทึก แต่รายการเก่ายังแสดงชื่อหมวดได้ตามปกติ
+          หมวดที่ปิดจะหายจากฟอร์มบันทึก แต่รายการเก่ายังแสดงชื่อหมวดได้ตามปกติ ·
+          หมวดรายจ่ายที่ติ๊ก <span className="font-medium text-ink-2">ค่าวัสดุ</span>{' '}
+          จะถูกนับรวมเป็นช่อง &ldquo;ค่าวัสดุ&rdquo; ในแถบต้นทุนของแต่ละโครงการ
         </p>
       </div>
 
@@ -139,6 +143,30 @@ export function CategoriesClient({ categories }: { categories: Row[] }) {
                     {c.name}
                   </span>
                   {!c.is_active && <Badge tone="pending">ปิดอยู่</Badge>}
+                  {/* 🔴 ธงนี้เป็นตัวตัดสินว่ารายจ่ายก้อนไหนไปโผล่ในช่อง "ค่าวัสดุ"
+                      ของแถบต้นทุนในหน้าโครงการ · ให้ติ๊กเองแทนการเทียบชื่อหมวด
+                      ในโค้ด เพราะเจ้าของเปลี่ยนชื่อหมวดและเพิ่มหมวดวัสดุอันที่สอง
+                      ได้ตลอด (ค่าเหล็ก · ค่าปูน) ซึ่งการเทียบชื่อรองรับไม่ได้เลย */}
+                  {kind === 'expense' && (
+                    <label
+                      className={`flex shrink-0 cursor-pointer items-center gap-1.5 text-xs ${
+                        c.is_material ? 'font-semibold text-ink-2' : 'text-muted-token'
+                      }`}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={c.is_material}
+                        disabled={busy !== null}
+                        onChange={() =>
+                          send(c.id, `/api/settings/categories/${c.id}`, 'PATCH',
+                            { isMaterial: !c.is_material },
+                            c.is_material ? 'ไม่นับเป็นค่าวัสดุแล้ว' : 'นับเป็นค่าวัสดุแล้ว')
+                        }
+                        className="size-4 accent-brand-solid"
+                      />
+                      ค่าวัสดุ
+                    </label>
+                  )}
                   <button
                     onClick={() =>
                       send(c.id, `/api/settings/categories/${c.id}`, 'PATCH',

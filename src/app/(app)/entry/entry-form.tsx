@@ -1,6 +1,7 @@
 'use client'
 
 import { Banknote, Camera, Check, Coins, ImagePlus, Landmark, Loader2, Wallet, X } from 'lucide-react'
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useMemo, useRef, useState } from 'react'
 import { toast } from 'sonner'
@@ -180,11 +181,30 @@ export function EntryForm({
 
   const err = (field: string) => (fieldError?.field === field ? fieldError.text : null)
 
+  // กำลังคีย์ให้โครงการไหน — อ่านจาก state ตัวเดียวกับกล่องเลือกข้างล่าง
+  // จึงเปลี่ยนตามทันทีที่สลับ ไม่ใช่ค่าที่ค้างมาจากตอนเปิดหน้า
+  const currentSite = sites.find((s) => s.id === form.siteId)
+  const scopeLabel =
+    form.siteId === CENTRAL
+      ? 'ส่วนกลาง (ไม่ผูกโครงการ)'
+      : (currentSite?.name ?? 'ยังไม่ได้เลือกโครงการ')
+
+  // ยกเลิกแล้วกลับไปหน้าโครงการที่กำลังคีย์ให้ · ส่วนกลางไม่มีหน้าของตัวเอง
+  // จึงกลับหน้าแรก แทนที่จะพาไปหน้าที่ไม่เกี่ยวกับสิ่งที่เพิ่งทำ
+  const cancelHref = currentSite ? `/sites/${currentSite.id}` : '/'
+
   return (
     <div className="mx-auto w-full max-w-xl">
       <h1 className="mb-1 text-2xl font-bold text-ink">
         {isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
       </h1>
+      {/* 🔴 ตอบ "คีย์ให้โครงการไหน" ตั้งแต่บรรทัดบน ไม่ใช่ให้ตาเลื่อนลงไปหา
+          กล่องเลือกกลางฟอร์ม · คนคีย์บิลเป็นตั้งจะสลับโครงการแล้วลืม แล้วยอด
+          ไปเข้าโครงการผิดโดยไม่มีอะไรทัก */}
+      <p className="mb-1 flex flex-wrap items-baseline gap-x-1.5 text-sm">
+        <span className="text-muted-token">กำลังบันทึกของ</span>
+        <span className="min-w-0 font-semibold text-ink">{scopeLabel}</span>
+      </p>
       <p className="mb-5 text-sm text-muted-token">
         {isOwner
           ? 'รายการที่คุณคีย์เองจะถูกอนุมัติทันที'
@@ -479,11 +499,11 @@ export function EntryForm({
           ฟอร์มยาวกว่าจอมือถือ — ปุ่มที่ต้องเลื่อนหาคือปุ่มที่กดช้าไปหนึ่งจังหวะ
           ยอดเงินอยู่บนปุ่นให้เช็คตาเปล่าอีกรอบก่อนกด · บนเดสก์ท็อปกลับไปอยู่
           ท้ายฟอร์มตามปกติ */}
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mt-4 lg:static">
+      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mt-4 flex gap-2 lg:static">
         <button
           onClick={submit}
           disabled={busy || uploading}
-          className="btn-primary w-full py-3 text-lg shadow-e2 lg:shadow-none"
+          className="btn-primary flex-1 py-3 text-lg shadow-e2 lg:shadow-none"
         >
           {busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
           {busy ? (
@@ -495,6 +515,22 @@ export function EntryForm({
             </>
           )}
         </button>
+        {/* 🔴 ระหว่างกำลังบันทึกต้องกดไม่ได้ — ลิงก์ที่กดตอนนั้นจะพาออกจากหน้า
+            กลางคัน แล้วคนคีย์จะไม่มีวันรู้ว่ารายการลงหรือไม่ลง · `<a>` ไม่มี
+            `disabled` จึงต้องปิดทั้งเมาส์ (pointer-events) และแป้น (tabIndex) */}
+        <Link
+          href={cancelHref}
+          aria-disabled={busy || uploading ? 'true' : undefined}
+          tabIndex={busy || uploading ? -1 : undefined}
+          className={`btn-secondary w-1/4 shrink-0 py-3 text-lg shadow-e2 lg:shadow-none ${
+            busy || uploading ? 'pointer-events-none opacity-50' : ''
+          }`}
+        >
+          <X className="size-5" />
+          {/* จอแคบเหลือแค่กากบาท — คำว่า "ยกเลิก" ในช่องกว้าง 1/4 ของจอ 390px
+              จะถูกตัดจนอ่านไม่ออกอยู่ดี · ชื่อยังอยู่ครบสำหรับโปรแกรมอ่านหน้าจอ */}
+          <span className="sr-only sm:not-sr-only">ยกเลิก</span>
+        </Link>
       </div>
     </div>
   )

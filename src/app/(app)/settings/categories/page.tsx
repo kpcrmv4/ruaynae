@@ -14,7 +14,7 @@ export default async function CategoriesPage() {
   const sb = await getSupabaseServer()
   const { data, error } = await sb
     .from('categories')
-    .select('id, name, kind, sort_order, is_active')
+    .select('id, name, kind, sort_order, is_active, is_material')
     .order('kind', { ascending: true })
     .order('sort_order', { ascending: true })
     .range(0, PAGE_SIZE * 4 - 1)

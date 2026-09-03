@@ -2,8 +2,8 @@
  * ตัวเลขเงินของโครงการ — คณิตศาสตร์ล้วน ไม่แตะฐานข้อมูล ไม่แตะ React
  *
  * สูตรทั้งหมดมาจาก `DESIGN.md` §5.1:
- *   เก็บเงินแล้ว = Σ รายรับที่ **อนุมัติแล้ว** / ค่างานรวม
- *   ต้นทุน      = Σ รายจ่ายที่ **อนุมัติแล้ว** / ค่างานรวม
+ *   เบิกเงินสะสม = Σ รายรับที่ **อนุมัติแล้ว** / ค่างานรวม
+ *   ต้นทุนสะสม  = Σ รายจ่ายที่ **อนุมัติแล้ว** + ค่าแรงที่เกิดขึ้นแล้ว / ค่างานรวม
  *   กำไรคงเหลือ = ค่างานรวม − ต้นทุนที่เกิดขึ้นแล้ว
  */
 
@@ -22,15 +22,39 @@ export type SiteMoney = {
   income: number | null
   /** รายจ่ายที่อนุมัติแล้ว + ค่าแรงที่เกิดขึ้นแล้ว */
   cost: number
-  /** ค่าแรงส่วนเดียว — ไว้บอกที่มาของตัวเลข ไม่ใช่ยอดแยกที่ต้องบวกเพิ่ม */
+  /** ค่าแรงส่วนเดียว — **อยู่ใน `cost` แล้ว** ไม่ใช่ยอดแยกที่ต้องบวกเพิ่ม */
   wage?: number
+  /** รายจ่ายในหมวดที่ติ๊กว่าเป็นวัสดุ — อยู่ใน `cost` แล้วเช่นกัน */
+  material?: number
+  /** กี่ **วัน** ที่มีคนถูกลงชื่อเข้าโครงการ (ไม่ใช่จำนวนคน-วัน) */
+  attendanceDays?: number
+}
+
+/**
+ * ต้นทุนสะสมแยกสามก้อน — **สามก้อนนี้บวกกันได้ `cost` เป๊ะเสมอ**
+ *
+ * 🔴 `other` คำนวณจาก `cost − wage − material` ไม่ใช่ตัวเลขที่ดึงมาอีกคอลัมน์
+ * สองตัวเลขที่ต้องตรงกันเองคือการเปิดช่องให้มันไม่ตรงกันวันหนึ่ง แล้วแถบสี
+ * จะยาวไม่เท่ากับยอดรวมที่เขียนอยู่ข้าง ๆ โดยไม่มี error ที่ไหนเลย
+ */
+export type CostSplit = {
+  wage: number
+  material: number
+  other: number
 }
 
 export type MoneyBars =
   /** คนเรียกไม่มีสิทธิ์เห็นค่างาน/รายรับ → ไม่มีแถบ ไม่มีเปอร์เซ็นต์ ไม่มีกำไร */
   | { kind: 'hidden'; cost: number; wage: number }
   /** มีสิทธิ์เห็น แต่ยังไม่ได้ตั้งค่างาน → บอกตรง ๆ ห้ามหารด้วยศูนย์ */
-  | { kind: 'no-contract'; income: number; cost: number; wage: number }
+  | {
+      kind: 'no-contract'
+      income: number
+      cost: number
+      wage: number
+      split: CostSplit
+      attendanceDays: number
+    }
   | {
       kind: 'ok'
       contract: number
@@ -38,12 +62,16 @@ export type MoneyBars =
       cost: number
       /** ส่วนที่มาจากค่าแรง — รวมอยู่ใน `cost` แล้ว ไม่ใช่ยอดที่ต้องบวกเพิ่ม */
       wage: number
+      split: CostSplit
+      attendanceDays: number
       /** เปอร์เซ็นต์จริงที่เอาไปแสดง — เกิน 100 ได้ และต้องเห็นว่าเกิน */
       paidPercent: number
       costPercent: number
       /** ความกว้างของแถบ — ตัดที่ 100 ไม่งั้นแถบล้นออกนอกกรอบ */
       paidWidth: number
       costWidth: number
+      /** ความกว้างของสามท่อนย่อยในแถบต้นทุน — บวกกันได้ `costWidth` พอดี */
+      costSegments: CostSplit
       profit: number
       /** ต้นทุนโตเร็วกว่าเงินที่เก็บได้ */
       overrun: boolean
@@ -52,11 +80,26 @@ export type MoneyBars =
 const pct = (part: number, whole: number): number => Math.round((part / whole) * 100)
 const clamp = (n: number): number => Math.max(0, Math.min(100, n))
 
+/**
+ * แบ่ง `cost` เป็นสามก้อน
+ *
+ * ค่าติดลบเกิดได้ทางเดียวคือข้อมูลเพี้ยน (วัสดุมากกว่ารายจ่ายทั้งหมด ซึ่ง
+ * เป็นไปไม่ได้เพราะวัสดุเป็นเซ็ตย่อยของรายจ่าย) — ตัดที่ 0 เพื่อไม่ให้แถบ
+ * กลายเป็นความกว้างติดลบ แล้วดันก้อนอื่นเพี้ยนตามไปทั้งแถว
+ */
+const splitCost = (cost: number, wage: number, material: number): CostSplit => ({
+  wage,
+  material,
+  other: Math.max(0, cost - wage - material),
+})
+
 export function moneyBars(m: SiteMoney): MoneyBars {
   // ค่างานหรือรายรับเป็น null แม้ค่าเดียว = ไม่มีสิทธิ์เห็นภาพเงินของโครงการนี้
   // (RPC คืน null ทั้งคู่พร้อมกันเสมอ · เช็คทั้งสองเพื่อไม่ให้บั๊กฝั่ง SQL
   //  กลายเป็น NaN บนหน้าจอ)
   const wage = m.wage ?? 0
+  const split = splitCost(m.cost, wage, m.material ?? 0)
+  const attendanceDays = m.attendanceDays ?? 0
 
   if (m.contract === null || m.income === null) {
     return { kind: 'hidden', cost: m.cost, wage }
@@ -64,10 +107,16 @@ export function moneyBars(m: SiteMoney): MoneyBars {
 
   // 🔴 ค่างาน 0 คือตัวหารเป็นศูนย์ · ปล่อยผ่านจะได้ `Infinity%` หรือ `NaN%`
   // ซึ่งเรนเดอร์ออกมาเป็นข้อความจริง ๆ บนหน้าจอโดยไม่มี error ที่ไหนเลย
-  if (m.contract <= 0) return { kind: 'no-contract', income: m.income, cost: m.cost, wage }
+  if (m.contract <= 0) {
+    return { kind: 'no-contract', income: m.income, cost: m.cost, wage, split, attendanceDays }
+  }
 
   const paidPercent = pct(m.income, m.contract)
   const costPercent = pct(m.cost, m.contract)
+  const costWidth = clamp(costPercent)
+  // สัดส่วนภายในแถบต้นทุน — คูณกับความกว้างที่ตัดแล้ว จึงบวกกันได้ `costWidth`
+  // พอดีเสมอ แม้ต้นทุนจะเกิน 100% ของค่างานจนแถบถูกตัด
+  const share = (part: number) => (m.cost > 0 ? (part / m.cost) * costWidth : 0)
 
   return {
     kind: 'ok',
@@ -75,10 +124,17 @@ export function moneyBars(m: SiteMoney): MoneyBars {
     income: m.income,
     cost: m.cost,
     wage,
+    split,
+    attendanceDays,
     paidPercent,
     costPercent,
     paidWidth: clamp(paidPercent),
-    costWidth: clamp(costPercent),
+    costWidth,
+    costSegments: {
+      wage: share(split.wage),
+      material: share(split.material),
+      other: share(split.other),
+    },
     // กำไรคงเหลือนับจาก **ต้นทุนที่เกิดขึ้นแล้ว** ไม่ใช่เงินที่เก็บได้
     // (DESIGN.md §5.1) — เก็บเงินช้าไม่ได้แปลว่ากำไรหด แปลว่ากระแสเงินสดตึง
     profit: m.contract - m.cost,

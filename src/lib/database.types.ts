@@ -328,6 +328,7 @@ export type Database = {
           created_at: string
           id: string
           is_active: boolean
+          is_material: boolean
           kind: Database["public"]["Enums"]["txn_kind"]
           name: string
           sort_order: number
@@ -336,6 +337,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_material?: boolean
           kind: Database["public"]["Enums"]["txn_kind"]
           name: string
           sort_order?: number
@@ -344,6 +346,7 @@ export type Database = {
           created_at?: string
           id?: string
           is_active?: boolean
+          is_material?: boolean
           kind?: Database["public"]["Enums"]["txn_kind"]
           name?: string
           sort_order?: number
@@ -1242,7 +1245,7 @@ export type Database = {
         }[]
       }
       report_by_category: {
-        Args: { p_from: string; p_site?: string; p_to: string }
+        Args: { p_from?: string; p_site?: string; p_to?: string }
         Returns: {
           category_id: string
           item_count: number
@@ -1343,8 +1346,10 @@ export type Database = {
       site_money: {
         Args: { p_site?: string }
         Returns: {
+          attendance_days: number
           contract_amount: number
           cost_expense: number
+          cost_material: number
           cost_pending: number
           cost_total: number
           cost_wage: number

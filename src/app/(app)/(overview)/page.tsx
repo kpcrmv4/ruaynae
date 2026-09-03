@@ -17,7 +17,7 @@ import { asNullableNumber, moneyBars } from '@/lib/money'
 import { Badge } from '@/components/ui/badge'
 import { Metric, MetricBar } from '@/components/ui/metric'
 import { EmptyState } from '@/components/ui/states'
-import { MoneyBars, OverrunBadge, ProfitChip } from '@/components/sites/money-bars'
+import { MoneyBars, OverrunBadge, ProfitChip, SiteSummary } from '@/components/sites/money-bars'
 import { TodayBoard } from '@/components/overview/today-board'
 
 export const metadata = { title: 'วันนี้' }
@@ -96,6 +96,8 @@ export default async function OverviewPage() {
         income: asNullableNumber(m.income_approved),
         cost: Number(m.cost_total),
         wage: Number(m.cost_wage),
+        material: Number(m.cost_material),
+        attendanceDays: Number(m.attendance_days),
       },
     ]),
   )
@@ -188,7 +190,7 @@ export default async function OverviewPage() {
             hint="ตามสัญญาของโครงการที่กำลังทำ"
           />
           <Metric
-            label="เก็บเงินแล้ว"
+            label="เบิกเงินสะสม"
             value={fmtBaht(activeIncome)}
             icon={Coins}
             tone="done"
@@ -199,7 +201,7 @@ export default async function OverviewPage() {
             }
           />
           <Metric
-            label="ต้นทุนที่จ่ายจริง"
+            label="ต้นทุนสะสม"
             value={fmtBaht(activeCost)}
             icon={TrendingDown}
             hint="รายจ่ายที่อนุมัติแล้ว + ค่าแรง"
@@ -265,17 +267,23 @@ export default async function OverviewPage() {
                 <div className="flex items-start justify-between gap-2">
                   <div className="min-w-0">
                     <div className="truncate text-base font-semibold text-ink">{site.name}</div>
-                    <div className="truncate text-sm text-muted-token">
-                      {site.client_name ?? 'ยังไม่ได้ระบุลูกค้า'}
-                      {bars.kind === 'ok' && (
-                        <>
-                          {' · ค่างาน '}
-                          <span className="tnum font-medium text-ink-2">
-                            {fmtBaht(bars.contract)}
-                          </span>
-                        </>
-                      )}
-                    </div>
+                    {/* ยังไม่ได้กรอกชื่อลูกค้า = ไม่ต้องเขียนอะไรเลย
+                        ข้อความ "ยังไม่ได้ระบุ" กินบรรทัดเท่าข้อมูลจริงแต่ไม่ได้
+                        บอกอะไร และไม่มีปุ่มให้แก้ตรงนั้นด้วย (เจ้าของสั่ง 4 ก.ย. 2569) */}
+                    {(site.client_name || bars.kind === 'ok') && (
+                      <div className="truncate text-sm text-muted-token">
+                        {site.client_name}
+                        {bars.kind === 'ok' && (
+                          <>
+                            {site.client_name ? ' · ' : ''}
+                            ค่างาน{' '}
+                            <span className="tnum font-medium text-ink-2">
+                              {fmtBaht(bars.contract)}
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                   <Badge tone={late ? 'urgent' : SITE_STATUS_TONE[site.status]} dot>
                     {late ? 'เลยกำหนด' : SITE_STATUS_LABEL[site.status]}
@@ -305,8 +313,9 @@ export default async function OverviewPage() {
                   )}
                 </div>
 
-                {/* แถบเก็บเงิน + ต้นทุน · หัวหน้าโครงการเห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ */}
+                {/* แถบเบิกเงิน + ต้นทุน · หัวหน้าโครงการเห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ */}
                 <MoneyBars bars={bars} />
+                <SiteSummary bars={bars} />
 
                 {bars.kind === 'ok' && (
                   <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-line-soft pt-2.5">

@@ -19,7 +19,8 @@ import { SITE_STATUS_LABEL, SITE_STATUS_TONE, timeProgress } from '@/lib/sites'
 import { asNullableNumber, moneyBars } from '@/lib/money'
 import { Badge } from '@/components/ui/badge'
 import { Metric, MetricBar } from '@/components/ui/metric'
-import { MoneyBars, OverrunBadge } from '@/components/sites/money-bars'
+import { MoneyBars, OverrunBadge, SiteSummary } from '@/components/sites/money-bars'
+import { CategoryTotals } from '@/components/sites/category-totals'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
 import { SiteDetailActions } from './site-detail-client'
@@ -62,6 +63,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
     txnResult,
     pickerSites,
     pickerCategories,
+    catTotals,
   ] = await Promise.all([
     sb
       .from('site_supervisors')
@@ -103,6 +105,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           income: asNullableNumber(row?.income_approved),
           cost: Number(row?.cost_total ?? 0),
           wage: Number(row?.cost_wage ?? 0),
+          material: Number(row?.cost_material ?? 0),
+          attendanceDays: Number(row?.attendance_days ?? 0),
         }
       }),
     // ── รายรับ-รายจ่ายล่าสุดของโครงการนี้ ────────────────────────────────
@@ -141,6 +145,19 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         if (e) console.error('[sites] อ่านหมวดไม่ได้', e.message)
         return data ?? []
       }),
+    // ── ยอดรวมแยกหมวดของ **ทั้งโครงการ** ──────────────────────────────
+    // 🔴 ไม่ใช่ผลบวกของ 10 แถวล่าสุดที่วาดอยู่ข้างล่าง — สรุปที่บวกมาจาก
+    // หน้าต่างที่ตัดแล้วคือตัวเลขที่ผิดโดยดูน่าเชื่อถือ · ส่ง null ทั้งช่วงวัน
+    // = ไม่จำกัดช่วง · RPC เป็น `security invoker` + เช็ค is_owner() ข้างใน
+    // จึงคืน 0 แถวให้หัวหน้าโครงการเอง ไม่ต้องมี if ตรงนี้
+    sb
+      .rpc('report_by_category', { p_site: id })
+      .order('total', { ascending: false })
+      .range(0, PAGE_SIZE * 2 - 1)
+      .then(({ data, error: e }) => {
+        if (e) console.error('[sites] อ่านยอดรวมแยกหมวดไม่ได้', e.message)
+        return data ?? []
+      }),
   ])
 
   const today = todayInBangkok()
@@ -172,9 +189,12 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
               {SITE_STATUS_LABEL[site.status]}
             </Badge>
           </div>
-          <p className="mt-0.5 text-sm text-muted-token">
-            {site.client_name ? `ลูกค้า: ${site.client_name}` : 'ยังไม่ได้ระบุลูกค้า'}
-          </p>
+          {/* ไม่มีชื่อลูกค้า = ไม่เขียนอะไรเลย · "ยังไม่ได้ระบุ" กินบรรทัดเท่าข้อมูลจริง
+              แต่ไม่ได้บอกอะไรใหม่ (เจ้าของสั่ง 4 ก.ย. 2569) — ช่องกรอกอยู่ในกล่อง
+              "แก้ไข" ซึ่งเจ้าของเห็นอยู่แล้วทางขวา */}
+          {site.client_name && (
+            <p className="mt-0.5 text-sm text-muted-token">ลูกค้า: {site.client_name}</p>
+          )}
         </div>
         {isOwner && (
           <SiteDetailActions
@@ -230,7 +250,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
       </nav>
 
       {/* ── ความคืบหน้า — สามแถบ (DESIGN.md §5.1) ─────────────────────
-          เวลา · เก็บเงินแล้ว · ต้นทุนที่จ่ายจริง
+          เวลา · เบิกเงินสะสม · ต้นทุนสะสม
           หัวหน้าโครงการเห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ เพราะเปอร์เซ็นต์
           ต้องหารด้วยค่างาน ซึ่งเป็นความลับจากเขา */}
       <section className="panel mb-4 p-4">
@@ -269,6 +289,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
 
         <MoneyBars bars={bars} />
+        <SiteSummary bars={bars} />
 
         {bars.kind === 'ok' && bars.overrun && (
           <div className="mt-3">
@@ -292,8 +313,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             label="ค่างานตามสัญญา"
             value={bars.kind === 'ok' ? fmtBaht(bars.contract) : 'ยังไม่ได้ตั้ง'}
           />
-          <Metric label="เก็บเงินแล้ว" value={fmtBaht(bars.income)} tone="done" />
-          <Metric label="ต้นทุนที่จ่ายจริง" value={fmtBaht(bars.cost)} />
+          <Metric label="เบิกเงินสะสม" value={fmtBaht(bars.income)} tone="done" />
+          <Metric label="ต้นทุนสะสม" value={fmtBaht(bars.cost)} />
           <Metric
             label="กำไรคงเหลือ (ประมาณ)"
             value={bars.kind === 'ok' ? fmtBaht(bars.profit) : '—'}
@@ -442,6 +463,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
               ดูทั้งหมด
             </Link>
           </div>
+
+          <CategoryTotals rows={catTotals} />
 
           {txnResult.error ? (
             <p className="px-4 py-6 text-center text-sm text-urgent">

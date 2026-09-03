@@ -18,6 +18,7 @@ export const CATEGORY_ERRORS: Record<string, string> = {
   NAME_TAKEN: 'มีหมวดชื่อนี้ในชนิดเดียวกันอยู่แล้ว',
   KIND_INVALID: 'ชนิดของหมวดไม่ถูกต้อง',
   SORT_ORDER_INVALID: 'ลำดับต้องเป็นจำนวนเต็ม 1–999',
+  MATERIAL_EXPENSE_ONLY: 'หมวดรายรับตั้งเป็นค่าวัสดุไม่ได้',
   NOT_FOUND: 'ไม่พบหมวดนี้',
   NOTHING_TO_UPDATE: 'ไม่มีอะไรให้บันทึก',
 }

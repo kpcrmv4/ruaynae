@@ -198,6 +198,12 @@ export const bottomNavFor = (role: Role): NavItem[] => [
   { href: '/', label: 'วันนี้', sub: '', icon: Home },
   role === 'owner'
     ? { href: '/approvals', label: 'รออนุมัติ', sub: '', icon: Inbox }
-    : { href: '/attendance', label: 'คนเข้าโครงการ', sub: '', icon: CalendarDays },
+    /*
+      🔴 ป้ายในแถบล่างสั้นกว่าชื่อเมนูเต็มโดยตั้งใจ — ช่องหนึ่งกว้าง 1/5 ของจอ
+      บนจอ 390px เหลือที่ให้ตัวหนังสือ 70px ส่วน "คนเข้าโครงการ" ที่ 10.5px
+      กว้าง 74px จึงถูก `truncate` ตัดเป็น "คนเข้าโครงกา…" ซึ่งอ่านแล้วเดาไม่ออก
+      · ชื่อเต็มยังอยู่ครบในแถบข้างและในแผ่น "เพิ่มเติม"
+    */
+    : { href: '/attendance', label: 'คนเข้างาน', sub: '', icon: CalendarDays },
   { href: '/ledger', label: 'รายการ', sub: '', icon: Receipt },
 ]

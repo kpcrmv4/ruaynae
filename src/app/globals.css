@@ -117,8 +117,17 @@
   /* ── แถบความคืบหน้า 3 เส้น — สามความหมาย ต้องแยกออกจากกันได้ในแวบเดียว ── */
   --bar-time: #2563eb;   /* เวลาที่ผ่านไป   */
   --bar-paid: #0c6b3c;   /* เงินที่เก็บได้   */
-  --bar-cost: #b45309;   /* ต้นทุนที่จ่ายจริง */
+  --bar-cost: #b45309;   /* ต้นทุนสะสม (ทั้งก้อน) */
   --bar-track: #e2e8f2;
+
+  /* ── สามท่อนของแถบต้นทุน — ไล่เฉดเดียวกับ `--bar-cost` ไม่ใช่สามสีคนละเรื่อง
+     สามก้อนนี้เป็น**ส่วนของยอดเดียวกัน** ใช้สีคนละวงศ์เมื่อไหร่ สายตาจะอ่านว่า
+     เป็นสามแถบที่ไม่เกี่ยวกัน แล้วเลิกบวกมันเข้าหากันในหัว
+     · บนพื้นสว่าง เข้ม = ก้อนหลัก · จุดสีในบรรทัดตัวเลขข้างล่างเป็นตัวผูก
+       ท่อนกับชื่อ จึงไม่ต้องพึ่งว่าสามเฉดนี้ต่างกันพอในแถบสูง 8px */
+  --bar-cost-wage: #92400e;
+  --bar-cost-material: #c2680a;
+  --bar-cost-other: #e9a94f;
 }
 
 .dark {
@@ -179,6 +188,12 @@
   --bar-paid: #34c07d;
   --bar-cost: #e8a34a;
   --bar-track: #28313e;
+
+  /* บนพื้นเข้มกลับด้าน: สว่าง = ก้อนหลัก · ท่อนที่จางที่สุดยังต้องแยกออกจาก
+     `--bar-track` ให้ได้ ไม่งั้นส่วน "อื่น ๆ" จะกลายเป็นช่องว่าง */
+  --bar-cost-wage: #f0ad5a;
+  --bar-cost-material: #cf8938;
+  --bar-cost-other: #a5702f;
 }
 
 @theme inline {
@@ -250,6 +265,9 @@
   --color-bar-time: var(--bar-time);
   --color-bar-paid: var(--bar-paid);
   --color-bar-cost: var(--bar-cost);
+  --color-bar-cost-wage: var(--bar-cost-wage);
+  --color-bar-cost-material: var(--bar-cost-material);
+  --color-bar-cost-other: var(--bar-cost-other);
   --color-bar-track: var(--bar-track);
 }
 

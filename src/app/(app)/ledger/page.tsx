@@ -9,6 +9,7 @@ import { TXN_STATUSES, TXN_STATUS_LABEL, isTxnKind, isTxnStatus } from '@/lib/tr
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
+import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
 
@@ -206,11 +207,22 @@ export default async function LedgerPage({
       sites={sitesResult.data ?? []}
       categories={categoriesResult.data ?? []}
     >
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-ink">รายรับ-รายจ่าย</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          {isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของโครงการที่คุณดูแล'}
-        </p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink">รายรับ-รายจ่าย</h1>
+          <p className="mt-0.5 text-sm text-muted-token">
+            {isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของโครงการที่คุณดูแล'}
+          </p>
+        </div>
+        {/* บันทึกได้จากหน้านี้เลย ไม่ต้องเด้งไป /entry แล้วเดินกลับมาดูว่าลงไหม
+            · กล่องใช้ฟอร์มชุดเดียวกับหน้า /entry ทุกช่อง */}
+        <TxnCreateButton
+          role={me.role}
+          today={today}
+          sites={sitesResult.data ?? []}
+          categories={categoriesResult.data ?? []}
+          initialSiteId={sp.site && sp.site !== 'central' ? sp.site : undefined}
+        />
       </div>
 
       {/* เจ้าของเท่านั้นที่มีทั้งสองชนิดให้สลับ — หัวหน้าโครงการเห็นแต่รายจ่าย
@@ -237,6 +249,31 @@ export default async function LedgerPage({
           ))}
         </div>
       )}
+
+      {/* ── ตัวกรองโครงการ / ส่วนกลาง ─────────────────────────────────
+          เดิมกรองได้เฉพาะตอนเข้ามาจากปุ่มลัดของหน้าโครงการ · หน้านี้จึงไม่มี
+          ทางเลือกขอบเขตเองเลย (เจ้าของแจ้ง 4 ก.ย. 2569) · เป็นฟอร์ม GET
+          เหมือนตัวกรองอื่นทั้งแอป — สถานะอยู่บน URL แชร์ลิงก์ได้ */}
+      <form action="/ledger" method="get" className="mb-3 flex flex-wrap gap-2">
+        {Object.entries(Object.fromEntries(keep)).map(([k, v]) =>
+          k === 'site' ? null : <input key={k} type="hidden" name={k} value={v} />,
+        )}
+        <select
+          name="site"
+          defaultValue={sp.site ?? ''}
+          aria-label="กรองตามโครงการ"
+          className="input-base w-auto min-w-52 max-w-full py-2"
+        >
+          <option value="">ทุกโครงการ + ส่วนกลาง</option>
+          {isOwner && <option value="central">เฉพาะส่วนกลาง (ไม่ผูกโครงการ)</option>}
+          {(sitesResult.data ?? []).map((s) => (
+            <option key={s.id} value={s.id}>{s.name}</option>
+          ))}
+        </select>
+        <button type="submit" className="btn-secondary shrink-0 px-4 py-2">
+          กรอง
+        </button>
+      </form>
 
       <ListToolbar
         basePath="/ledger"

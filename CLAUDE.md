@@ -212,9 +212,29 @@ Dashboard → **Settings → API Keys** → แท็บ **"Publishable and secr
 - เรียลไทม์ = **broadcast-from-database** (trigger → `realtime.messages` + policy) ไม่ใช่ subscribe ตาราง
 - งานตามเวลา = **pg_cron + pg_net** ไม่ใช่ Vercel cron (Hobby ได้แค่ 2 งาน วันละครั้ง)
 - pg_cron ทำงานเป็น **UTC** — งานที่ต้องยิงตอน 8 โมงเช้าไทยคือ `0 1 * * *`
-- งานที่ต้องมี:
-  - `sweep-orphans` ทุกชั่วโมง → เรียก `/api/cron/sweep-orphans` ลบไฟล์ R2 ที่ `upload_intents` หมดอายุแล้วไม่มีคนใช้
-  - `daily-digest` 8 โมงเช้าไทย → แจ้งเจ้าของว่ามีกี่รายการค้างอนุมัติ
+- ✅ **ติดตั้งและทำงานจริงแล้ว 4 ก.ย. 2569** — `pg_cron` + `pg_net` เปิดใช้บนโปรเจ็คแล้ว
+  ยิงเข้า production (`https://cpie.vercel.app`) ได้ 200 จริง ตรวจจาก `net._http_response`
+
+| งาน | ตาราง (UTC) | เวลาไทย | ยิงไปที่ |
+|---|---|---|---|
+| `sweep-orphans` | `7 * * * *` | ทุกชั่วโมง | `/api/cron/sweep-orphans` — ลบไฟล์ R2 ที่ `upload_intents` หมดอายุแล้วไม่มีคนใช้ |
+| `recurring-expenses` | `0 1 * * *` | 08:00 | `/api/cron/recurring` — ลงรายจ่ายรายเดือนที่ถึงกำหนด |
+| `push-dispatch` | `*/5 * * * *` | ทุก 5 นาที | `/api/cron/push-dispatch` — ส่ง push ที่ค้างคิว |
+
+- 🔴 **URL และ `CRON_SECRET` อยู่ใน Supabase Vault ไม่ใช่ในไฟล์ migration** —
+  commit ความลับเมื่อไหร่ก็ติดอยู่ในประวัติ git ตลอดไป (§13 ข้อ 4)
+  · ตัวเติมคือ `node scripts/setup-cron.mjs` ซึ่งอ่านจาก `.env.local`
+  · ฟังก์ชัน `public.cron_call(path)` เป็นตัวอ่าน Vault แล้วยิง `net.http_get`
+  ⚠️ **เปลี่ยนโดเมนหรือหมุน `CRON_SECRET` ต้องรัน `setup-cron.mjs` ซ้ำ**
+  ไม่งั้นงานจะยิงด้วยกุญแจเดิมแล้วโดน 401 เงียบ ๆ ทุกวัน
+- ตรวจว่าทำงานจริงยังไง (ไม่ใช่แค่ "ตั้งไว้แล้ว"):
+  ```sql
+  select jobname, schedule, active from cron.job;
+  select status_code, left(content,120), error_msg from net._http_response order by id desc limit 5;
+  ```
+  · `cron.job_run_details` บอกว่างานถูกเรียกไหม · `net._http_response` บอกว่าปลายทางตอบอะไร
+  — ต้องดูตัวที่สอง เพราะงานที่ "สำเร็จ" อาจยิงไปแล้วได้ 401 ก็ได้
+- `daily-digest` (แจ้งเจ้าของว่ามีกี่รายการค้างอนุมัติ) **ยังไม่ได้ทำ** — ยังไม่มี route
 
 ## 9. รูปสลิป — Cloudflare R2
 

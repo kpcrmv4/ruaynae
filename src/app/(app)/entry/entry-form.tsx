@@ -1,517 +1,93 @@
 'use client'
 
-import { Banknote, Camera, Check, Coins, ImagePlus, Landmark, Loader2, Wallet, X } from 'lucide-react'
+import { Check, Loader2, X } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { useMemo, useRef, useState } from 'react'
-import { toast } from 'sonner'
 import type { Role } from '@/lib/auth/current-user'
-import { IMAGE_UPLOAD_ACCEPT, MAX_ATTACHMENTS } from '@/lib/constants'
 import { fmtBaht } from '@/lib/format'
-import { slipUploadError, uploadSlip, type UploadedSlip } from '@/lib/slip-upload'
 import {
-  INCOME_KINDS, INCOME_KIND_LABEL, PAY_METHODS, PAY_METHOD_LABEL, txnError,
-  type IncomeKind, type PayMethod, type TxnKind,
-} from '@/lib/transactions'
+  TxnDraftFields, TxnKindSwitch, useTxnDraft,
+  type DraftCategory, type DraftSite,
+} from '@/components/ledger/txn-draft'
+import type { TxnKind } from '@/lib/transactions'
 
-type Site = { id: string; name: string }
-type Category = { id: string; name: string; kind: TxnKind }
-
-const fail = txnError
-
-
-const CENTRAL = '__central__'
-
+/**
+ * หน้าบันทึกเต็มจอ — **เปลือก**ของฟอร์มที่อยู่ใน `components/ledger/txn-draft.tsx`
+ *
+ * ช่องกรอกและตรรกะทั้งหมดอยู่ที่นั่นที่เดียว เพราะกล่องบันทึกบน `/ledger`
+ * ใช้ชุดเดียวกัน · ที่ต่างกันคือปุ่มบันทึกลอยเหนือแถบเมนู กับหัวเรื่องเท่านั้น
+ */
 export function EntryForm({
   role, today, sites, categories, initialKind = 'expense', initialSiteId,
 }: {
   role: Role
-  /** วันนี้ตามเวลาไทย คำนวณฝั่งเซิร์ฟเวอร์ — ห้ามใช้ new Date() ที่นี่
-   *  เครื่องผู้ใช้ตั้งเขตเวลาอะไรก็ได้ และค่านั้นจะไม่ตรงกับที่เซิร์ฟเวอร์ตรวจ */
   today: string
-  sites: Site[]
-  categories: Category[]
+  sites: DraftSite[]
+  categories: DraftCategory[]
   /** เปิดหน้าจากแผ่นบันทึกประจำวันด้วย ?kind=income — หน้า page กรอง role ให้แล้ว */
   initialKind?: TxnKind
   /** เปิดหน้าจากปุ่มลัดบนหน้าโครงการด้วย ?site= — หน้า page ตรวจแล้วว่าโครงการนี้เลือกได้จริง */
   initialSiteId?: string
 }) {
   const router = useRouter()
-  const isOwner = role === 'owner'
-
-  const [kind, setKind] = useState<TxnKind>(initialKind)
-  const [busy, setBusy] = useState(false)
-  const [fieldError, setFieldError] = useState<{ field: string; text: string } | null>(null)
-  const [slips, setSlips] = useState<UploadedSlip[]>([])
-  const [uploading, setUploading] = useState(false)
-  const cameraRef = useRef<HTMLInputElement>(null)
-  const galleryRef = useRef<HTMLInputElement>(null)
-  const amountRef = useRef<HTMLInputElement>(null)
-  const [form, setForm] = useState({
-    // "ส่วนกลาง" มีเฉพาะฝั่งรายจ่ายของเจ้าของ — เปิดหน้าแบบรายรับต้องไม่ตกไปที่ค่านั้น
-    siteId:
-      initialSiteId ?? sites[0]?.id ?? (isOwner && initialKind === 'expense' ? CENTRAL : ''),
-    categoryId: '',
-    amount: '',
-    txnDate: today,
-    payMethod: 'cash' as PayMethod,
-    incomeKind: 'installment' as IncomeKind,
-    installmentNo: '',
-    note: '',
-  })
-
-  // หมวดกรองตามชนิดที่เลือกอยู่ — เลือกรายรับแล้วต้องไม่เห็นหมวดของรายจ่าย
-  const visibleCategories = useMemo(
-    () => categories.filter((c) => c.kind === kind),
-    [categories, kind],
-  )
-
-  const set = <K extends keyof typeof form>(k: K, v: (typeof form)[K]) => {
-    setForm((f) => ({ ...f, [k]: v }))
-    setFieldError(null)
-  }
-
-  const switchKind = (next: TxnKind) => {
-    setKind(next)
-    // หมวดของอีกชนิดใช้ไม่ได้ — ล้างทิ้งแทนที่จะปล่อยให้ส่งไปแล้วโดนปฏิเสธ
-    // โครงการที่เลือกไว้ต้องอยู่ต่อ (เข้ามาจากปุ่มลัดของโครงการก็ยังเป็นโครงการนั้น) —
-    // ยกเว้น "ส่วนกลาง" ซึ่งฝั่งรายรับไม่มีตัวเลือกนี้
-    setForm((f) => ({
-      ...f,
-      categoryId: '',
-      siteId: next === 'income' && f.siteId === CENTRAL ? (sites[0]?.id ?? '') : f.siteId,
-    }))
-    setFieldError(null)
-  }
-
-  const amountNumber = Number(form.amount.replace(/,/g, ''))
-  const amountValid = Number.isFinite(amountNumber) && amountNumber > 0
-
-  /**
-   * บีบรูปแล้วอัปตรงเข้า R2 · ขั้นตอนจริงอยู่ใน `lib/slip-upload.ts`
-   * ที่เดียวกับที่กล่องแก้ไขรายการเรียกใช้
-   */
-  async function addFile(file: File) {
-    if (slips.length >= MAX_ATTACHMENTS) {
-      toast.error('แนบได้ไม่เกิน ' + MAX_ATTACHMENTS + ' รูปต่อรายการ')
-      return
-    }
-    setUploading(true)
-    try {
-      const slip = await uploadSlip(file, form.siteId === CENTRAL ? null : form.siteId)
-      setSlips((cur) => [...cur, slip])
-    } catch (e) {
-      // แสดงเฉพาะข้อความที่เราเขียนเอง — error จากเบราว์เซอร์หรือจากการโหลด
-      // chunk เป็นภาษาอังกฤษล้วน และไม่บอกอะไรกับคนที่ยืนอยู่กลางโครงการ
-      toast.error(slipUploadError(e))
-    } finally {
-      setUploading(false)
-    }
-  }
-
-  /**
-   * เอารูปออกจากรายการที่กำลังจะบันทึก
-   *
-   * ไฟล์ที่อัปไปแล้วยังอยู่ใน R2 — ปล่อยให้ตัวกวาด (sweep-orphans) จัดการ
-   * เมื่อ upload_intents หมดอายุ · ลบทันทีที่นี่จะต้องมี endpoint ลบไฟล์
-   * ซึ่งเป็นปุ่มที่ใครก็ยิงได้ถ้าเดาคีย์ถูก และเราไม่ได้ต้องการมัน
-   */
-  const removeSlip = (key: string) => {
-    setSlips((cur) => {
-      const gone = cur.find((s) => s.objectKey === key)
-      if (gone) URL.revokeObjectURL(gone.preview)
-      return cur.filter((s) => s.objectKey !== key)
-    })
-  }
-
-  async function submit() {
-    if (busy) return
-    if (!amountValid) return setFieldError({ field: 'amount', text: 'จำนวนเงินต้องมากกว่า 0' })
-    if (!form.categoryId) return setFieldError({ field: 'category', text: 'กรุณาเลือกหมวด' })
-    if (!isOwner && !form.siteId) return setFieldError({ field: 'site', text: 'กรุณาเลือกโครงการ' })
-
-    setBusy(true)
-    try {
-      const r = await fetch('/api/transactions', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          kind,
-          siteId: form.siteId === CENTRAL ? null : form.siteId,
-          categoryId: form.categoryId,
-          amount: amountNumber,
-          txnDate: form.txnDate,
-          payMethod: form.payMethod,
-          note: form.note,
-          ...(kind === 'income'
-            ? {
-                incomeKind: form.incomeKind,
-                ...(form.incomeKind === 'installment' ? { installmentNo: form.installmentNo } : {}),
-              }
-            : {}),
-          // 🔴 หนึ่งค่าต่อ "หนึ่งครั้งที่ตั้งใจบันทึก" — ยิงซ้ำด้วยค่าเดิม
-          // ฐานข้อมูลจะปฏิเสธแถวที่สอง · ปุ่ม disabled กันได้แค่กรณีปกติ
-          // เน็ตช้าแล้วกดซ้ำ หรือเปิดสองแท็บ ยังผ่านมาได้
-          clientRef: crypto.randomUUID(),
-          attachments: slips.map((s) => ({ objectKey: s.objectKey, thumbKey: s.thumbKey })),
-        }),
-      })
-      const b = await r.json().catch(() => ({}))
-      if (!r.ok) {
-        toast.error(fail(b.error))
-        return
-      }
-      // แนบไม่ติดแต่ตัวเลขบันทึกแล้ว — ต้องบอกให้ชัด ไม่ใช่ขึ้น "สำเร็จ" เฉย ๆ
-      // แล้วผู้ใช้เชื่อว่าสลิปอยู่ในระบบทั้งที่ไม่มี
-      if (b.attachError) toast.error(fail(b.attachError))
-      else toast.success(isOwner ? 'บันทึกแล้ว' : 'บันทึกแล้ว รอเจ้าของอนุมัติ')
-      for (const s of slips) URL.revokeObjectURL(s.preview)
-      setSlips([])
-      setForm((f) => ({ ...f, amount: '', note: '', installmentNo: '' }))
-      // จังหวะ "บันทึกรายการต่อ" — โครงการ หมวด วันที่ วิธีจ่าย ค้างไว้ให้
-      // เคอร์เซอร์กลับไปที่ช่องยอดเงิน คีย์บิลใบถัดไปได้เลย
-      amountRef.current?.focus()
-      router.refresh()
-    } catch {
-      toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
-    } finally {
-      setBusy(false)
-    }
-  }
-
-  const err = (field: string) => (fieldError?.field === field ? fieldError.text : null)
-
-  // กำลังคีย์ให้โครงการไหน — อ่านจาก state ตัวเดียวกับกล่องเลือกข้างล่าง
-  // จึงเปลี่ยนตามทันทีที่สลับ ไม่ใช่ค่าที่ค้างมาจากตอนเปิดหน้า
-  const currentSite = sites.find((s) => s.id === form.siteId)
-  const scopeLabel =
-    form.siteId === CENTRAL
-      ? 'ส่วนกลาง (ไม่ผูกโครงการ)'
-      : (currentSite?.name ?? 'ยังไม่ได้เลือกโครงการ')
+  const draft = useTxnDraft({ role, today, sites, categories, initialKind, initialSiteId })
 
   // ยกเลิกแล้วกลับไปหน้าโครงการที่กำลังคีย์ให้ · ส่วนกลางไม่มีหน้าของตัวเอง
   // จึงกลับหน้าแรก แทนที่จะพาไปหน้าที่ไม่เกี่ยวกับสิ่งที่เพิ่งทำ
-  const cancelHref = currentSite ? `/sites/${currentSite.id}` : '/'
+  const cancelHref = draft.currentSite ? `/sites/${draft.currentSite.id}` : '/'
+
+  const save = async () => {
+    if (await draft.submit()) {
+      // จังหวะ "บันทึกรายการต่อ" — โครงการ หมวด วันที่ วิธีจ่าย ค้างไว้ให้
+      // เคอร์เซอร์กลับไปที่ช่องยอดเงิน คีย์บิลใบถัดไปได้เลย
+      draft.amountRef.current?.focus()
+      router.refresh()
+    }
+  }
+
+  const blocked = draft.busy || draft.uploading
 
   return (
     <div className="mx-auto w-full max-w-xl">
       <h1 className="mb-1 text-2xl font-bold text-ink">
-        {isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
+        {draft.isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
       </h1>
       {/* 🔴 ตอบ "คีย์ให้โครงการไหน" ตั้งแต่บรรทัดบน ไม่ใช่ให้ตาเลื่อนลงไปหา
           กล่องเลือกกลางฟอร์ม · คนคีย์บิลเป็นตั้งจะสลับโครงการแล้วลืม แล้วยอด
           ไปเข้าโครงการผิดโดยไม่มีอะไรทัก */}
       <p className="mb-1 flex flex-wrap items-baseline gap-x-1.5 text-sm">
         <span className="text-muted-token">กำลังบันทึกของ</span>
-        <span className="min-w-0 font-semibold text-ink">{scopeLabel}</span>
+        <span className="min-w-0 font-semibold text-ink">{draft.scopeLabel}</span>
       </p>
       <p className="mb-5 text-sm text-muted-token">
-        {isOwner
+        {draft.isOwner
           ? 'รายการที่คุณคีย์เองจะถูกอนุมัติทันที'
           : 'รายการที่คีย์จะเข้าคิวรอเจ้าของอนุมัติ'}
       </p>
 
-      {/* ── สลับรายรับ/รายจ่าย — เจ้าของเท่านั้น ─────────────────────
-          หัวหน้าโครงการไม่มีปุ่มนี้เลย ไม่ใช่มีแล้วกดไม่ได้ · ปุ่มที่กดแล้วถูก
-          ปฏิเสธทุกครั้งคือปุ่มที่ไม่ควรมี */}
-      {isOwner && (
-        <div className="mb-4 grid grid-cols-2 gap-2">
-          {(['expense', 'income'] as const).map((k) => {
-            const active = kind === k
-            const Icon = k === 'income' ? Banknote : Wallet
-            return (
-              <button
-                key={k}
-                type="button"
-                onClick={() => switchKind(k)}
-                aria-pressed={active}
-                className={`flex items-center justify-center gap-2 rounded-md border px-4 py-3 text-base font-semibold transition-colors duration-150 ${
-                  active
-                    ? k === 'income'
-                      ? 'border-income bg-income-bg text-income'
-                      : 'border-expense bg-expense-bg text-expense'
-                    : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2'
-                }`}
-              >
-                <Icon className="size-4.5" />
-                {k === 'income' ? 'รายรับ' : 'รายจ่าย'}
-              </button>
-            )
-          })}
-        </div>
-      )}
+      <TxnKindSwitch draft={draft} />
 
-      <div className="panel space-y-4 p-4">
-        {/* จำนวนเงินอยู่บนสุดและตัวใหญ่ที่สุด — เป็นสิ่งที่คนมาที่หน้านี้เพื่อกรอก */}
-        <div>
-          <label htmlFor="amount" className="label-base">จำนวนเงิน (บาท)</label>
-          <input
-            id="amount"
-            ref={amountRef}
-            type="text"
-            inputMode="decimal"
-            value={form.amount}
-            onChange={(e) => set('amount', e.target.value)}
-            placeholder="0"
-            aria-invalid={err('amount') ? 'true' : undefined}
-            className="input-base py-3 text-2xl font-bold tnum"
-            autoFocus
-          />
-          {err('amount') ? (
-            <p className="mt-1 text-sm text-urgent">{err('amount')}</p>
-          ) : (
-            amountValid && (
-              <p className="mt-1 text-sm text-muted-token tnum">{fmtBaht(amountNumber)}</p>
-            )
-          )}
-        </div>
-
-        {/* ── หมวดเป็นชิปแตะได้เลย ไม่ใช่กล่องเลือกที่ต้องเปิดก่อน ────────
-            หมวดมีไม่กี่ตัวและใช้ซ้ำทุกวัน — เห็นครบ แตะเดียวจบ และตัวที่เลือก
-            ค้างอยู่ให้เห็นตอน "บันทึกรายการต่อ" ว่ากำลังคีย์หมวดเดิมอยู่ */}
-        <div>
-          <span id="category-label" className="label-base">หมวด</span>
-          {visibleCategories.length === 0 ? (
-            <p className="text-sm text-muted-token">
-              ยังไม่มีหมวดของ{kind === 'income' ? 'รายรับ' : 'รายจ่าย'} — เจ้าของเพิ่มได้ที่หน้าตั้งค่า
-            </p>
-          ) : (
-            <div role="radiogroup" aria-labelledby="category-label" className="flex flex-wrap gap-2">
-              {visibleCategories.map((c) => {
-                const active = form.categoryId === c.id
-                return (
-                  <button
-                    key={c.id}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => set('categoryId', c.id)}
-                    className={`min-h-11 rounded-md border px-3.5 text-sm transition-colors duration-100 ${
-                      active
-                        ? 'border-brand bg-brand-tint font-semibold text-brand-on-tint'
-                        : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2'
-                    }`}
-                  >
-                    {c.name}
-                  </button>
-                )
-              })}
-            </div>
-          )}
-          {err('category') && <p className="mt-1 text-sm text-urgent">{err('category')}</p>}
-        </div>
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="site" className="label-base">โครงการ</label>
-            <select
-              id="site"
-              value={form.siteId}
-              onChange={(e) => set('siteId', e.target.value)}
-              aria-invalid={err('site') ? 'true' : undefined}
-              className="input-base"
-            >
-              {sites.length === 0 && <option value="">— ยังไม่มีโครงการที่คุณดูแล —</option>}
-              {sites.map((s) => (
-                <option key={s.id} value={s.id}>{s.name}</option>
-              ))}
-              {/* ส่วนกลาง = ค่าน้ำมัน ค่าทางด่วน ค่าออฟฟิศ ที่ไม่ใช่ต้นทุนของโครงการไหน
-                  หัวหน้าโครงการไม่มีตัวเลือกนี้ — เป็นค่าใช้จ่ายของเจ้าของ */}
-              {isOwner && kind === 'expense' && (
-                <option value={CENTRAL}>ส่วนกลาง (ไม่ผูกโครงการ)</option>
-              )}
-            </select>
-            {err('site') && <p className="mt-1 text-sm text-urgent">{err('site')}</p>}
-          </div>
-
-          <div>
-            {/* 🔴 input type=date แสดงปี พ.ศ. บนเครื่องที่ตั้งภาษาไทย
-                แต่ค่าที่อ่านได้เป็น ค.ศ. เสมอ — ส่งลงฐานข้อมูลได้ตรง ๆ */}
-            <label htmlFor="date" className="label-base">วันที่</label>
-            <input
-              id="date"
-              type="date"
-              max={today}
-              value={form.txnDate}
-              onChange={(e) => set('txnDate', e.target.value)}
-              className="input-base"
-            />
-          </div>
-
-          <div>
-            {/* สองทางเลือกที่สลับกันทุกรายการ — สองปุ่มเห็นสถานะค้าง เร็วกว่ากล่องเลือก */}
-            <span id="pay-label" className="label-base">จ่ายด้วย</span>
-            <div role="radiogroup" aria-labelledby="pay-label" className="grid grid-cols-2 gap-2">
-              {PAY_METHODS.map((m) => {
-                const active = form.payMethod === m
-                const Icon = m === 'cash' ? Coins : Landmark
-                return (
-                  <button
-                    key={m}
-                    type="button"
-                    role="radio"
-                    aria-checked={active}
-                    onClick={() => set('payMethod', m)}
-                    className={`flex min-h-11 items-center justify-center gap-2 rounded-md border px-3 text-sm transition-colors duration-100 ${
-                      active
-                        ? 'border-brand bg-brand-tint font-semibold text-brand-on-tint'
-                        : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2'
-                    }`}
-                  >
-                    <Icon className="size-4.5" strokeWidth={1.8} />
-                    {PAY_METHOD_LABEL[m]}
-                  </button>
-                )
-              })}
-            </div>
-          </div>
-
-          {kind === 'income' && (
-            <>
-              <div>
-                <label htmlFor="incomeKind" className="label-base">รับเป็นค่าอะไร</label>
-                <select
-                  id="incomeKind"
-                  value={form.incomeKind}
-                  onChange={(e) => set('incomeKind', e.target.value as IncomeKind)}
-                  className="input-base"
-                >
-                  {INCOME_KINDS.map((k) => (
-                    <option key={k} value={k}>{INCOME_KIND_LABEL[k]}</option>
-                  ))}
-                </select>
-              </div>
-              {form.incomeKind === 'installment' && (
-                <div>
-                  <label htmlFor="installment" className="label-base">งวดที่</label>
-                  <input
-                    id="installment"
-                    type="text"
-                    inputMode="numeric"
-                    value={form.installmentNo}
-                    onChange={(e) => set('installmentNo', e.target.value)}
-                    placeholder="เช่น 2"
-                    className="input-base tnum"
-                  />
-                </div>
-              )}
-            </>
-          )}
-        </div>
-
-        <div>
-          <label htmlFor="note" className="label-base">รายละเอียด (ไม่บังคับ)</label>
-          <input
-            id="note"
-            value={form.note}
-            onChange={(e) => set('note', e.target.value)}
-            placeholder="เช่น ปูนซีเมนต์ 20 ถุง ร้านเจริญค้าวัสดุ"
-            className="input-base"
-          />
-        </div>
-
-        {/* ── แนบสลิป ─────────────────────────────────────────────────
-            🔴 **สองปุ่มแยกกัน** ไม่ใช่ปุ่มเดียวแล้วให้ระบบถาม —
-            คนกลางโครงการที่ถือมือถือเปื้อนปูนรู้อยู่แล้วว่าจะถ่ายใหม่หรือหยิบรูปเก่า
-            การถามซ้ำคือการเพิ่มขั้นตอนให้คนที่ตัดสินใจไปแล้ว
-            · capture="environment" เปิดกล้องหลังตรง ๆ ไม่ผ่านตัวเลือกไฟล์ */}
-        <div>
-          <span className="label-base">สลิป / บิล (ไม่บังคับ)</span>
-          <div className="grid grid-cols-2 gap-2">
-            <button
-              type="button"
-              onClick={() => cameraRef.current?.click()}
-              disabled={uploading || slips.length >= MAX_ATTACHMENTS}
-              className="btn-secondary"
-            >
-              {uploading ? <Loader2 className="size-4 animate-spin" /> : <Camera className="size-4" />}
-              ถ่ายรูป
-            </button>
-            <button
-              type="button"
-              onClick={() => galleryRef.current?.click()}
-              disabled={uploading || slips.length >= MAX_ATTACHMENTS}
-              className="btn-secondary"
-            >
-              <ImagePlus className="size-4" />
-              เลือกจากแกลอรี่
-            </button>
-          </div>
-
-          {/* ⚠️ ช่องกล้องคง `image/*` ไว้ตามเดิม — ต่างจากช่องแกลอรี่ข้างล่าง
-              กล้องบนไอโอเอสส่ง JPEG มาอยู่แล้ว ไม่เคยส่ง HEIC ผ่านทางนี้
-              การจำกัดชนิดจึงไม่ได้อะไรเพิ่ม แต่แลกมากับความเสี่ยงที่แอนดรอยด์
-              บางรุ่นจะไม่ยอมเปิดกล้องให้ — ซึ่งทดสอบจากเครื่องพัฒนาไม่ได้ */}
-          <input
-            ref={cameraRef}
-            type="file"
-            accept="image/*"
-            capture="environment"
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) void addFile(f)
-            }}
-          />
-          <input
-            ref={galleryRef}
-            type="file"
-            accept={IMAGE_UPLOAD_ACCEPT}
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0]
-              e.target.value = ''
-              if (f) void addFile(f)
-            }}
-          />
-
-          {slips.length > 0 && (
-            <ul className="mt-3 flex flex-wrap gap-2">
-              {slips.map((s) => (
-                <li key={s.objectKey} className="relative">
-                  {/* eslint-disable-next-line @next/next/no-img-element */}
-                  <img
-                    src={s.preview}
-                    alt="สลิปที่แนบ"
-                    className="size-20 rounded-md border border-line object-cover animate-zoom-in"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => removeSlip(s.objectKey)}
-                    aria-label="เอารูปนี้ออก"
-                    className="absolute -right-1.5 -top-1.5 grid size-6 place-items-center rounded-full border-2 border-surface bg-urgent-solid text-white transition-transform active:scale-90"
-                  >
-                    <X className="size-3.5" strokeWidth={2.5} />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          <p className="mt-1.5 text-xs text-muted-token">
-            แนบได้สูงสุด {MAX_ATTACHMENTS} รูป · ระบบย่อรูปให้อัตโนมัติก่อนอัปโหลด
-          </p>
-        </div>
-
+      <div className="panel p-4">
+        <TxnDraftFields draft={draft} />
       </div>
 
       {/* ── ปุ่มบันทึกลอยเหนือแถบเมนูล่างเสมอ ─────────────────────────────
           ฟอร์มยาวกว่าจอมือถือ — ปุ่มที่ต้องเลื่อนหาคือปุ่มที่กดช้าไปหนึ่งจังหวะ
-          ยอดเงินอยู่บนปุ่นให้เช็คตาเปล่าอีกรอบก่อนกด · บนเดสก์ท็อปกลับไปอยู่
+          ยอดเงินอยู่บนปุ่มให้เช็คตาเปล่าอีกรอบก่อนกด · บนเดสก์ท็อปกลับไปอยู่
           ท้ายฟอร์มตามปกติ */}
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 mt-4 flex gap-2 lg:static">
         <button
-          onClick={submit}
-          disabled={busy || uploading}
+          onClick={save}
+          disabled={blocked}
           className="btn-primary flex-1 py-3 text-lg shadow-e2 lg:shadow-none"
         >
-          {busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
-          {busy ? (
+          {draft.busy ? <Loader2 className="size-5 animate-spin" /> : <Check className="size-5" />}
+          {draft.busy ? (
             'กำลังบันทึก…'
           ) : (
             <>
               บันทึก
-              {amountValid && <span className="tnum">{fmtBaht(amountNumber)}</span>}
+              {draft.amountValid && <span className="tnum">{fmtBaht(draft.amountNumber)}</span>}
             </>
           )}
         </button>
@@ -520,10 +96,10 @@ export function EntryForm({
             `disabled` จึงต้องปิดทั้งเมาส์ (pointer-events) และแป้น (tabIndex) */}
         <Link
           href={cancelHref}
-          aria-disabled={busy || uploading ? 'true' : undefined}
-          tabIndex={busy || uploading ? -1 : undefined}
+          aria-disabled={blocked ? 'true' : undefined}
+          tabIndex={blocked ? -1 : undefined}
           className={`btn-secondary w-1/4 shrink-0 py-3 text-lg shadow-e2 lg:shadow-none ${
-            busy || uploading ? 'pointer-events-none opacity-50' : ''
+            blocked ? 'pointer-events-none opacity-50' : ''
           }`}
         >
           <X className="size-5" />

@@ -1232,6 +1232,7 @@ export type Database = {
           paid: number
         }[]
       }
+      cron_call: { Args: { p_path: string }; Returns: number }
       delete_employee: { Args: { p_id: string }; Returns: Json }
       employee_balance: {
         Args: { p_employee: string }

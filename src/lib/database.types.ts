@@ -543,6 +543,7 @@ export type Database = {
         Row: {
           body: string | null
           created_at: string
+          digest_date: string | null
           id: string
           kind: Database["public"]["Enums"]["notification_kind"]
           link: string | null
@@ -555,6 +556,7 @@ export type Database = {
         Insert: {
           body?: string | null
           created_at?: string
+          digest_date?: string | null
           id?: string
           kind: Database["public"]["Enums"]["notification_kind"]
           link?: string | null
@@ -567,6 +569,7 @@ export type Database = {
         Update: {
           body?: string | null
           created_at?: string
+          digest_date?: string | null
           id?: string
           kind?: Database["public"]["Enums"]["notification_kind"]
           link?: string | null
@@ -1528,7 +1531,11 @@ export type Database = {
     }
     Enums: {
       income_kind: "deposit" | "installment" | "variation_order" | "other"
-      notification_kind: "txn_pending" | "txn_approved" | "txn_rejected"
+      notification_kind:
+        | "txn_pending"
+        | "txn_approved"
+        | "txn_rejected"
+        | "daily_digest"
       pay_method: "cash" | "transfer"
       payroll_status: "open" | "closed"
       site_status: "planning" | "active" | "paused" | "done" | "cancelled"
@@ -1664,7 +1671,12 @@ export const Constants = {
   public: {
     Enums: {
       income_kind: ["deposit", "installment", "variation_order", "other"],
-      notification_kind: ["txn_pending", "txn_approved", "txn_rejected"],
+      notification_kind: [
+        "txn_pending",
+        "txn_approved",
+        "txn_rejected",
+        "daily_digest",
+      ],
       pay_method: ["cash", "transfer"],
       payroll_status: ["open", "closed"],
       site_status: ["planning", "active", "paused", "done", "cancelled"],

@@ -27,10 +27,13 @@ export async function GET(req: NextRequest) {
     console.error('[cron] CRON_SECRET ยังไม่ได้ตั้ง — ปฏิเสธไว้ก่อน')
     return NextResponse.json({ error: 'NOT_CONFIGURED' }, { status: 503 })
   }
-  // รับได้ทั้งสองแบบ: Authorization ของ pg_net และ query ของการเรียกด้วยมือ
+  // 🔴 **รับกุญแจทาง header เท่านั้น** — เคยรับทาง `?secret=` ไว้ให้เรียกด้วยมือ
+  // สะดวก แล้วมันไปโผล่ใน access log ของทุกชั้นที่คำขอวิ่งผ่าน (dev server,
+  // Vercel, proxy) กับประวัติเบราว์เซอร์ · ความลับที่นอนอยู่ในไฟล์ log คือ
+  // ความลับที่รั่วไปแล้วโดยไม่มีใครรู้ตัว (เจอจริง 4 ก.ย. 2569)
+  // เรียกด้วยมือ: curl -H "Authorization: Bearer <CRON_SECRET>" <url>
   const header = req.headers.get('authorization') ?? ''
-  const fromQuery = new URL(req.url).searchParams.get('secret') ?? ''
-  const given = header.startsWith('Bearer ') ? header.slice(7) : fromQuery
+  const given = header.startsWith('Bearer ') ? header.slice(7) : ''
   if (given !== secret) {
     return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
   }

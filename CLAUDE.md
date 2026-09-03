@@ -218,7 +218,8 @@ Dashboard → **Settings → API Keys** → แท็บ **"Publishable and secr
 | งาน | ตาราง (UTC) | เวลาไทย | ยิงไปที่ |
 |---|---|---|---|
 | `sweep-orphans` | `7 * * * *` | ทุกชั่วโมง | `/api/cron/sweep-orphans` — ลบไฟล์ R2 ที่ `upload_intents` หมดอายุแล้วไม่มีคนใช้ |
-| `recurring-expenses` | `0 1 * * *` | 08:00 | `/api/cron/recurring` — ลงรายจ่ายรายเดือนที่ถึงกำหนด |
+| `recurring-expenses` | `55 0 * * *` | 07:55 | `/api/cron/recurring` — ลงรายจ่ายรายเดือนที่ถึงกำหนด |
+| `daily-digest` | `0 1 * * *` | 08:00 | `/api/cron/daily-digest` — สรุปของค้างส่งเจ้าของ (**ไม่มีของค้าง = ไม่ส่ง**) |
 | `push-dispatch` | `*/5 * * * *` | ทุก 5 นาที | `/api/cron/push-dispatch` — ส่ง push ที่ค้างคิว |
 
 - 🔴 **URL และ `CRON_SECRET` อยู่ใน Supabase Vault ไม่ใช่ในไฟล์ migration** —
@@ -234,7 +235,12 @@ Dashboard → **Settings → API Keys** → แท็บ **"Publishable and secr
   ```
   · `cron.job_run_details` บอกว่างานถูกเรียกไหม · `net._http_response` บอกว่าปลายทางตอบอะไร
   — ต้องดูตัวที่สอง เพราะงานที่ "สำเร็จ" อาจยิงไปแล้วได้ 401 ก็ได้
-- `daily-digest` (แจ้งเจ้าของว่ามีกี่รายการค้างอนุมัติ) **ยังไม่ได้ทำ** — ยังไม่มี route
+- 🔴 **cron route รับกุญแจทาง header เท่านั้น** — เคยรับทาง `?secret=` ด้วยเพื่อ
+  เรียกด้วยมือสะดวก แล้วมันไปนอนอยู่ใน access log ของทุกชั้นที่คำขอวิ่งผ่าน
+  (dev server · Vercel · proxy) และประวัติเบราว์เซอร์ · เรียกด้วยมือใช้
+  `curl -H "Authorization: Bearer <CRON_SECRET>" <url>`
+- ลำดับตั้งใจ: ลงรายจ่ายรายเดือน (07:55) → แล้วค่อยสรุปของค้าง (08:00) ·
+  สรุปที่ส่งก่อนรายการของวันถูกลง = สรุปที่ล้าไปหนึ่งรอบทุกวันที่ 1 ของเดือน
 
 ## 9. รูปสลิป — Cloudflare R2
 

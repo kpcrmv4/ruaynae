@@ -646,6 +646,7 @@ export type Database = {
           closed_at: string | null
           closed_by: string | null
           created_at: string
+          employee_id: string | null
           id: string
           period_end: string
           period_start: string
@@ -660,6 +661,7 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           created_at?: string
+          employee_id?: string | null
           id?: string
           period_end: string
           period_start: string
@@ -674,6 +676,7 @@ export type Database = {
           closed_at?: string | null
           closed_by?: string | null
           created_at?: string
+          employee_id?: string | null
           id?: string
           period_end?: string
           period_start?: string
@@ -690,6 +693,13 @@ export type Database = {
             columns: ["closed_by"]
             isOneToOne: false
             referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "payroll_runs_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
             referencedColumns: ["id"]
           },
           {
@@ -1231,6 +1241,16 @@ export type Database = {
       mcp_update_transaction: {
         Args: { p_actor: string; p_id: string; p_key: string; p_patch: Json }
         Returns: Json
+      }
+      pay_employee_wage: {
+        Args: { p_employee: string }
+        Returns: {
+          accrued: number
+          days: number
+          deducted: number
+          paid: number
+          run_id: string
+        }[]
       }
       payroll_balances: {
         Args: never

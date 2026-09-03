@@ -11,7 +11,7 @@ import { EmptyState } from '@/components/ui/states'
 import { PayrollBoard } from './payroll-client'
 import { WorkGrid } from './work-grid'
 
-export const metadata = { title: 'ค่าแรงและรอบจ่าย' }
+export const metadata = { title: 'ค่าแรงและการจ่าย' }
 
 type Search = { tab?: string; p?: string }
 
@@ -30,14 +30,17 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const month = period.mode === 'month' ? period : parsePeriod(today.slice(0, 7), today)
   const monthDays = daysInRange(month.from, month.to)
 
-  const [{ data: balances, error: bErr }, { data: runs, error: rErr }, { data: sites }, { data: openAdvances }] =
+  const [{ data: balances, error: bErr }, { data: payments, error: rErr }, { data: sites }, { data: openAdvances }] =
     await Promise.all([
       // 🔴 RPC ตัวเดียวคืนยอดของทุกคน — ไม่ใช่ยิง employee_balance ทีละคน (N+1)
       sb.rpc('payroll_balances'),
+      // ประวัติการจ่าย — เฉพาะที่ปิดแล้ว เพราะรอบที่ยังเปิดค้างอยู่ไม่ใช่การจ่าย
+      // และไม่มีทางเกิดใหม่แล้ว (ปุ่มจ่ายสร้างแล้วปิดในทรานแซกชันเดียว)
       sb
         .from('payroll_runs')
-        .select('id, period_start, period_end, site_id, status, total_accrued, total_advance_deducted, total_paid, sites(name)')
-        .order('period_start', { ascending: false })
+        .select('id, period_start, period_end, total_accrued, total_advance_deducted, total_paid, employees(full_name)')
+        .eq('status', 'closed')
+        .order('closed_at', { ascending: false })
         .range(0, PAGE_SIZE - 1),
       sb.from('sites').select('id, name').order('name', { ascending: true }).range(0, PAGE_SIZE - 1),
       sb
@@ -98,9 +101,9 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   return (
     <>
       <div className="mb-5">
-        <h1 className="text-2xl font-bold text-ink">ค่าแรงและรอบจ่าย</h1>
+        <h1 className="text-2xl font-bold text-ink">ค่าแรงและการจ่าย</h1>
         <p className="mt-0.5 text-sm text-muted-token">
-          ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าโครงการ · การเบิกและปิดรอบคือ{' '}
+          ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าโครงการ · การเบิกและการจ่ายคือ{' '}
           <span className="font-medium text-ink-2">เงินสดออก ไม่ใช่ต้นทุนใหม่</span>
         </p>
       </div>
@@ -110,7 +113,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           label="ค่าแรงค้างจ่าย"
           value={fmtBaht(totalAccrued)}
           icon={Wallet}
-          hint="ยังไม่ถูกปิดรอบ"
+          hint="ยังไม่ได้จ่าย"
         />
         <Metric label="เบิกไปแล้ว" value={fmtBaht(totalAdvanced)} hint="ยังไม่ถูกหัก" />
         <Metric
@@ -210,7 +213,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             }))}
           />
         )
-      ) : rows.length === 0 && (runs ?? []).length === 0 ? (
+      ) : rows.length === 0 && (payments ?? []).length === 0 ? (
         <EmptyState
           icon={Wallet}
           message="ยังไม่มีค่าแรงค้างจ่าย — ติ๊กคนเข้าโครงการที่หน้าคนเข้าโครงการก่อน แล้วยอดจะขึ้นที่นี่"
@@ -219,17 +222,15 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <PayrollBoard
           today={today}
           rows={rows}
-          runs={(runs ?? []).map((r) => ({
+          payments={(payments ?? []).map((r) => ({
             id: r.id,
             period_start: r.period_start,
             period_end: r.period_end,
-            status: r.status,
-            site_name: r.sites?.name ?? null,
+            employee_name: r.employees?.full_name ?? null,
             total_accrued: Number(r.total_accrued),
             total_advance_deducted: Number(r.total_advance_deducted),
             total_paid: Number(r.total_paid),
           }))}
-          sites={sites ?? []}
           advances={(openAdvances ?? []).map((a) => ({
             id: a.id,
             employee_id: a.employee_id,

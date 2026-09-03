@@ -53,8 +53,8 @@ export const NAV: NavGroup[] = [
       // (คำสั่งเจ้าของ 31 ส.ค. 2569) · CRUD คนงานอยู่ที่ /settings/users
       {
         href: '/payroll',
-        label: 'ค่าแรงและรอบจ่าย',
-        sub: 'ค้างจ่าย เบิก ปิดรอบ',
+        label: 'ค่าแรงและการจ่าย',
+        sub: 'ค้างจ่าย เบิก จ่ายค่าแรง',
         icon: Users,
         ownerOnly: true,
       },

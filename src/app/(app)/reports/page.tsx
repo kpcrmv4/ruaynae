@@ -348,7 +348,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   icon={HandCoins}
                 />
                 <Cell
-                  label="ปิดรอบจ่ายแล้ว"
+                  label="จ่ายค่าแรงแล้ว"
                   value={fmtBaht(Number(labor?.payroll_paid ?? 0))}
                   icon={Banknote}
                 />

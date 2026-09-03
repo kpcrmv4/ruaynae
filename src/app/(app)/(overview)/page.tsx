@@ -332,7 +332,7 @@ export default async function OverviewPage() {
       <p className="mt-5 rounded-lg border border-line-soft bg-surface-2 px-4 py-3 text-sm text-muted-token">
         ต้นทุนนับจาก <span className="font-medium text-ink-2">รายจ่ายที่อนุมัติแล้ว</span> บวกกับ{' '}
         <span className="font-medium text-ink-2">ค่าแรงจากการลงชื่อคนเข้าโครงการ</span> ซึ่งเกิดขึ้นทันทีที่ติ๊ก
-        — การเบิกล่วงหน้าและการปิดรอบจ่ายค่าแรงเป็นเงินสดออก ไม่ถูกนับเป็นต้นทุนซ้ำอีกรอบ
+        — การเบิกล่วงหน้าและการจ่ายค่าแรงเป็นเงินสดออก ไม่ถูกนับเป็นต้นทุนซ้ำอีกรอบ
       </p>
     </>
   )

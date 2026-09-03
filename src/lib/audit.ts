@@ -43,7 +43,7 @@ export const TABLE_LABEL: Record<string, string> = {
   attendance: 'คนเข้าโครงการ',
   attendance_wages: 'ยอดค่าแรงรายวัน',
   advances: 'เบิกล่วงหน้า',
-  payroll_runs: 'รอบจ่ายค่าแรง',
+  payroll_runs: 'การจ่ายค่าแรง',
   payroll_lines: 'บรรทัดจ่ายรายคน',
   login_attempts: 'ความพยายามล็อกอิน',
 }

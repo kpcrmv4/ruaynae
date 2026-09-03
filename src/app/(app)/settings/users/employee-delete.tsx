@@ -92,7 +92,7 @@ export function EmployeeDelete({
 
           {paid ? (
             <Dialog.Description className="mt-2 text-sm leading-6 text-muted-token">
-              คนนี้อยู่ในรอบจ่ายค่าแรงที่ปิดไปแล้ว {info?.payroll_lines} รอบ —
+              คนนี้เคยรับค่าแรงไปแล้ว {info?.payroll_lines} ครั้ง —
               ยอดที่จ่ายไปแล้วอ้างถึงชื่อนี้อยู่ <span className="font-medium text-ink-2">จึงลบไม่ได้</span>
               <br />
               ถ้าคนนี้ไม่ทำงานกับเราแล้ว ให้กด “ปิดใช้งาน” แทน — ชื่อจะหายจากรายการลงชื่อเข้าโครงการ

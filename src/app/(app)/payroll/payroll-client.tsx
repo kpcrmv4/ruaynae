@@ -1,29 +1,36 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { CalendarRange, Check, HandCoins, Loader2, Lock, X } from 'lucide-react'
+import { BadgeCheck, Check, HandCoins, Loader2, Wallet, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht, fmtDate } from '@/lib/format'
-import { Badge } from '@/components/ui/badge'
 
 type Row = {
   employee_id: string
   full_name: string
   job_title: string | null
-  /** วันแรงที่ยังไม่ถูกปิดรอบ (เต็มวัน = 1 · ครึ่งวัน = 0.5) */
+  /** วันแรงที่ยังไม่ได้รับเงิน (เต็มวัน = 1 · ครึ่งวัน = 0.5) */
   days: number
   accrued: number
   advanced: number
   balance: number
 }
-type Run = {
+/**
+ * ประวัติการจ่ายหนึ่งครั้ง
+ *
+ * ⚠️ ในฐานข้อมูลมันคือ `payroll_runs` ที่ปิดแล้ว แต่**คำว่า "รอบจ่าย" ไม่โผล่
+ * บนหน้าจออีกแล้ว** (คำสั่งเจ้าของ 4 ก.ย. 2569) — เจ้าของกดจ่ายรายคน
+ * ระบบจึงสร้าง "รอบของคนคนเดียว" ให้เองแล้วปิดทันที · ตารางยังอยู่เพราะมันคือ
+ * ตัวที่กันจ่ายซ้ำวันเดิม ล็อกค่าแรงย้อนหลัง และเป็นฐานของเพดานเบิก
+ */
+type Payment = {
   id: string
   period_start: string
   period_end: string
-  status: 'open' | 'closed'
-  site_name: string | null
+  /** ชื่อคนที่จ่ายให้ — `null` = การจ่ายรวมหลายคนจากระบบเดิม */
+  employee_name: string | null
   total_accrued: number
   total_advance_deducted: number
   total_paid: number
@@ -44,11 +51,8 @@ const MESSAGES: Record<string, string> = {
   DATE_INVALID: 'รูปแบบวันที่ไม่ถูกต้อง',
   DATE_BUDDHIST_ERA: 'ปีที่กรอกเป็น พ.ศ. — ระบบเก็บเป็น ค.ศ. กรุณาเลือกวันจากปฏิทิน',
   DATE_FUTURE: 'บันทึกเบิกของวันในอนาคตไม่ได้',
-  DATE_RANGE_INVALID: 'วันสิ้นสุดต้องไม่มาก่อนวันเริ่ม',
-  PERIOD_OVERLAP: 'ช่วงเวลานี้ซ้อนกับรอบที่เปิดไว้แล้ว — ค่าแรงวันเดียวจะถูกจ่ายสองรอบ',
-  PAYROLL_CLOSED: 'ใบเบิกนี้ถูกหักในรอบที่ปิดแล้ว ลบไม่ได้',
-  ALREADY_CLOSED: 'รอบนี้ปิดไปแล้ว',
-  NOTHING_TO_PAY: 'ไม่มีค่าแรงค้างจ่ายในช่วงนี้',
+  PAYROLL_CLOSED: 'ใบเบิกนี้ถูกหักตอนจ่ายค่าแรงไปแล้ว ลบไม่ได้',
+  NOTHING_TO_PAY: 'คนนี้ไม่มีค่าแรงค้างจ่าย',
   NOT_FOUND: 'ไม่พบรายการนี้',
 }
 const fail = (code?: string, detail?: string) =>
@@ -59,23 +63,20 @@ const fail = (code?: string, detail?: string) =>
 export function PayrollBoard({
   today,
   rows,
-  runs,
-  sites,
+  payments,
   advances,
 }: {
   today: string
   rows: Row[]
-  runs: Run[]
-  sites: { id: string; name: string }[]
+  payments: Payment[]
   advances: Advance[]
 }) {
   const router = useRouter()
   const [busy, setBusy] = useState<string | null>(null)
   const [advanceFor, setAdvanceFor] = useState<Row | null>(null)
+  const [payFor, setPayFor] = useState<Row | null>(null)
   const [amount, setAmount] = useState('')
   const [fieldError, setFieldError] = useState('')
-  const [openRun, setOpenRun] = useState(false)
-  const [period, setPeriod] = useState({ start: today, end: today, siteId: '' })
 
   async function send(key: string, url: string, body: unknown, ok: string, method = 'POST') {
     // กันกดซ้ำสองชั้น: ปุ่ม disabled *และ* ธงตรงนี้
@@ -180,81 +181,81 @@ export function PayrollBoard({
                   </div>
                 </dl>
 
-                <button
-                  type="button"
-                  onClick={() => {
-                    setAdvanceFor(r)
-                    setAmount('')
-                    setFieldError('')
-                  }}
-                  disabled={busy !== null || r.balance <= 0}
-                  className="btn-secondary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
-                >
-                  <HandCoins className="size-4" />
-                  เบิก
-                </button>
+                <div className="flex shrink-0 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAdvanceFor(r)
+                      setAmount('')
+                      setFieldError('')
+                    }}
+                    disabled={busy !== null || r.balance <= 0}
+                    className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <HandCoins className="size-4" />
+                    เบิก
+                  </button>
+                  {/* จ่ายค่าแรง = เคลียร์ยอดค้างของคนนี้ให้หมดในปุ่มเดียว
+                      · ยอดค่าแรงยังไม่ถึงมือแต่เบิกไปแล้วเต็มจำนวน (accrued
+                        เท่ากับ advanced) ยังต้องกดได้ เพราะมันคือการปิดยอดค้าง
+                        ที่เหลือ ฿0 ไม่ใช่ "ไม่มีอะไรให้ทำ" — ปิดเฉพาะตอนไม่มี
+                        ค่าแรงค้างเลยจริง ๆ */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setPayFor(r)
+                      setFieldError('')
+                    }}
+                    disabled={busy !== null || r.accrued <= 0}
+                    className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                  >
+                    <Wallet className="size-4" />
+                    จ่ายค่าแรง
+                  </button>
+                </div>
               </li>
             ))}
           </ul>
         )}
       </section>
 
-      {/* ── รอบจ่าย ───────────────────────────────────────────────── */}
+      {/* ── ประวัติการจ่าย ────────────────────────────────────────────
+          อ่านอย่างเดียว · ไม่มีปุ่มเปิด/ปิดอะไรทั้งนั้น การจ่ายเกิดจากปุ่มข้างบน
+          เท่านั้น · ยังต้องมีให้เห็น เพราะเวลามีคนทวงเงิน คำถามคือ "จ่ายไปเมื่อไหร่
+          เท่าไหร่" ซึ่งยอดคงเหลือปัจจุบันตอบไม่ได้ */}
       <section className="panel">
         <div className="panel-head">
-          รอบจ่ายค่าแรง
-          <button
-            type="button"
-            onClick={() => {
-              setOpenRun(true)
-              setFieldError('')
-            }}
-            className="ml-auto text-sm font-medium text-brand hover:underline"
-          >
-            เปิดรอบใหม่
-          </button>
+          ประวัติการจ่ายค่าแรง
+          <span className="ml-auto text-xs font-normal tnum text-muted-token">
+            {payments.length} ครั้ง
+          </span>
         </div>
-        {runs.length === 0 ? (
+        {payments.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-token">
-            ยังไม่เคยเปิดรอบจ่าย — เปิดรอบแล้วปิดรอบเพื่อสรุปว่าต้องจ่ายใครเท่าไหร่
+            ยังไม่เคยจ่ายค่าแรง — กดปุ่ม &ldquo;จ่ายค่าแรง&rdquo; ของแต่ละคนด้านบน
           </p>
         ) : (
           <ul>
-            {runs.map((run) => (
+            {payments.map((p) => (
               <li
-                key={run.id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
+                key={p.id}
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
               >
-                <CalendarRange className="size-4 shrink-0 text-muted-token" />
+                <BadgeCheck className="size-4 shrink-0 text-status-done" strokeWidth={1.8} />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-medium text-ink">
-                    {fmtDate(run.period_start)} – {fmtDate(run.period_end)}
+                    {p.employee_name ?? 'จ่ายรวมหลายคน'}
                   </div>
                   <div className="truncate text-xs text-muted-token">
-                    {run.site_name ?? 'ทุกโครงการ'}
-                    {run.status === 'closed' &&
-                      ` · ค่าแรง ${fmtBaht(run.total_accrued)} − เบิก ${fmtBaht(run.total_advance_deducted)} = จ่ายจริง ${fmtBaht(run.total_paid)}`}
+                    งานวันที่ {fmtDate(p.period_start)}
+                    {p.period_end !== p.period_start && ` – ${fmtDate(p.period_end)}`}
+                    {p.total_advance_deducted > 0 &&
+                      ` · หักเบิก ${fmtBaht(p.total_advance_deducted)} จากค่าแรง ${fmtBaht(p.total_accrued)}`}
                   </div>
                 </div>
-                {run.status === 'closed' ? (
-                  <Badge tone="done" dot>
-                    ปิดรอบแล้ว
-                  </Badge>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={() => send(run.id, `/api/payroll/${run.id}/close`, undefined, 'ปิดรอบแล้ว')}
-                    disabled={busy !== null}
-                    className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
-                  >
-                    {busy === run.id ? (
-                      <Loader2 className="size-4 animate-spin" />
-                    ) : (
-                      <Lock className="size-4" />
-                    )}
-                    ปิดรอบ
-                  </button>
-                )}
+                <span className="shrink-0 text-sm font-bold tnum text-ink">
+                  {fmtBaht(p.total_paid)}
+                </span>
               </li>
             ))}
           </ul>
@@ -327,62 +328,50 @@ export function PayrollBoard({
         </Dialog.Portal>
       </Dialog.Root>
 
-      {/* ── กล่องเปิดรอบ ──────────────────────────────────────────── */}
+      {/* ── กล่องยืนยันจ่ายค่าแรง ──────────────────────────────────────
+          🔴 ต้องเห็นยอดสามบรรทัดก่อนกด — จ่ายแล้ว **ย้อนกลับไม่ได้** เพราะวัน
+          ที่จ่ายแล้วจะถูกล็อกไม่ให้แก้ค่าแรงย้อนหลังอีก */}
       <Dialog.Root
-        open={openRun}
+        open={payFor !== null}
         onOpenChange={(v) => {
           if (busy) return
-          setOpenRun(v)
-          if (!v) setFieldError('')
+          if (!v) {
+            setPayFor(null)
+            setFieldError('')
+          }
         }}
       >
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 animate-fade-in" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(28rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-surface p-5 shadow-e3 animate-pop-in">
-            <Dialog.Title className="text-lg font-bold text-ink">เปิดรอบจ่ายค่าแรง</Dialog.Title>
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-[min(26rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-line bg-surface p-5 shadow-e3 animate-pop-in">
+            <Dialog.Title className="text-lg font-bold text-ink">
+              จ่ายค่าแรง — {payFor?.full_name}
+            </Dialog.Title>
             <Dialog.Description className="mt-0.5 text-sm text-muted-token">
-              เลือกช่วงวันที่จะจ่าย · ตอนปิดรอบระบบจะหักยอดที่เบิกไปแล้วให้อัตโนมัติ
+              ปิดยอดค้างจ่ายของคนนี้ทั้งหมด {payFor?.days} วัน
             </Dialog.Description>
 
-            <div className="mt-4 grid gap-3 sm:grid-cols-2">
-              <div>
-                <label htmlFor="run-start" className="label-base">ตั้งแต่วันที่</label>
-                <input
-                  id="run-start"
-                  type="date"
-                  value={period.start}
-                  max={today}
-                  onChange={(e) => setPeriod((p) => ({ ...p, start: e.target.value }))}
-                  className="input-base tnum"
-                />
+            <dl className="mt-4 space-y-1.5 rounded-lg border border-line-soft bg-surface-2 px-3.5 py-3 text-sm">
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-muted-token">ค่าแรงที่เกิดขึ้น</dt>
+                <dd className="tnum font-semibold text-ink">{fmtBaht(payFor?.accrued ?? 0)}</dd>
               </div>
-              <div>
-                <label htmlFor="run-end" className="label-base">ถึงวันที่</label>
-                <input
-                  id="run-end"
-                  type="date"
-                  value={period.end}
-                  max={today}
-                  onChange={(e) => setPeriod((p) => ({ ...p, end: e.target.value }))}
-                  className="input-base tnum"
-                />
+              <div className="flex items-baseline justify-between gap-2">
+                <dt className="text-muted-token">หักเบิกล่วงหน้า</dt>
+                <dd className="tnum text-muted-token">− {fmtBaht(payFor?.advanced ?? 0)}</dd>
               </div>
-              <div className="sm:col-span-2">
-                <label htmlFor="run-site" className="label-base">เฉพาะโครงการ (ไม่บังคับ)</label>
-                <select
-                  id="run-site"
-                  value={period.siteId}
-                  onChange={(e) => setPeriod((p) => ({ ...p, siteId: e.target.value }))}
-                  className="input-base"
-                >
-                  <option value="">ทุกโครงการ</option>
-                  {sites.map((s) => (
-                    <option key={s.id} value={s.id}>{s.name}</option>
-                  ))}
-                </select>
+              <div className="flex items-baseline justify-between gap-2 border-t border-line-soft pt-1.5">
+                <dt className="font-medium text-ink-2">จ่ายจริงวันนี้</dt>
+                <dd className="tnum text-base font-bold text-income">
+                  {fmtBaht(payFor?.balance ?? 0)}
+                </dd>
               </div>
-            </div>
+            </dl>
 
+            <p className="mt-2 text-xs text-muted-token">
+              จ่ายแล้ววันทำงานเหล่านี้จะถูกล็อก แก้ค่าแรงย้อนหลังไม่ได้อีก
+              · ยอดนี้ไม่ทำให้ต้นทุนโครงการเพิ่ม เพราะนับไปตั้งแต่ตอนลงชื่อแล้ว
+            </p>
             {fieldError && <p className="mt-2 text-sm text-urgent">{fieldError}</p>}
 
             <div className="mt-4 flex justify-end gap-2">
@@ -390,22 +379,19 @@ export function PayrollBoard({
               <button
                 type="button"
                 onClick={async () => {
-                  const done = await send('new-run', '/api/payroll', {
-                    periodStart: period.start,
-                    periodEnd: period.end,
-                    siteId: period.siteId || null,
-                  }, 'เปิดรอบแล้ว')
-                  if (done) setOpenRun(false)
+                  if (!payFor) return
+                  const done = await send(
+                    `pay-${payFor.employee_id}`, '/api/payroll/pay',
+                    { employeeId: payFor.employee_id },
+                    `จ่ายค่าแรงให้ ${payFor.full_name} แล้ว`,
+                  )
+                  if (done) setPayFor(null)
                 }}
                 disabled={busy !== null}
                 className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
               >
-                {busy === 'new-run' ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <CalendarRange className="size-4" />
-                )}
-                เปิดรอบ
+                {busy !== null ? <Loader2 className="size-4 animate-spin" /> : <Wallet className="size-4" />}
+                ยืนยันจ่าย
               </button>
             </div>
           </Dialog.Content>

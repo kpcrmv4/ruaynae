@@ -107,7 +107,7 @@ export default async function UsersPage({
           // ผูกได้เฉพาะบัญชีที่ยังใช้งานอยู่ — ผูกกับบัญชีที่ปิดไปแล้วคือการสร้าง
           // ความสัมพันธ์ที่ไม่มีวันได้ใช้
           people={(profiles ?? []).filter((p) => p.is_active).map(
-            (p) => ({ id: p.id, full_name: p.full_name }),
+            (p) => ({ id: p.id, full_name: p.full_name, role: p.role }),
           )}
         />
       )}

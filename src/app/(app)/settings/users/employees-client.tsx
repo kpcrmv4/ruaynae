@@ -29,7 +29,10 @@ export type EmployeeRow = {
 export type DeleteInfoRow = DeleteInfo & { employee_id: string }
 
 type Site = { id: string; name: string }
-type Person = { id: string; full_name: string }
+/** บัญชีล็อกอินที่ผูกได้ — ต้องมี `role` มาด้วย ไม่งั้นกล่องเลือกบอกไม่ได้ว่าใครเป็นใคร */
+type Person = { id: string; full_name: string; role: 'owner' | 'site_supervisor' }
+
+const ROLE_LABEL = { owner: 'เจ้าของ', site_supervisor: 'หัวหน้าโครงการ' } as const
 
 const EMPTY = {
   fullName: '',
@@ -262,8 +265,13 @@ export function EmployeesClient({
                 className="input-base"
               >
                 <option value="">ไม่มีบัญชี — เป็นคนงานอย่างเดียว</option>
+                {/* 🔴 ต้องบอกตำแหน่งด้วย — ชื่อเปล่า ๆ ไม่ได้บอกว่าคนไหนคือ
+                    หัวหน้าโครงการ เจ้าของจึงเลือกไม่ถูกว่าจะผูกกับใคร
+                    (เจ้าของแจ้ง 4 ก.ย. 2569) */}
                 {people.map((p) => (
-                  <option key={p.id} value={p.id}>{p.full_name}</option>
+                  <option key={p.id} value={p.id}>
+                    {p.full_name} · {ROLE_LABEL[p.role]}
+                  </option>
                 ))}
               </select>
             </div>

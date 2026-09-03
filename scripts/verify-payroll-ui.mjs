@@ -172,48 +172,41 @@ try {
       b.detail ?? '(ไม่มีรายละเอียด)')
   }
 
-  // ── P5-API-05 · เปิดรอบ ───────────────────────────────────────────
+  // ── P5-API-07 · จ่ายให้คนที่ไม่มีค่าแรงค้าง ───────────────────────
   {
-    const r = await req('POST', '/api/payroll', {
-      periodStart: day(-10), periodEnd: today, siteId }, ownerJar)
+    const [other] = (await sql(
+      `insert into public.employees(full_name, is_active) values ('${MARK} ไม่มีค่าแรง', true) returning id`)).rows
+    const runsBefore = await countOf('payroll_runs')
+    const r = await req('POST', '/api/payroll/pay', { employeeId: other.id }, ownerJar)
     const b = await r.json().catch(() => ({}))
-    runId = b.run?.id ?? null
-    check('P5-API-05 เปิดรอบจ่าย → 201 · status เริ่มที่ open',
-      r.status === 201 && b.run?.status === 'open', `${r.status} ${b.run?.status}`)
+    const runsAfter = await countOf('payroll_runs')
+    check('P5-API-07 จ่ายค่าแรงให้คนที่ไม่มียอดค้าง → 409 NOTHING_TO_PAY · ไม่มีรอบใหม่ค้างไว้',
+      r.status === 409 && b.error === 'NOTHING_TO_PAY' && runsAfter === runsBefore,
+      `${r.status} ${b.error} · รอบ ${runsBefore}→${runsAfter}`)
+    await sql(`delete from public.employees where id = '${other.id}'`)
   }
 
-  // ── P5-API-07 · ปิดรอบที่ไม่มีอะไรให้จ่าย ─────────────────────────
+  // ── P5-API-05 + P5-API-06 + P5-UI-06 · จ่ายค่าแรงด้วยปุ่มเดียว ─────
   {
-    const r = await req('POST', '/api/payroll', {
-      periodStart: '2001-01-01', periodEnd: '2001-01-31' }, ownerJar)
-    const b = await r.json().catch(() => ({}))
-    const emptyRun = b.run?.id
-    const close = await req('POST', `/api/payroll/${emptyRun}/close`, undefined, ownerJar)
-    const cb = await close.json().catch(() => ({}))
-    const [row] = (await sql(
-      `select status from public.payroll_runs where id = '${emptyRun}'`)).rows
-    check('P5-API-07 ปิดรอบที่ไม่มีค่าแรงในช่วงนั้น → 409 NOTHING_TO_PAY · รอบยัง open',
-      close.status === 409 && cb.error === 'NOTHING_TO_PAY' && row?.status === 'open',
-      `${close.status} ${cb.error} · status=${row?.status}`)
-    await sql(`delete from public.payroll_runs where id = '${emptyRun}'`)
-  }
-
-  // ── P5-API-06 + P5-UI-06 · ปิดรอบจริง ─────────────────────────────
-  {
-    const r = await req('POST', `/api/payroll/${runId}/close`, undefined, ownerJar)
+    const r = await req('POST', '/api/payroll/pay', { employeeId: empId }, ownerJar)
     const b = await r.json().catch(() => ({}))
     const html = await page('/payroll', ownerJar)
     const [row] = (await sql(
-      `select status, closed_by, total_paid from public.payroll_runs where id = '${runId}'`)).rows
-    check('P5-API-06 ปิดรอบ → 200 พร้อมยอดรวม · status=closed · มี closed_by',
-      r.status === 200 && Number(b.paid) === 2300 && row?.status === 'closed'
+      `select id, status, closed_by, total_paid, employee_id from public.payroll_runs
+       where employee_id = '${empId}' order by created_at desc limit 1`)).rows
+    runId = row?.id ?? null
+    check('P5-API-05 จ่ายค่าแรงรายคน → สร้างรอบของ**คนคนเดียว** ที่ปิดแล้วทันที (ไม่มีสถานะ open ค้าง)',
+      r.status === 200 && row?.status === 'closed' && row?.employee_id === empId
       && Boolean(row?.closed_by),
-      `${r.status} · จ่ายจริง ฿${b.paid}`)
-    check('P5-UI-06 หน้าจอแสดงสรุปของรอบ: ค่าแรง − เบิก = จ่ายจริง',
-      html.includes('ปิดรอบแล้ว') && html.includes('฿3,300') && html.includes('฿2,300'),
-      'มีทั้งสามตัวเลขบนแถวรอบ')
+      `${r.status} · status=${row?.status} · employee_id ตรง=${row?.employee_id === empId}`)
+    check('P5-API-06 ยอดที่คืนมา: ค่าแรง ฿3,300 − เบิก ฿1,000 = จ่ายจริง ฿2,300',
+      Number(b.accrued) === 3300 && Number(b.deducted) === 1000 && Number(b.paid) === 2300,
+      `ค่าแรง ${b.accrued} − เบิก ${b.deducted} = ${b.paid}`)
+    check('P5-UI-06 หน้าจอมี ประวัติการจ่ายค่าแรง พร้อมยอด และ**ไม่มีคำว่า รอบจ่าย** ให้ผู้ใช้เห็นแล้ว',
+      html.includes('ประวัติการจ่ายค่าแรง') && html.includes('฿2,300')
+      && html.includes('฿3,300') && !html.includes('เปิดรอบ') && !html.includes('ปิดรอบ'),
+      `ประวัติ=${html.includes('ประวัติการจ่ายค่าแรง')} · เหลือคำว่ารอบ=${/เปิดรอบ|ปิดรอบ/.test(html)}`)
   }
-
   // ── P5-API-04 · ลบใบเบิกที่ถูกหักไปแล้วไม่ได้ ─────────────────────
   {
     const [adv] = (await sql(
@@ -231,8 +224,7 @@ try {
     const calls = [
       ['POST', '/api/advances', { employeeId: empId, amount: '1', advanceDate: today }],
       ['DELETE', '/api/advances/00000000-0000-4000-8000-000000000000', undefined],
-      ['POST', '/api/payroll', { periodStart: today, periodEnd: today }],
-      ['POST', `/api/payroll/${runId}/close`, undefined],
+      ['POST', '/api/payroll/pay', { employeeId: empId }],
     ]
     const codes = []
     for (const [m, path, body] of calls) {
@@ -252,7 +244,7 @@ try {
     const src = [
       ['supabase/migrations/20260831010000_p5_advances_payroll.sql', stripSql],
       ['src/app/api/advances/route.ts', stripTs],
-      ['src/app/api/payroll/route.ts', stripTs],
+      ['supabase/migrations/20260904050000_pay_employee_wage.sql', stripSql],
     ].map(([f, fn]) => fn(readFileSync(f, 'utf8'))).join('\n\n')
 
     const cols = [

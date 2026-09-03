@@ -782,6 +782,89 @@ export type Database = {
           },
         ]
       }
+      recurring_expenses: {
+        Row: {
+          amount: number
+          category_id: string
+          created_at: string
+          created_by: string | null
+          day_of_month: number
+          employee_id: string | null
+          end_month: string | null
+          id: string
+          is_active: boolean
+          name: string
+          note: string | null
+          pay_method: Database["public"]["Enums"]["pay_method"]
+          site_id: string | null
+          start_month: string
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category_id: string
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number
+          employee_id?: string | null
+          end_month?: string | null
+          id?: string
+          is_active?: boolean
+          name: string
+          note?: string | null
+          pay_method?: Database["public"]["Enums"]["pay_method"]
+          site_id?: string | null
+          start_month: string
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category_id?: string
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number
+          employee_id?: string | null
+          end_month?: string | null
+          id?: string
+          is_active?: boolean
+          name?: string
+          note?: string | null
+          pay_method?: Database["public"]["Enums"]["pay_method"]
+          site_id?: string | null
+          start_month?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "recurring_expenses_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "categories"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "recurring_expenses_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       site_finance: {
         Row: {
           contract_amount: number
@@ -957,6 +1040,8 @@ export type Database = {
           mcp_key_id: string | null
           note: string | null
           pay_method: Database["public"]["Enums"]["pay_method"]
+          period_month: string | null
+          recurring_id: string | null
           rejected_reason: string | null
           site_id: string | null
           status: Database["public"]["Enums"]["txn_status"]
@@ -978,6 +1063,8 @@ export type Database = {
           mcp_key_id?: string | null
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
+          period_month?: string | null
+          recurring_id?: string | null
           rejected_reason?: string | null
           site_id?: string | null
           status?: Database["public"]["Enums"]["txn_status"]
@@ -999,6 +1086,8 @@ export type Database = {
           mcp_key_id?: string | null
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
+          period_month?: string | null
+          recurring_id?: string | null
           rejected_reason?: string | null
           site_id?: string | null
           status?: Database["public"]["Enums"]["txn_status"]
@@ -1032,6 +1121,13 @@ export type Database = {
             columns: ["mcp_key_id"]
             isOneToOne: false
             referencedRelation: "mcp_keys"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "transactions_recurring_id_fkey"
+            columns: ["recurring_id"]
+            isOneToOne: false
+            referencedRelation: "recurring_expenses"
             referencedColumns: ["id"]
           },
           {
@@ -1156,6 +1252,10 @@ export type Database = {
           work_days: number
         }[]
       }
+      gen_recurring: {
+        Args: { p_rule: string; p_through: string }
+        Returns: number
+      }
       is_owner: { Args: never; Returns: boolean }
       mcp_assume_owner: { Args: { p_actor: string }; Returns: undefined }
       mcp_begin_write: {
@@ -1276,6 +1376,16 @@ export type Database = {
           job_title: string
         }[]
       }
+      recurring_status: {
+        Args: { p_through: string }
+        Returns: {
+          due_months: number
+          id: string
+          last_month: string
+          posted_months: number
+          posted_total: number
+        }[]
+      }
       report_by_category: {
         Args: { p_from?: string; p_site?: string; p_to?: string }
         Returns: {
@@ -1350,6 +1460,11 @@ export type Database = {
           work_units: number
         }[]
       }
+      run_recurring_expense: {
+        Args: { p_rule: string; p_through: string }
+        Returns: number
+      }
+      run_recurring_expenses: { Args: { p_through: string }; Returns: number }
       save_attendance_day: {
         Args: {
           p_date: string

@@ -98,6 +98,7 @@ create type payroll_status as enum ('open','closed');
 | `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date`, `pay_method`, `site_id`, `payroll_run_id`, `mcp_key_id` | supervisor เขียนของโครงการตัวเอง |
 | `payroll_runs` | `period_start`, `period_end`, `site_id`, `status`, `total_accrued`, `total_advance_deducted`, `total_paid` | **owner เท่านั้น** |
 | `payroll_lines` | `run_id`, `employee_id`, `days`, `accrued`, `advance_deducted`, `net_paid` | ตาม run |
+| `recurring_expenses` | ค่าใช้จ่ายรายเดือนที่ระบบลงให้เอง: `name`, `amount`, `category_id`, `site_id` (NULL = ส่วนกลาง), `employee_id` (NULL = ไม่ผูกคน), `day_of_month`, `start_month`, `end_month`, `is_active` | **owner เท่านั้น** |
 | `audit_log` | `table_name`, `row_id`, `action`, `actor`, `before` jsonb, `after` jsonb, `at`, **`mcp_key_id`** (มีค่า = AI ทำแทนเจ้าของ · **ไม่มี FK** โดยตั้งใจ ดู §17 ข้อ 19) | **อ่านได้เฉพาะ owner · ไม่มี policy ให้ UPDATE/DELETE กับใครทั้งนั้น** |
 | `notifications` | `user_id`, `kind`, `title`, `body`, `link`, `read_at` | ของตัวเอง |
 | `push_subscriptions` | `user_id`, `endpoint` (unique), `p256dh`, `auth`, `last_ok_at` | ของตัวเอง |
@@ -421,6 +422,11 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       · **คนที่เคยอยู่ในรอบจ่ายที่ปิดแล้วลบไม่ได้** (`payroll_lines` คือหลักฐานการจ่ายเงิน) ให้ปิดใช้งานแทน
       · `employees_delete_info()` ส่งยอดค้างจ่ายมาพร้อมหน้า กล่องยืนยันจึงบอกได้ทันทีว่ากำลังจะเสียอะไร
 - [x] **R8 · มุมมองการ์ดของคนเข้าโครงการ** — ปุ่มสลับมุมมอง + การ์ดสองคอลัมน์สำหรับเลือกด้วยนิ้วเดียว
+- [x] **R9 · รอบคำสั่งเจ้าของ 4 ก.ย. 2569** — เรียกหน่วยงานว่า "โครงการ" ทั้งระบบ · ปิดการ์ด
+      "งานวันนี้" · ต้นทุนสะสมแยกสามก้อน (ค่าแรง/ค่าวัสดุ/อื่น ๆ) + ธง `categories.is_material`
+      · ยอดรวมแยกหมวดในหน้าโครงการ · **จ่ายค่าแรงรายคนปุ่มเดียว** (เลิกใช้คำว่า "รอบจ่าย"
+      บนหน้าจอ แต่กลไกรอบที่ปิดแล้วยังอยู่ เพราะมันคือตัวกันจ่ายซ้ำ/ล็อกค่าแรง/ฐานเพดานเบิก)
+      · แท็บ "ทำงานที่ไหนบ้าง" รายคน–รายโครงการ · **ค่าใช้จ่ายรายเดือน** ที่ลงย้อนหลังให้เอง
       (ไม่แตะฐานข้อมูลและ API เลย เป็นมุมมองใหม่ของข้อมูลชุดเดิม)
 
 **เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อโครงการ+เตือน · ปันส่วนเงินเดือนเข้าโครงการตามวัน
@@ -428,6 +434,11 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 ## 15. กติกาที่ห้ามละเมิด
 
 - ภาษาไทยทั้งระบบ · **lucide ห้าม emoji** · **sonner ห้าม `alert()`** · radix สำหรับ confirm/ask
+- ⚠️ **"ค่าแรง" กับ "เงินเดือน" เข้าต้นทุนคนละทาง ห้ามตั้งซ้อนกัน** — คนรายวัน
+  ได้ค่าแรงตอนติ๊กเข้าโครงการ (accrual) · คนรายเดือนมี `wage_snapshot = 0` จึงเข้า
+  เฉพาะ OT แล้วรับเงินเดือนผ่านกฎใน `recurring_expenses` แทน · ตั้งกฎเงินเดือนให้
+  คนรายวันเมื่อไหร่ ต้นทุนเป็นสองเท่าทันที — `guard_recurring` กันไว้ที่ฐานข้อมูล
+  และหน้าจอไม่แสดงคนรายวันในกล่องเลือกเลย
 - ⚠️ **หน่วยงานเรียกว่า "โครงการ" เท่านั้น** (คำสั่งเจ้าของ 4 ก.ย. 2569) — ไม่มีคำว่า
   "ไซต์" หรือ "ไซต์งาน" ในข้อความที่ผู้ใช้เห็นอีกแล้ว รวมถึงข้อความที่ฐานข้อมูล
   **คืนกลับมาเป็นข้อมูล** (เช่นป้าย `'ส่วนกลาง (ไม่ผูกโครงการ)'` ใน `report_by_site`)

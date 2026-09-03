@@ -1,6 +1,6 @@
 'use client'
 
-import { ArrowRight, HardHat, Loader2, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
+import { ArrowRight, CalendarClock, HardHat, Loader2, Pencil, Plus, UserCheck, UserX } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
@@ -365,6 +365,19 @@ export function EmployeesClient({
               </span>
 
               <div className="flex shrink-0 items-center gap-1.5">
+                {/* 🔴 เฉพาะคนรายเดือน — คนรายวันมีค่าแรงเกิดตอนติ๊กเข้าโครงการ
+                    อยู่แล้ว ตั้งเงินเดือนซ้ำจะทำให้ต้นทุนเป็นสองเท่า (§17 ข้อ 1)
+                    · ปุ่มจึงไม่วาดเลยสำหรับคนรายวัน ไม่ใช่วาดแล้วกดไม่ผ่าน */}
+                {e.wage_type === 'monthly' && e.is_active && (
+                  <Link
+                    href={`/settings/recurring?employee=${e.id}`}
+                    aria-label={`ตั้งเงินเดือนรายเดือนของ ${e.full_name}`}
+                    className="btn-secondary"
+                  >
+                    <CalendarClock className="size-4" />
+                    <span className="hidden sm:inline">เงินเดือนรายเดือน</span>
+                  </Link>
+                )}
                 <button
                   onClick={() => openEdit(e)}
                   aria-label={`แก้ไข ${e.full_name}`}

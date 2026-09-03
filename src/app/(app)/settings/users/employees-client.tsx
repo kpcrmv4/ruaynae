@@ -34,6 +34,18 @@ type Person = { id: string; full_name: string; role: 'owner' | 'site_supervisor'
 
 const ROLE_LABEL = { owner: 'เจ้าของ', site_supervisor: 'หัวหน้าโครงการ' } as const
 
+/** ตำแหน่งที่พิมพ์บ่อย — กดแล้วเติมให้ พิมพ์เองก็ยังได้ */
+const JOB_TITLES = [
+  'หัวหน้าคนงาน',
+  'หัวหน้าโครงการ',
+  'โฟร์แมน',
+  'ช่างปูน',
+  'ช่างไม้',
+  'ช่างเหล็ก',
+  'ช่างไฟ',
+  'กรรมกร',
+] as const
+
 const EMPTY = {
   fullName: '',
   jobTitle: '',
@@ -189,6 +201,27 @@ export function EmployeesClient({
                 placeholder="เช่น ช่างปูน · กรรมกร"
                 className="input-base"
               />
+              {/* 🔴 ยังเป็นช่องพิมพ์อิสระ ไม่ใช่กล่องเลือกที่ล็อกตัวเลือกไว้ —
+                  ผู้รับเหมาแต่ละเจ้าเรียกตำแหน่งไม่เหมือนกัน · ชิปเป็นทางลัดของ
+                  ตำแหน่งที่ใช้บ่อย ไม่ใช่รายการที่อนุญาต (เจ้าของแจ้ง 4 ก.ย. 2569
+                  ว่าไม่มี "หัวหน้าคนงาน" ให้เลือก) */}
+              <div className="mt-1.5 flex flex-wrap gap-1.5">
+                {JOB_TITLES.map((t) => (
+                  <button
+                    key={t}
+                    type="button"
+                    onClick={() => set('jobTitle', t)}
+                    aria-pressed={form.jobTitle === t}
+                    className={`rounded-sm border px-2 py-1 text-xs font-medium transition-colors duration-100 ${
+                      form.jobTitle === t
+                        ? 'border-brand bg-brand-tint text-brand-on-tint'
+                        : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2 hover:text-ink'
+                    }`}
+                  >
+                    {t}
+                  </button>
+                ))}
+              </div>
             </div>
 
             <div>

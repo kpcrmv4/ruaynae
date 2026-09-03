@@ -1096,6 +1096,18 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      attendance_by_site: {
+        Args: { p_from: string; p_to: string }
+        Returns: {
+          amount: number
+          days: number
+          employee_id: string
+          full_name: string
+          job_title: string
+          site_id: string
+          site_name: string
+        }[]
+      }
       attendance_grid: {
         Args: { p_from: string; p_to: string }
         Returns: {

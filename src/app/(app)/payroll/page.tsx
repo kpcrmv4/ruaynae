@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { CalendarDays, Wallet } from 'lucide-react'
+import { CalendarDays, HardHat, Wallet } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -8,17 +8,20 @@ import { fmtBaht, todayInBangkok } from '@/lib/format'
 import { daysInRange, parsePeriod, periodOptions } from '@/lib/reports'
 import { Metric, MetricBar } from '@/components/ui/metric'
 import { EmptyState } from '@/components/ui/states'
+import { asNullableNumber } from '@/lib/money'
 import { PayrollBoard } from './payroll-client'
+import { SiteHistory } from './site-history'
 import { WorkGrid } from './work-grid'
 
 export const metadata = { title: 'ค่าแรงและการจ่าย' }
 
-type Search = { tab?: string; p?: string }
+type Search = { tab?: string; p?: string; view?: string }
 
 export default async function PayrollPage({ searchParams }: { searchParams: Promise<Search> }) {
   const [me, sp] = await Promise.all([getCurrentUser(), searchParams])
-  // สองมุมมองสลับกันได้ · สถานะอยู่บน URL เหมือนหน้าอื่นทั้งแอป — แชร์ลิงก์ได้
-  const tab = sp.tab === 'grid' ? 'grid' : 'balances'
+  // สามมุมมองสลับกันได้ · สถานะอยู่บน URL เหมือนหน้าอื่นทั้งแอป — แชร์ลิงก์ได้
+  const tab = sp.tab === 'grid' ? 'grid' : sp.tab === 'sites' ? 'sites' : 'balances'
+  const view = sp.view === 'site' ? 'site' : 'person'
   // ซ่อนเมนูอย่างเดียวไม่พอ — คนพิมพ์ URL ตรงได้ ต้องกันที่หน้าเองด้วย
   // เบิกและรอบจ่ายเป็นเรื่องเงินทั้งหมด · หัวหน้าโครงการไม่เกี่ยว
   if (me.role !== 'owner') redirect('/')
@@ -51,6 +54,14 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         .range(0, PAGE_SIZE - 1),
     ])
 
+  // ── ข้อมูลของแท็บ "ทำงานที่ไหนบ้าง" — สรุปในฐานข้อมูล ไม่ใช่ group ใน JS ──
+  const { data: workRows, error: wErr } =
+    tab === 'sites'
+      ? await sb
+          .rpc('attendance_by_site', { p_from: month.from, p_to: month.to })
+          .range(0, 2000)
+      : { data: null, error: null }
+
   // ── ข้อมูลของแท็บ "ตารางการทำงาน" — ดึงเฉพาะตอนเปิดแท็บนั้นจริง ──────
   // เปิดแท็บยอดค้างอยู่แล้วไม่ต้องจ่ายค่า query ของอีกแท็บหนึ่ง
   const [{ data: gridCells, error: gErr }, { data: gridPeople, error: pErr }] =
@@ -72,10 +83,10 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           { data: null, error: null },
         ]
 
-  if (bErr || rErr || gErr || pErr) {
+  if (bErr || rErr || gErr || pErr || wErr) {
     console.error(
       '[payroll] โหลดข้อมูลไม่ได้',
-      bErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message,
+      bErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message ?? wErr?.message,
     )
     return (
       <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
@@ -136,6 +147,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                 label: 'ตารางการทำงาน',
                 href: `/payroll?tab=grid&p=${month.key}`,
               },
+              {
+                key: 'sites',
+                label: 'ทำงานที่ไหนบ้าง',
+                href: `/payroll?tab=sites&p=${month.key}`,
+              },
             ] as const
           ).map((t) => (
             <Link
@@ -148,16 +164,21 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
                   : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2 hover:text-ink'
               }`}
             >
-              {t.key === 'grid' ? <CalendarDays className="size-4" /> : <Wallet className="size-4" />}
+              {t.key === 'grid' ? <CalendarDays className="size-4" />
+                : t.key === 'sites' ? <HardHat className="size-4" />
+                : <Wallet className="size-4" />}
               {t.label}
             </Link>
           ))}
         </div>
 
         {/* เลือกเดือน — ค่าเริ่มต้นคือเดือนปัจจุบัน · เป็นฟอร์ม GET ไม่มี state ฝั่ง client */}
-        {tab === 'grid' && (
+        {tab !== 'balances' && (
           <form action="/payroll" method="get" className="flex gap-2">
-            <input type="hidden" name="tab" value="grid" />
+            <input type="hidden" name="tab" value={tab} />
+            {tab === 'sites' && view === 'site' && (
+              <input type="hidden" name="view" value="site" />
+            )}
             <select
               name="p"
               defaultValue={month.key}
@@ -177,7 +198,21 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         )}
       </div>
 
-      {tab === 'grid' ? (
+      {tab === 'sites' ? (
+        <SiteHistory
+          view={view}
+          monthKey={month.key}
+          rows={(workRows ?? []).map((r) => ({
+            employee_id: r.employee_id,
+            full_name: r.full_name,
+            job_title: r.job_title,
+            site_id: r.site_id,
+            site_name: r.site_name,
+            days: Number(r.days),
+            amount: asNullableNumber(r.amount),
+          }))}
+        />
+      ) : tab === 'grid' ? (
         (gridPeople ?? []).length === 0 ? (
           <EmptyState
             icon={CalendarDays}

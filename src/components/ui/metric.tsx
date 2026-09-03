@@ -34,7 +34,13 @@ export function MetricBar({
   cols = 2,
 }: {
   children: ReactNode
-  /** จำนวนคอลัมน์บนจอเล็ก — แถบ 3 ช่องใช้ 3 จะได้ไม่เหลือช่องว่างครึ่งแถว */
+  /**
+   * จำนวนคอลัมน์บนจอเล็ก — แถบ 3 ช่องใช้ 3 จะได้ไม่เหลือช่องว่างครึ่งแถว
+   *
+   * 🔴 ใช้ `3` เฉพาะแถบที่เป็น **จำนวนนับ** (4 โครงการ · 12 รายการ) เท่านั้น
+   * ช่องกว้าง 1/3 ของจอ 390px เหลือที่ให้ตัวเลขราว 100px ซึ่งไม่พอกับยอดเงิน
+   * หลักแสนขึ้นไป · แถบที่เป็นเงินให้ใช้ 2
+   */
   cols?: 2 | 3
 }) {
   return (
@@ -44,6 +50,26 @@ export function MetricBar({
       {children}
     </div>
   )
+}
+
+/**
+ * ขนาดตัวเลขบนจอเล็ก — ยาวขึ้น = เล็กลงหนึ่งขั้น
+ *
+ * 🔴 ตัวเลขเงินย่อเองไม่ได้และ `truncate` ก็ใช้ไม่ได้ — "฿69,20…" คือตัวเลข
+ * **ผิด** ไม่ใช่ตัวเลขที่อ่านยาก · ของที่เจอจริง: ฿-69,203 ในช่องกว้าง 1/3
+ * ของจอ 390px ล้นออกไปทับช่องข้าง ๆ โดยที่ `overflow-hidden` ของแถบซ่อน
+ * ส่วนที่เกินขอบขวาสุดไว้อีกที ตัวตรวจ "ล้นขอบจอ" จึงไม่มีทางจับได้
+ *
+ * ⚠️ ไม่ใช่ปัญหาของจอมือถืออย่างเดียว — ตั้งแต่ `sm:` ขึ้นไปแถบเรียงเป็น
+ * คอลัมน์เท่ากัน แถบ 4 ช่องบนจอ 768px จึงเหลือที่ให้ตัวเลขแค่ ~151px
+ * (วัดจริง: ฿3,554,300 ต้องการ 157px) · ขนาดจึงต้องไล่ขึ้นตามเบรกพอยต์
+ * ไม่ใช่กระโดดกลับเต็มขนาดที่ `sm:`
+ */
+function valueSize(value: ReactNode): string {
+  const len = typeof value === 'string' || typeof value === 'number' ? String(value).length : 0
+  if (len >= 12) return 'text-xl md:text-2xl xl:text-3xl'
+  if (len >= 10) return 'text-2xl lg:text-3xl'
+  return 'text-3xl'
 }
 
 export function Metric({
@@ -70,7 +96,7 @@ export function Metric({
         <span className="truncate">{label}</span>
       </div>
       {/* tnum: these get scanned vertically against each other */}
-      <div className={`mt-0.5 text-center text-3xl font-bold tracking-tight tnum ${VALUE_TONE[tone]}`}>
+      <div className={`mt-0.5 text-center font-bold tracking-tight tnum ${valueSize(value)} ${VALUE_TONE[tone]}`}>
         {value}
         {unit && <span className="ml-1 text-sm font-normal tracking-normal text-muted-token">{unit}</span>}
       </div>

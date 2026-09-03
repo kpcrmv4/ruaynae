@@ -1273,6 +1273,7 @@ export type Database = {
           ot_total: number
           payroll_paid: number
           wage_total: number
+          work_days: number
           work_units: number
           worker_count: number
         }[]

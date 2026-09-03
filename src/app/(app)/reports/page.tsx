@@ -174,7 +174,9 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         />
       ) : (
         <>
-          <MetricBar cols={3}>
+          {/* ยอดเงินล้วน — 3 ช่องบนจอ 390px แคบเกินไปสำหรับหลักแสนขึ้นไป
+              (เจ้าของเจอ ฿-69,203 ล้นทับช่องข้าง ๆ 4 ก.ย. 2569) */}
+          <MetricBar>
             <Metric
               label="รายรับ"
               value={fmtBaht(income)}
@@ -319,7 +321,10 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
             <section className="panel">
               <div className="panel-head">คนและค่าแรง</div>
               <div className="grid grid-cols-2 divide-x divide-y divide-line-soft">
-                <Cell label="วันแรงรวม" value={`${Number(labor?.work_units ?? 0)} วัน`} />
+                {/* 🔴 นับ **วันตามปฏิทิน** ที่มีคนถูกลงชื่อ ไม่ใช่วันแรงของทุกคนบวกกัน
+                    — 5 คนมาวันเดียวกันคือ 1 วัน ไม่ใช่ 5 (คำสั่งเจ้าของ 4 ก.ย. 2569)
+                    ปริมาณแรงงานอ่านได้จาก "ค่าแรงที่เกิดขึ้น" กับลิสต์รายคนข้างล่าง */}
+                <Cell label="วันที่ทำงาน" value={`${Number(labor?.work_days ?? 0)} วัน`} />
                 <Cell label="คนที่มาทำงาน" value={`${Number(labor?.worker_count ?? 0)} คน`} />
                 <Cell label="ค่าแรงที่เกิดขึ้น" value={fmtBaht(Number(labor?.wage_total ?? 0))} />
                 <Cell label="ในนั้นเป็น OT" value={fmtBaht(Number(labor?.ot_total ?? 0))} />

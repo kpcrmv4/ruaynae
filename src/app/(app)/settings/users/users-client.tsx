@@ -32,7 +32,7 @@ const MESSAGES: Record<string, string> = {
 }
 const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
 
-const ROLE_LABEL = { owner: 'เจ้าของ', site_supervisor: 'หัวหน้าไซต์' } as const
+const ROLE_LABEL = { owner: 'เจ้าของ', site_supervisor: 'หัวหน้าโครงการ' } as const
 
 export function UsersClient({ meId, users }: { meId: string; users: Row[] }) {
   const router = useRouter()
@@ -135,7 +135,7 @@ export function UsersClient({ meId, users }: { meId: string; users: Row[] }) {
                 onChange={(e) => setForm({ ...form, role: e.target.value as Row['role'] })}
                 className="input-base"
               >
-                <option value="site_supervisor">หัวหน้าไซต์ (ล็อกอินด้วย PIN)</option>
+                <option value="site_supervisor">หัวหน้าโครงการ (ล็อกอินด้วย PIN)</option>
                 <option value="owner">เจ้าของ (ล็อกอินด้วยอีเมล)</option>
               </select>
             </div>

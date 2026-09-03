@@ -10,7 +10,7 @@ import { ListRow } from '@/components/ui/list-row'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 import { NewSiteButton } from '../sites-client'
 
-export const metadata = { title: 'ไซต์งาน' }
+export const metadata = { title: 'โครงการ' }
 
 /**
  * PostgREST `or=(…)` แยกเงื่อนไขด้วยจุลภาคและใช้วงเล็บเป็นไวยากรณ์
@@ -30,7 +30,7 @@ export default async function SitesPage({
   const status = isSiteStatus(sp.status) ? sp.status : 'all'
   const q = safeQuery(sp.q ?? '')
 
-  // 🔴 client ที่ผูกกับเซสชัน ไม่ใช่ secret key — "หัวหน้าไซต์เห็นเฉพาะไซต์ตัวเอง"
+  // 🔴 client ที่ผูกกับเซสชัน ไม่ใช่ secret key — "หัวหน้าโครงการเห็นเฉพาะโครงการตัวเอง"
   // จึงบังคับด้วย RLS ไม่ใช่ด้วย where ที่ผมอาจลืมใส่ในหน้าถัดไป
   const sb = await getSupabaseServer()
 
@@ -56,7 +56,7 @@ export default async function SitesPage({
     return count ?? 0
   }
 
-  // ค่างานอยู่ตาราง `site_finance` ที่หัวหน้าไซต์อ่านไม่ได้เลย
+  // ค่างานอยู่ตาราง `site_finance` ที่หัวหน้าโครงการอ่านไม่ได้เลย
   // จึงดึงเฉพาะตอนเป็นเจ้าของ — ถ้าดึงทุกครั้งจะได้ลิสต์ว่างเงียบ ๆ
   // ซึ่งแยกไม่ออกจาก "ยังไม่มีใครตั้งค่างาน"
   const isOwner = me.role === 'owner'
@@ -82,10 +82,10 @@ export default async function SitesPage({
   const { data: sites, error } = listResult
 
   if (error) {
-    console.error('[sites] อ่านรายการไซต์ไม่ได้', error.message)
+    console.error('[sites] อ่านรายการโครงการไม่ได้', error.message)
     return (
       <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดรายการไซต์งานไม่สำเร็จ</p>
+        <p className="text-sm text-urgent">โหลดรายการโครงการไม่สำเร็จ</p>
         <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
       </div>
     )
@@ -102,7 +102,7 @@ export default async function SitesPage({
 
   const contractOf = new Map(financeRows.map((f) => [f.site_id, Number(f.contract_amount)]))
   const rows = sites ?? []
-  // ไม่มีผลการค้นหา กับ ยังไม่มีไซต์เลย เป็นคนละสถานะ — ข้อความเดียวกันทำให้
+  // ไม่มีผลการค้นหา กับ ยังไม่มีโครงการเลย เป็นคนละสถานะ — ข้อความเดียวกันทำให้
   // คนคิดว่าข้อมูลหายไปทั้งที่แค่ตัวกรองไม่ตรง
   const isSearching = q !== '' || status !== 'all'
 
@@ -110,9 +110,9 @@ export default async function SitesPage({
     <>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold text-ink">ไซต์งาน</h1>
+          <h1 className="truncate text-2xl font-bold text-ink">โครงการ</h1>
           <p className="mt-0.5 text-sm text-muted-token">
-            {isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะไซต์ที่คุณดูแลอยู่ตอนนี้'}
+            {isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะโครงการที่คุณดูแลอยู่ตอนนี้'}
           </p>
         </div>
         {isOwner && <NewSiteButton />}
@@ -123,7 +123,7 @@ export default async function SitesPage({
         q={q}
         filters={filters}
         activeFilter={status}
-        placeholder="ค้นหาชื่อไซต์หรือชื่อลูกค้า…"
+        placeholder="ค้นหาชื่อโครงการหรือชื่อลูกค้า…"
       />
 
       {rows.length === 0 ? (
@@ -131,10 +131,10 @@ export default async function SitesPage({
           icon={HardHat}
           message={
             isSearching
-              ? 'ไม่พบไซต์งานที่ตรงกับเงื่อนไขนี้ ลองล้างตัวกรองหรือเปลี่ยนคำค้น'
+              ? 'ไม่พบโครงการที่ตรงกับเงื่อนไขนี้ ลองล้างตัวกรองหรือเปลี่ยนคำค้น'
               : isOwner
-                ? 'ยังไม่มีไซต์งานในระบบ เริ่มจากเพิ่มไซต์แรกเพื่อบันทึกรายรับรายจ่ายเข้าไป'
-                : 'ยังไม่มีไซต์งานที่คุณดูแลอยู่ ให้เจ้าของมอบหมายไซต์ให้ก่อน'
+                ? 'ยังไม่มีโครงการในระบบ เริ่มจากเพิ่มโครงการแรกเพื่อบันทึกรายรับรายจ่ายเข้าไป'
+                : 'ยังไม่มีโครงการที่คุณดูแลอยู่ ให้เจ้าของมอบหมายโครงการให้ก่อน'
           }
           action={isOwner && !isSearching ? <NewSiteButton /> : undefined}
         />
@@ -159,7 +159,7 @@ export default async function SitesPage({
               }
               aside={
                 <>
-                  {/* หัวหน้าไซต์ไม่เห็นช่องนี้เลย — และไม่ใช่แค่ซ่อนบนหน้าจอ
+                  {/* หัวหน้าโครงการไม่เห็นช่องนี้เลย — และไม่ใช่แค่ซ่อนบนหน้าจอ
                       ฐานข้อมูลไม่ยอมให้เขาอ่านตาราง site_finance ตั้งแต่แรก */}
                   {isOwner && (
                     <span className="text-sm font-semibold tnum text-ink">

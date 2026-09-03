@@ -4,7 +4,7 @@
  *
  * เรื่องที่ตรวจ: แก้/ลบรายการที่บันทึกไปแล้ว
  *  · เจ้าของแตะได้ทุกแถว รวมที่อนุมัติแล้ว (ร่องรอยอยู่ที่ audit_log)
- *  · หัวหน้าไซต์แตะได้เฉพาะของตัวเองที่ยังไม่อนุมัติ
+ *  · หัวหน้าโครงการแตะได้เฉพาะของตัวเองที่ยังไม่อนุมัติ
  *  · ของที่ถูกตีกลับ เจ้าตัวแก้แล้ว = ส่งใหม่ สถานะกลับเป็น pending เอง
  *
  * 🔴 "0 แถว" ทุกจุดมีการพิสูจน์ฝั่งบวกคู่กันเสมอ — ไม่งั้นแยกไม่ออกว่า
@@ -148,7 +148,7 @@ try {
     const { rows } = await sql(
       `select status::text as s, coalesce(rejected_reason,'') as reason, amount::float8 as a
        from public.transactions where id='${id}'`)
-    check('R4-DB-03 หัวหน้าไซต์แก้ของที่ถูกตีกลับได้ · สถานะกลับเป็น pending · เหตุผลถูกล้าง',
+    check('R4-DB-03 หัวหน้าโครงการแก้ของที่ถูกตีกลับได้ · สถานะกลับเป็น pending · เหตุผลถูกล้าง',
       r.status === 200 && rows[0].s === 'pending' && rows[0].reason === '' && rows[0].a === 2500,
       `${r.status} · ${rows[0].s} · เหตุผล "${rows[0].reason}" · ยอด ${rows[0].a}`)
 
@@ -159,7 +159,7 @@ try {
       after === before + 1, `${before}→${after}`)
   }
 
-  // ── R4-DB-04 / R4-DB-05 · หัวหน้าไซต์แตะของที่อนุมัติแล้วไม่ได้ ───
+  // ── R4-DB-04 / R4-DB-05 · หัวหน้าโครงการแตะของที่อนุมัติแล้วไม่ได้ ───
   {
     const id = await seedTxn('approved', sup1.id, 3000)
     const before = await txnCount()
@@ -170,12 +170,12 @@ try {
     })
     const { rows: kept } = await sql(
       `select amount::float8 as a from public.transactions where id='${id}'`)
-    check('R4-DB-04 หัวหน้าไซต์แก้ยอดของรายการที่อนุมัติแล้วไม่ได้ · ยอดเดิมคงอยู่',
+    check('R4-DB-04 หัวหน้าโครงการแก้ยอดของรายการที่อนุมัติแล้วไม่ได้ · ยอดเดิมคงอยู่',
       kept[0].a === 3000, `${upd.status} · ยอด ${kept[0].a}`)
 
     const del = await db(supTok, `/transactions?id=eq.${id}`, { method: 'DELETE' })
     const after = await txnCount()
-    check('R4-DB-05 หัวหน้าไซต์ลบรายการที่อนุมัติแล้วไม่ได้ · จำนวนเท่าเดิม',
+    check('R4-DB-05 หัวหน้าโครงการลบรายการที่อนุมัติแล้วไม่ได้ · จำนวนเท่าเดิม',
       after === before, `${del.status} · ${before}→${after}`)
   }
 
@@ -185,7 +185,7 @@ try {
     const before = await txnCount()
     const r = await db(supTok, `/transactions?id=eq.${id}`, { method: 'DELETE' })
     const after = await txnCount()
-    check('R4-DB-07 หัวหน้าไซต์ลบรายการของตัวเองที่ถูกตีกลับได้',
+    check('R4-DB-07 หัวหน้าโครงการลบรายการของตัวเองที่ถูกตีกลับได้',
       r.ok && after === before - 1, `${r.status} · ${before}→${after}`)
   }
 
@@ -285,7 +285,7 @@ try {
       d.status === 200 && gone[0].n === 0, `${d.status} · เหลือ ${gone[0].n} แถว`)
   }
 
-  // ── R4-API-03 / 04 · หัวหน้าไซต์แตะของที่อนุมัติแล้วไม่ได้ ─────────
+  // ── R4-API-03 / 04 · หัวหน้าโครงการแตะของที่อนุมัติแล้วไม่ได้ ─────────
   {
     const id = await mk('approved', sup1.id, 2000)
     const p = await req('PATCH', `/api/transactions/${id}`, {
@@ -295,7 +295,7 @@ try {
     const pb = await p.json().catch(() => ({}))
     const { rows } = await sql(
       `select amount::float8 as a from public.transactions where id='${id}'`)
-    check('R4-API-03 หัวหน้าไซต์ PATCH ของที่อนุมัติแล้ว → 403 EDIT_FORBIDDEN (ไม่ใช่ 200 เงียบ ๆ)',
+    check('R4-API-03 หัวหน้าโครงการ PATCH ของที่อนุมัติแล้ว → 403 EDIT_FORBIDDEN (ไม่ใช่ 200 เงียบ ๆ)',
       p.status === 403 && pb.error === 'EDIT_FORBIDDEN' && rows[0].a === 2000,
       `${p.status} · ${pb.error} · ยอด ${rows[0].a}`)
 
@@ -303,7 +303,7 @@ try {
     const db2 = await d.json().catch(() => ({}))
     const { rows: still } = await sql(
       `select count(*)::int as n from public.transactions where id='${id}'`)
-    check('R4-API-04 หัวหน้าไซต์ DELETE ของที่อนุมัติแล้ว → 403 DELETE_FORBIDDEN · แถวยังอยู่',
+    check('R4-API-04 หัวหน้าโครงการ DELETE ของที่อนุมัติแล้ว → 403 DELETE_FORBIDDEN · แถวยังอยู่',
       d.status === 403 && db2.error === 'DELETE_FORBIDDEN' && still[0].n === 1,
       `${d.status} · ${db2.error}`)
   }
@@ -340,7 +340,7 @@ try {
     const r = await req('DELETE', `/api/attachments/${attId}`, undefined, { cookie: supJar })
     const { rows } = await sql(
       `select count(*)::int as n from public.attachments where id='${attId}'`)
-    check('R4-API-07 หัวหน้าไซต์ลบสลิปของรายการที่แก้ไม่ได้ → ปฏิเสธ · แถวสลิปยังอยู่',
+    check('R4-API-07 หัวหน้าโครงการลบสลิปของรายการที่แก้ไม่ได้ → ปฏิเสธ · แถวสลิปยังอยู่',
       (r.status === 403 || r.status === 404) && rows[0].n === 1, `${r.status} · เหลือ ${rows[0].n}`)
   }
 
@@ -371,26 +371,26 @@ try {
     const supHtml = await page(`/ledger?site=${apiSite}`, supJar)
     check('R4-UI-01 เจ้าของเห็นปุ่มแก้ไขครบทุกแถว (2 แถว → 2 ปุ่ม)',
       marks(ownerHtml) === 2, `พบ ${marks(ownerHtml)} ปุ่ม`)
-    check('R4-UI-02 หัวหน้าไซต์เห็นทั้งสองแถว แต่มีปุ่มเฉพาะแถวที่ยังไม่อนุมัติ',
+    check('R4-UI-02 หัวหน้าโครงการเห็นทั้งสองแถว แต่มีปุ่มเฉพาะแถวที่ยังไม่อนุมัติ',
       marks(supHtml) === 1 && supHtml.includes('700') && supHtml.includes('900'),
       `ปุ่ม ${marks(supHtml)} · เห็นทั้งสองแถว ${supHtml.includes('700') && supHtml.includes('900')}`)
   }
 
-  // ── R4-UI-07 / 10 · รายการท้ายหน้าไซต์ ────────────────────────────
+  // ── R4-UI-07 / 10 · รายการท้ายหน้าโครงการ ────────────────────────────
   {
     const html = await page(`/sites/${apiSite}`, ownerJar)
-    check('R4-UI-07 หน้าไซต์มีแผง "รายรับ-รายจ่ายล่าสุด" พร้อมลิงก์ไป /ledger ของไซต์นั้น',
+    check('R4-UI-07 หน้าโครงการมีแผง "รายรับ-รายจ่ายล่าสุด" พร้อมลิงก์ไป /ledger ของโครงการนั้น',
       html.includes('รายรับ-รายจ่ายล่าสุด') && html.includes(`/ledger?site=${apiSite}`),
       html.includes('รายรับ-รายจ่ายล่าสุด') ? 'พบแผง' : 'ไม่พบแผง')
   }
 
-  // ── R4-UI-08 · ไซต์ที่ยังไม่มีรายการ ──────────────────────────────
+  // ── R4-UI-08 · โครงการที่ยังไม่มีรายการ ──────────────────────────────
   {
     const [{ id: emptySite }] = (await sql(
-      "insert into public.sites(name) values ('ทดสอบ R4 ไซต์ว่าง') returning id")).rows
+      "insert into public.sites(name) values ('ทดสอบ R4 โครงการว่าง') returning id")).rows
     const html = await page(`/sites/${emptySite}`, ownerJar)
-    check('R4-UI-08 ไซต์ที่ยังไม่มีรายการขึ้นสถานะว่าง ไม่ใช่แผงเปล่า',
-      html.includes('ยังไม่มีรายการของไซต์นี้'), 'สถานะว่าง')
+    check('R4-UI-08 โครงการที่ยังไม่มีรายการขึ้นสถานะว่าง ไม่ใช่แผงเปล่า',
+      html.includes('ยังไม่มีรายการของโครงการนี้'), 'สถานะว่าง')
     await sql(`delete from public.sites where id='${emptySite}'`)
   }
 } finally {

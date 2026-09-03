@@ -18,17 +18,17 @@ migration `20260831040000_branding_company_name.sql` ซึ่งเติม**�
 
 
 เว็บแอปสำหรับผู้รับเหมาก่อสร้างรายเล็ก-กลาง (**บริษัทเดียว ไม่ใช่ SaaS หลายผู้เช่า**)
-บันทึกรายรับ-รายจ่ายรายวันต่อไซต์งาน แนบสลิป/บิล จัดการพนักงานและค่าแรง
+บันทึกรายรับ-รายจ่ายรายวันต่อโครงการ แนบสลิป/บิล จัดการพนักงานและค่าแรง
 และให้เจ้าของเห็นว่าแต่ละโปรเจ็คคืบหน้าแค่ไหน เก็บเงินได้เท่าไหร่ เหลือกำไรเท่าไหร่
 
-ผู้ใช้จริงไม่ชำนาญคอมพิวเตอร์ และใช้งานหลักบนมือถือกลางไซต์ → การ์ดโปร่ง ตัวหนังสือใหญ่ ขั้นตอนน้อย
+ผู้ใช้จริงไม่ชำนาญคอมพิวเตอร์ และใช้งานหลักบนมือถือกลางโครงการ → การ์ดโปร่ง ตัวหนังสือใหญ่ ขั้นตอนน้อย
 
 ## 2. Role
 
 | Role | ล็อกอิน | เห็น | ทำได้ |
 |---|---|---|---|
-| `owner` | อีเมล + รหัสผ่าน | ทุกไซต์ ทุกตัวเลข กำไร audit log | ทุกอย่าง · อนุมัติ/ตีกลับ · ปิดรอบจ่ายค่าแรง · CRUD ทั้งหมด |
-| `site_supervisor` | PIN 6 หลัก | เฉพาะไซต์ที่ดูแล **ณ ช่วงเวลานั้น** | คีย์รายจ่ายไซต์ตัวเอง (เข้าคิวรออนุมัติ) · ลงชื่อคนเข้าไซต์ · บันทึกเบิกล่วงหน้า |
+| `owner` | อีเมล + รหัสผ่าน | ทุกโครงการ ทุกตัวเลข กำไร audit log | ทุกอย่าง · อนุมัติ/ตีกลับ · ปิดรอบจ่ายค่าแรง · CRUD ทั้งหมด |
+| `site_supervisor` | PIN 6 หลัก | เฉพาะโครงการที่ดูแล **ณ ช่วงเวลานั้น** | คีย์รายจ่ายโครงการตัวเอง (เข้าคิวรออนุมัติ) · ลงชื่อคนเข้าโครงการ · บันทึกเบิกล่วงหน้า |
 
 **คนงานไม่ล็อกอิน** — เป็นแถวใน `employees` ไม่ใช่ผู้ใช้ระบบ `role` ถูกกำหนดฝั่งเซิร์ฟเวอร์เท่านั้น ห้ามเชื่อ metadata จาก client
 
@@ -86,16 +86,16 @@ create type payroll_status as enum ('open','closed');
 | `branding` | แถวเดียว: `company_name`, `logo_object_key`, `updated_at` | **`anon` SELECT ได้** (หน้า login ต้องอ่านตอนยังไม่ล็อกอิน) · UPDATE เฉพาะ owner |
 | `app_settings` | แถวเดียว: ที่อยู่, เลขผู้เสียภาษี, ผู้ลงนาม, นโยบายเก็บรูป ฯลฯ | **owner เท่านั้น ทั้งอ่านและเขียน** |
 | `profiles` | `id → auth.users`, `full_name`, `role`, `pin_hash` (HMAC + pepper, unique), `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
-| `sites` | `name`, `client_name`, `contract_amount`, `start_date`, `end_date`, `status` | owner ทั้งหมด · supervisor อ่านเฉพาะไซต์ที่ดูแล |
+| `sites` | `name`, `client_name`, `contract_amount`, `start_date`, `end_date`, `status` | owner ทั้งหมด · supervisor อ่านเฉพาะโครงการที่ดูแล |
 | `site_supervisors` | `site_id`, `profile_id`, **`effective_from`, `effective_to`** | owner เขียน · supervisor อ่านแถวตัวเอง |
-| `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date` — ยังไม่มีคอลัมน์บอกว่างวดไหนเก็บเงินแล้ว (วางแผนไว้เป็น `collected_txn_id` แต่ยังไม่ได้สร้าง รอเฟสหลัง) | ตามไซต์ |
+| `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date` — ยังไม่มีคอลัมน์บอกว่างวดไหนเก็บเงินแล้ว (วางแผนไว้เป็น `collected_txn_id` แต่ยังไม่ได้สร้าง รอเฟสหลัง) | ตามโครงการ |
 | `categories` | `name`, `kind`, `is_active`, `sort_order` | อ่านได้ทุก role · เขียนเฉพาะ owner |
-| `employees` | `full_name`, `job_title`, `wage_type`, `daily_rate`, `monthly_salary`, `default_site_id`, `is_active`, **`profile_id`** (NULL = ไม่มีบัญชีล็อกอิน) | owner ทั้งหมด · supervisor อ่านคนที่เคยเข้าไซต์ตัวเอง |
-| `attendance` | `work_date`, `site_id`, `employee_id`, `work_units`, `ot_amount`, **`wage_snapshot`**, `amount` (generated), `mcp_key_id` | supervisor เขียนได้เฉพาะไซต์ตัวเองและวันที่ยังไม่ปิดรอบ |
-| `transactions` | `kind`, `site_id` (NULL = ส่วนกลาง), `category_id`, `amount`, `txn_date`, `pay_method`, `status`, `income_kind`, `installment_no`, **`mcp_key_id`** (NULL = คนคีย์เอง · มีค่า = AI คีย์ผ่านคีย์ใบนั้น) | supervisor เขียน `pending` ของไซต์ตัวเอง · **แก้เป็น `approved` ได้เฉพาะ owner** |
+| `employees` | `full_name`, `job_title`, `wage_type`, `daily_rate`, `monthly_salary`, `default_site_id`, `is_active`, **`profile_id`** (NULL = ไม่มีบัญชีล็อกอิน) | owner ทั้งหมด · supervisor อ่านคนที่เคยเข้าโครงการตัวเอง |
+| `attendance` | `work_date`, `site_id`, `employee_id`, `work_units`, `ot_amount`, **`wage_snapshot`**, `amount` (generated), `mcp_key_id` | supervisor เขียนได้เฉพาะโครงการตัวเองและวันที่ยังไม่ปิดรอบ |
+| `transactions` | `kind`, `site_id` (NULL = ส่วนกลาง), `category_id`, `amount`, `txn_date`, `pay_method`, `status`, `income_kind`, `installment_no`, **`mcp_key_id`** (NULL = คนคีย์เอง · มีค่า = AI คีย์ผ่านคีย์ใบนั้น) | supervisor เขียน `pending` ของโครงการตัวเอง · **แก้เป็น `approved` ได้เฉพาะ owner** |
 | `attachments` | `transaction_id`, `object_key`, `thumb_key`, `byte_size`, `content_type` | ตาม transaction |
 | `upload_intents` | `object_key`, `thumb_key`, `created_by`, `site_id`, `expires_at`, `consumed_at` | ของตัวเองเท่านั้น |
-| `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date`, `pay_method`, `site_id`, `payroll_run_id`, `mcp_key_id` | supervisor เขียนของไซต์ตัวเอง |
+| `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date`, `pay_method`, `site_id`, `payroll_run_id`, `mcp_key_id` | supervisor เขียนของโครงการตัวเอง |
 | `payroll_runs` | `period_start`, `period_end`, `site_id`, `status`, `total_accrued`, `total_advance_deducted`, `total_paid` | **owner เท่านั้น** |
 | `payroll_lines` | `run_id`, `employee_id`, `days`, `accrued`, `advance_deducted`, `net_paid` | ตาม run |
 | `audit_log` | `table_name`, `row_id`, `action`, `actor`, `before` jsonb, `after` jsonb, `at`, **`mcp_key_id`** (มีค่า = AI ทำแทนเจ้าของ · **ไม่มี FK** โดยตั้งใจ ดู §17 ข้อ 19) | **อ่านได้เฉพาะ owner · ไม่มี policy ให้ UPDATE/DELETE กับใครทั้งนั้น** |
@@ -109,9 +109,9 @@ create type payroll_status as enum ('open','closed');
 | คือใคร | ทุกคนที่มีค่าแรงต้องจ่าย | ทุกคนที่ล็อกอินเข้าระบบได้ |
 | ล็อกอินได้ | ไม่ (ค่าเริ่มต้น) | ใช่ |
 | มี role | **ไม่มี** | `owner` / `site_supervisor` |
-| ตัวอย่าง | ช่างปูน กรรมกร ที่มีแค่ชื่อกับค่าแรง | เจ้าของ · หัวหน้าไซต์ |
+| ตัวอย่าง | ช่างปูน กรรมกร ที่มีแค่ชื่อกับค่าแรง | เจ้าของ · หัวหน้าโครงการ |
 
-คนส่วนใหญ่มีแต่แถวใน `employees` · บางคน (เช่นหัวหน้าไซต์ที่กินเงินเดือนด้วย) มีทั้งสองแถว
+คนส่วนใหญ่มีแต่แถวใน `employees` · บางคน (เช่นหัวหน้าโครงการที่กินเงินเดือนด้วย) มีทั้งสองแถว
 เชื่อมด้วย `employees.profile_id` · ห้ามยุบเป็นตารางเดียวแล้วใส่ `role = NULL` เพราะ
 สร้าง `auth.users` ให้คนที่ไม่มีวันล็อกอินคือการเปิดบัญชีทิ้งไว้เปล่า ๆ ให้กิน MAU และกลายเป็นช่องโหว่
 
@@ -153,7 +153,7 @@ supervises_site(p_site uuid, p_on date default current_date) -> boolean
 ```
 ⚠️ **ห้ามใส่ทางลัด `auth.uid() is null` เพื่อให้ service-role ผ่าน** ในฟังก์ชันที่ `anon` เรียกได้ —
 นั่นคือช่องที่เปิดข้อมูลทั้งระบบให้คนที่ยังไม่ล็อกอิน
-⚠️ **ขอบเขตไซต์ไม่ใช่การเช็ค role** — `supervises_site()` บอกแค่ว่าอยู่ไซต์นั้นไหม ไม่ได้บอกว่าอนุมัติได้
+⚠️ **ขอบเขตโครงการไม่ใช่การเช็ค role** — `supervises_site()` บอกแค่ว่าอยู่โครงการนั้นไหม ไม่ได้บอกว่าอนุมัติได้
 
 ### Index
 FK ทุกตัว + คอลัมน์ที่ใช้กรองจริง:
@@ -161,9 +161,9 @@ FK ทุกตัว + คอลัมน์ที่ใช้กรองจ�
 `attendance(work_date, site_id)` · `attendance(employee_id, work_date)` · `advances(employee_id, advance_date)`
 `audit_log(table_name, row_id)` · `audit_log(at desc)`
 
-### สมาชิกไซต์ต้องมีช่วงเวลา
-`site_supervisors` **ต้อง**มี `effective_from` / `effective_to` — ถ้าเก็บแค่ "ใครดูแลไซต์ไหน" แบบไม่มีวันที่
-พอย้ายหัวหน้าไซต์ รายงานย้อนหลังจะเปลี่ยนเจ้าของตามไปด้วย และคนที่ย้ายออกจะเห็นข้อมูลใหม่ที่ไม่ควรเห็น
+### สมาชิกโครงการต้องมีช่วงเวลา
+`site_supervisors` **ต้อง**มี `effective_from` / `effective_to` — ถ้าเก็บแค่ "ใครดูแลโครงการไหน" แบบไม่มีวันที่
+พอย้ายหัวหน้าโครงการ รายงานย้อนหลังจะเปลี่ยนเจ้าของตามไปด้วย และคนที่ย้ายออกจะเห็นข้อมูลใหม่ที่ไม่ควรเห็น
 ใช้ `btree_gist` + exclusion constraint กันช่วงเวลาซ้อนกัน
 
 ## 6. เชื่อม Supabase
@@ -343,7 +343,7 @@ src/
     globals.css · layout.tsx · loading.tsx · error.tsx
   components/ui/*          ← จาก thai-admin-page-kit
   components/{sites,ledger,attendance,employees}/*
-#                            ledger/txn-row.tsx (แถวรายการ ใช้ทั้ง /ledger และหน้าไซต์)
+#                            ledger/txn-row.tsx (แถวรายการ ใช้ทั้ง /ledger และหน้าโครงการ)
 #                            ledger/txn-edit.tsx (กล่องแก้ไข/ลบ — ตัวเดียวต่อหน้า)
   lib/supabase/{browser,server,admin,middleware}.ts
   lib/{r2,constants,dates,money,database.types}.ts
@@ -365,7 +365,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 โปรเจ็คนี้เป็น **single-organization** จึงใช้ชุดนี้ (ไม่ต้องมี onboarding/tenant):
 
 1. **migration รีเซ็ต** ที่ commit ไว้ — ล้างทุกตารางรวมถึง `auth.users`
-2. **seed เดโม่** ที่ครอบคลุมทุกสถานะที่หน้าจอเรนเดอร์ได้จริง: ไซต์ที่ใกล้ครบกำหนด · ไซต์ที่ต้นทุนแซงรายรับ · รายจ่าย `pending`/`approved`/`rejected` · คนเบิกเต็มเพดาน · รอบจ่ายที่ปิดแล้วและที่ยังเปิด · หน้าที่ยังว่าง
+2. **seed เดโม่** ที่ครอบคลุมทุกสถานะที่หน้าจอเรนเดอร์ได้จริง: โครงการที่ใกล้ครบกำหนด · โครงการที่ต้นทุนแซงรายรับ · รายจ่าย `pending`/`approved`/`rejected` · คนเบิกเต็มเพดาน · รอบจ่ายที่ปิดแล้วและที่ยังเปิด · หน้าที่ยังว่าง
 3. **ล็อกอินเดโม่แบบกดครั้งเดียว** ปิดได้ด้วย env kill switch
 4. รหัสผ่าน/PIN ของ seed **ต้องมาจาก env ไม่ใช่ฝังใน SQL** — ฝังใน SQL แล้ว commit
    = รหัสติดอยู่ในประวัติ git ตลอดไป ลบไฟล์ทีหลังก็ยังอยู่
@@ -381,7 +381,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    🔴 **ต้องรันหลัง `npm run verify:all` บนฐานที่มีข้อมูลจริง** — `verify-ship` เรียก seed
    เมื่อฐานยังว่าง แล้วไม่เก็บกวาด · แถว `site_supervisors` ช่วงเปิดที่มันทิ้งไว้
    ไปชน exclusion constraint กับแถวที่สคริปต์ตรวจตัวอื่นต้อง insert ให้คนเดียวกัน
-   → หัวหน้าไซต์ไม่ได้สิทธิ์ในไซต์ทดสอบ → **ตกยกชุด 30 แถวโดยที่แอปไม่ได้ผิดอะไร**
+   → หัวหน้าโครงการไม่ได้สิทธิ์ในโครงการทดสอบ → **ตกยกชุด 30 แถวโดยที่แอปไม่ได้ผิดอะไร**
 
 ## 14. เฟสการสร้าง
 
@@ -391,13 +391,13 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 - [x] **P0.5 · แบรนด์ + ผู้ใช้** — `branding` + `app_settings` + `/api/branding` (ไม่ต้องล็อกอิน),
       หน้าตั้งค่าแบรนด์ (ชื่อ + อัปโหลดโลโก้เข้า R2), แสดงผลบนหน้า login และหัวระบบ พร้อม fallback,
       หน้า `/settings/users` ให้เจ้าของ CRUD ผู้ใช้ระบบ (แท็บคนงานมาเติมใน P4)
-- [x] **P1 · ไซต์ + ภาพรวม** — CRUD ไซต์, `site_supervisors` มีช่วงเวลา, การ์ด 3 แถบ, ป้ายเตือนต้นทุนแซงรายรับ, หน้าไซต์
-- [x] **P2 · รายรับ-รายจ่าย + R2** — หมวด, ฟอร์มบันทึก, ผูกไซต์/ส่วนกลาง, บีบรูป, presigned PUT/GET, `upload_intents` + sweep, `/ledger` + ค้นหา/กรอง + pagination
+- [x] **P1 · โครงการ + ภาพรวม** — CRUD โครงการ, `site_supervisors` มีช่วงเวลา, การ์ด 3 แถบ, ป้ายเตือนต้นทุนแซงรายรับ, หน้าโครงการ
+- [x] **P2 · รายรับ-รายจ่าย + R2** — หมวด, ฟอร์มบันทึก, ผูกโครงการ/ส่วนกลาง, บีบรูป, presigned PUT/GET, `upload_intents` + sweep, `/ledger` + ค้นหา/กรอง + pagination
 - [x] **P3 · อนุมัติ + แจ้งเตือนในแอป** — คิวอนุมัติ, ตีกลับ+เหตุผล, guard triggers, กระดิ่ง + realtime broadcast
-- [x] **P4 · พนักงาน + คนเข้าไซต์** — CRUD คนงานที่ `/settings/users?tab=workers` (ไม่มี login ไม่มี role)
+- [x] **P4 · พนักงาน + คนเข้าโครงการ** — CRUD คนงานที่ `/settings/users?tab=workers` (ไม่มี login ไม่มี role)
       · มีปุ่มของตัวเองบนหน้าตั้งค่า ต่อจากปุ่มผู้ใช้ระบบ,
       ตั้งค่าแรง**รายคน** (รายวัน/รายเดือน + เรตของแต่ละคน), ผูก `profile_id` ได้ถ้าคนนั้นล็อกอินด้วย,
-      ลงชื่อรายวัน + `wage_snapshot`, ยอดค่าแรงวันนี้, ต้นทุนไซต์ขึ้นทันที
+      ลงชื่อรายวัน + `wage_snapshot`, ยอดค่าแรงวันนี้, ต้นทุนโครงการขึ้นทันที
 - [x] **P5 · เบิก + รอบจ่าย** — `advances` + trigger เพดาน, `payroll_runs`/`payroll_lines`, ปิดรอบ, สรุปค่าแรงรายคน
 - [x] **P6 · Audit** — หน้า `/audit` + กรอง + pagination, ตรวจว่าทุกตารางมี trigger จริง
 - [x] **P7 · PWA + push** — manifest, SW, subscribe, ส่ง push ตอนมีรายการรออนุมัติ/ถูกตีกลับ, badge
@@ -412,7 +412,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       ฟังก์ชัน `mcp_*` ฝั่งเขียน 7 ตัว (สวมสิทธิ์เจ้าของแล้ว insert ลงตารางจริง — guard trigger
       เดิมทุกตัวยังบังคับครบ), tool ใหม่ 7 ตัว (`list_categories` `list_employees` `record_transaction`
       `update_transaction` `delete_transaction` `record_attendance` `record_advance`),
-      ป้าย "บันทึกผ่าน AI" ที่ `/ledger` · หน้าไซต์ · `/audit`
+      ป้าย "บันทึกผ่าน AI" ที่ `/ledger` · หน้าโครงการ · `/audit`
       · 🔴 **การยืนยันเกิดในแชท** — รายการเข้าเป็น `approved` ทันที ไม่มีคิวอนุมัติรับต่อ
       คำอธิบาย tool คือด่านเดียวที่บังคับให้ AI สรุปแล้วถามก่อนบันทึก
       · 🔴 **รูปในแชทไม่ถูกเก็บเข้าระบบ** (MCP รับแต่ JSON) เก็บเฉพาะตัวเลขที่อ่านได้
@@ -420,14 +420,19 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 - [x] **R7 · ลบคนงาน** — `delete_employee()` ลบคนพร้อมประวัติลงชื่อ/ใบเบิกในทรานแซกชันเดียว
       · **คนที่เคยอยู่ในรอบจ่ายที่ปิดแล้วลบไม่ได้** (`payroll_lines` คือหลักฐานการจ่ายเงิน) ให้ปิดใช้งานแทน
       · `employees_delete_info()` ส่งยอดค้างจ่ายมาพร้อมหน้า กล่องยืนยันจึงบอกได้ทันทีว่ากำลังจะเสียอะไร
-- [x] **R8 · มุมมองการ์ดของคนเข้าไซต์** — ปุ่มสลับมุมมอง + การ์ดสองคอลัมน์สำหรับเลือกด้วยนิ้วเดียว
+- [x] **R8 · มุมมองการ์ดของคนเข้าโครงการ** — ปุ่มสลับมุมมอง + การ์ดสองคอลัมน์สำหรับเลือกด้วยนิ้วเดียว
       (ไม่แตะฐานข้อมูลและ API เลย เป็นมุมมองใหม่ของข้อมูลชุดเดิม)
 
-**เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อไซต์+เตือน · ปันส่วนเงินเดือนเข้าไซต์ตามวัน
+**เฟสหลัง (ยังไม่ทำ):** PDF ไทย A4 · Excel/CSV · งบประมาณต่อโครงการ+เตือน · ปันส่วนเงินเดือนเข้าโครงการตามวัน
 
 ## 15. กติกาที่ห้ามละเมิด
 
 - ภาษาไทยทั้งระบบ · **lucide ห้าม emoji** · **sonner ห้าม `alert()`** · radix สำหรับ confirm/ask
+- ⚠️ **หน่วยงานเรียกว่า "โครงการ" เท่านั้น** (คำสั่งเจ้าของ 4 ก.ย. 2569) — ไม่มีคำว่า
+  "ไซต์" หรือ "ไซต์งาน" ในข้อความที่ผู้ใช้เห็นอีกแล้ว รวมถึงข้อความที่ฐานข้อมูล
+  **คืนกลับมาเป็นข้อมูล** (เช่นป้าย `'ส่วนกลาง (ไม่ผูกโครงการ)'` ใน `report_by_site`)
+  · ตัวระบุในโค้ดและฐานข้อมูลยังเป็น `sites` / `site_id` / `supervises_site()` เหมือนเดิม
+  — เปลี่ยนคำบนจอไม่ใช่เหตุผลพอที่จะเขียนฐานข้อมูลใหม่ทั้งใบ
 - **RLS เปิดทุกตาราง** ไม่มีข้อยกเว้น
 - **ทุก query ลิสต์มี `.order()` + `.range()`**
 - **ทุกหน้าที่แสดงข้อมูลต้องมีครบ 4 สถานะ** — โครงร่าง / ผิดพลาด+ปุ่มลองใหม่ / ว่าง / สำเร็จ · ปุ่มที่กำลังทำงานต้องถูก disable พร้อมสปินเนอร์
@@ -460,7 +465,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 
 > เจอใหม่เติมทันที พร้อมอาการที่เห็นจริง ไม่ใช่แค่ชื่อปัญหา
 
-1. **ต้นทุนค่าแรงบวกซ้ำ** — ติ๊กคนเข้าไซต์คือ *ต้นทุนเกิด* (accrual) ส่วนเบิกล่วงหน้าและปิดรอบจ่ายคือ *เงินสดออก*
+1. **ต้นทุนค่าแรงบวกซ้ำ** — ติ๊กคนเข้าโครงการคือ *ต้นทุนเกิด* (accrual) ส่วนเบิกล่วงหน้าและปิดรอบจ่ายคือ *เงินสดออก*
    ถ้านับทั้งสองอย่างเป็นรายจ่าย ต้นทุนจะเป็นสองเท่า · ในหน้าจอแถวจ่ายเงินต้องเป็นสีเทาพร้อมป้าย "ไม่นับซ้ำเป็นต้นทุน"
    (เจอตอนทำเดโม่ — ดู `DESIGN.md` §5.4 มีตัวอย่างตัวเลขที่ต้องถูก)
 2. **ยอดรวมใน mockup ไม่ตรงกับผลบวกจริง** — ตอนแรกเขียน ฿3,190 ไว้ 3 ที่ แต่บวกจริงได้ ฿2,460
@@ -514,7 +519,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    แปลง HEIC เป็น JPEG ให้อัตโนมัติเมื่อ `accept` ไม่มี HEIC — `accept="image/*"`
    ทำให้ไอโฟนส่ง HEIC ดิบมาแล้วพังทุกครั้ง
 13. **`catch (e) { toast.error(e.message) }` คือการเอาข้อความอังกฤษของเบราว์เซอร์ขึ้นจอ**
-   `"Failed to fetch"` โผล่ให้คนงานกลางไซต์อ่าน · แสดงเฉพาะข้อความที่เราเขียนเอง
+   `"Failed to fetch"` โผล่ให้คนงานกลางโครงการอ่าน · แสดงเฉพาะข้อความที่เราเขียนเอง
    (ติดป้าย `name` ไว้แล้วเช็ค) ที่เหลือใช้ประโยคกลางภาษาไทย
 14. **สคริปต์ตรวจที่ "ล้างของค้างก่อนวัด" อาจกำลังลบของจริงของลูกค้า**
    `verify-r2` ลบทุกไฟล์ใน `branding/` แล้วอัปโลโก้ปลอมทับ เพื่อวัดว่าไฟล์เก่าถูกลบจริง
@@ -556,7 +561,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
 
 18. **ข้อความบนหน้าจอที่สัญญาสิ่งที่ policy ไม่อนุญาต — ไม่มี error ให้ใครเห็น**
    กล่องตีกลับเขียนว่า *"คนที่คีย์จะได้รับแจ้งเตือนพร้อมเหตุผลนี้ เพื่อให้แก้แล้วส่งใหม่ได้"*
-   แต่ `transactions_update` ยอมให้แก้เฉพาะแถวที่ `status = 'pending'` · หัวหน้าไซต์
+   แต่ `transactions_update` ยอมให้แก้เฉพาะแถวที่ `status = 'pending'` · หัวหน้าโครงการ
    ที่ถูกตีกลับจึงแก้ใบเดิมไม่ได้ ลบก็ไม่ได้ ทำได้อย่างเดียวคือคีย์ใบใหม่แล้วทิ้ง
    ใบเก่าค้างไว้ในระบบตลอดไป · อาการฝั่งผู้ใช้คือกดแล้ว "สำเร็จ" แต่ไม่มีอะไรเปลี่ยน
    (RLS ตัดเหลือ 0 แถว แล้ว PostgREST ตอบ 200) · **ทุกประโยคบนหน้าจอที่บอกว่า

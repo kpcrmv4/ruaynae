@@ -132,14 +132,14 @@ export function SiteDetailActions({
   }
 
   const saveSite = async () => {
-    if (!form.name.trim()) return toast.error('กรุณากรอกชื่อไซต์งาน')
+    if (!form.name.trim()) return toast.error('กรุณากรอกชื่อโครงการ')
     if (await send(`/api/sites/${site.id}`, 'PATCH', form, 'บันทึกการแก้ไขแล้ว')) setEditing(false)
   }
 
   const assign = async () => {
     if (!crewForm.profileId) return toast.error('กรุณาเลือกผู้ใช้')
     const done = await send(
-      `/api/sites/${site.id}/supervisors`, 'POST', crewForm, 'มอบหมายหัวหน้าไซต์แล้ว',
+      `/api/sites/${site.id}/supervisors`, 'POST', crewForm, 'มอบหมายหัวหน้าโครงการแล้ว',
     )
     if (done) {
       setCrewForm({ profileId: people[0]?.id ?? '', effectiveFrom: '', effectiveTo: '' })
@@ -163,20 +163,20 @@ export function SiteDetailActions({
       </button>
       <button onClick={() => setAssigning(true)} disabled={busy} className="btn-secondary">
         <UserPlus className="size-4" />
-        มอบหมายหัวหน้าไซต์
+        มอบหมายหัวหน้าโครงการ
       </button>
       <button onClick={() => setAddingMilestone(true)} disabled={busy} className="btn-secondary">
         <CalendarPlus className="size-4" />
         เพิ่มงวด
       </button>
 
-      {/* ── แก้ข้อมูลไซต์ ─────────────────────────────────────────── */}
+      {/* ── แก้ข้อมูลโครงการ ─────────────────────────────────────────── */}
       <Modal
         open={editing} onOpenChange={setEditing} busy={busy} onSubmit={saveSite}
-        title="แก้ไขไซต์งาน"
+        title="แก้ไขโครงการ"
         description="ค่าที่ไม่แก้ให้ปล่อยไว้ ระบบบันทึกทับทั้งชุด"
       >
-        <Field id="e-name" label="ชื่อไซต์งาน" span>
+        <Field id="e-name" label="ชื่อโครงการ" span>
           <input id="e-name" value={form.name}
             onChange={(e) => setForm({ ...form, name: e.target.value })} className="input-base" />
         </Field>
@@ -214,17 +214,17 @@ export function SiteDetailActions({
         </Field>
       </Modal>
 
-      {/* ── มอบหมายหัวหน้าไซต์ ────────────────────────────────────── */}
+      {/* ── มอบหมายหัวหน้าโครงการ ────────────────────────────────────── */}
       <Modal
         open={assigning} onOpenChange={setAssigning} busy={busy} onSubmit={assign}
-        title="มอบหมายหัวหน้าไซต์"
+        title="มอบหมายหัวหน้าโครงการ"
         description="ช่วงเวลาสำคัญ — ย้ายคนโดยไม่ระบุวัน จะทำให้รายงานย้อนหลังเปลี่ยนเจ้าของตามไปด้วย"
       >
         <Field id="c-person" label="ผู้ใช้" span>
           <select id="c-person" value={crewForm.profileId}
             onChange={(e) => setCrewForm({ ...crewForm, profileId: e.target.value })}
             className="input-base">
-            {people.length === 0 && <option value="">ยังไม่มีหัวหน้าไซต์ในระบบ</option>}
+            {people.length === 0 && <option value="">ยังไม่มีหัวหน้าโครงการในระบบ</option>}
             {people.map((p) => <option key={p.id} value={p.id}>{p.full_name}</option>)}
           </select>
         </Field>
@@ -296,7 +296,7 @@ function RemoveButtons({
     <>
       <details className="w-full">
         <summary className="cursor-pointer text-sm text-muted-token hover:text-ink">
-          ถอนหัวหน้าไซต์ / ลบงวด
+          ถอนหัวหน้าโครงการ / ลบงวด
         </summary>
         <div className="mt-2 flex flex-wrap gap-2">
           {crew.map((m) => (
@@ -305,8 +305,8 @@ function RemoveButtons({
               disabled={busy}
               onClick={() => setConfirm({
                 url: `/api/sites/${siteId}/supervisors?assignment=${m.id}`,
-                label: `ถอน ${m.profiles?.full_name ?? 'ผู้ใช้'} ออกจากไซต์นี้`,
-                ok: 'ถอนหัวหน้าไซต์แล้ว',
+                label: `ถอน ${m.profiles?.full_name ?? 'ผู้ใช้'} ออกจากโครงการนี้`,
+                ok: 'ถอนหัวหน้าโครงการแล้ว',
               })}
               className="btn-danger px-3 py-1.5 text-sm"
             >

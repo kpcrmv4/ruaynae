@@ -23,15 +23,15 @@ type Row = {
 
 const MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
-  FORBIDDEN: 'คุณไม่ได้ดูแลไซต์นี้ในวันที่เลือก',
-  SITE_REQUIRED: 'กรุณาเลือกไซต์',
+  FORBIDDEN: 'คุณไม่ได้ดูแลโครงการนี้ในวันที่เลือก',
+  SITE_REQUIRED: 'กรุณาเลือกโครงการ',
   EMPLOYEE_REQUIRED: 'กรุณาเลือกคนงาน',
   DATE_INVALID: 'รูปแบบวันที่ไม่ถูกต้อง',
   DATE_BUDDHIST_ERA: 'ปีที่กรอกเป็น พ.ศ. — ระบบเก็บเป็น ค.ศ. กรุณาเลือกวันจากปฏิทิน',
   DATE_FUTURE: 'ลงชื่อล่วงหน้าไม่ได้ — ค่าแรงของวันที่ยังไม่มาถึงคือต้นทุนที่ยังไม่เกิด',
   WORK_UNITS_INVALID: 'ลงได้เฉพาะเต็มวันหรือครึ่งวัน',
-  WORK_UNITS_EXCEEDED: 'วันนี้คนนี้ถูกลงชื่อที่ไซต์อื่นไปแล้ว รวมกันจะเกินหนึ่งวัน',
-  ALREADY_SIGNED_IN: 'คนนี้ถูกลงชื่อในไซต์นี้ของวันนี้ไปแล้ว',
+  WORK_UNITS_EXCEEDED: 'วันนี้คนนี้ถูกลงชื่อที่โครงการอื่นไปแล้ว รวมกันจะเกินหนึ่งวัน',
+  ALREADY_SIGNED_IN: 'คนนี้ถูกลงชื่อในโครงการนี้ของวันนี้ไปแล้ว',
   EMPLOYEE_INACTIVE: 'คนงานคนนี้ถูกปิดใช้งานแล้ว',
   OT_INVALID: 'ค่า OT ต้องเป็นตัวเลขที่ไม่ติดลบ',
   NOT_FOUND: 'ไม่พบรายการนี้ — อาจถูกลบไปแล้ว',
@@ -56,14 +56,14 @@ export function AttendanceBoard({
   sites: { id: string; name: string }[]
   employees: Employee[]
   signedIn: Row[]
-  /** เจ้าของเท่านั้น — หัวหน้าไซต์บันทึกว่าใครมา ไม่ได้ดูเงิน */
+  /** เจ้าของเท่านั้น — หัวหน้าโครงการบันทึกว่าใครมา ไม่ได้ดูเงิน */
   canSeeMoney: boolean
   /** ค่าแรงรวมของวัน จาก RPC ฝั่งเซิร์ฟเวอร์ — undefined = คนดูไม่มีสิทธิ์เห็นเงิน */
   dayWage?: number
-  /** ใครเข้าไซต์นี้เมื่อวาน (วันก่อนวันที่เลือก) — ป้อนปุ่ม "เหมือนเมื่อวาน" */
+  /** ใครเข้าโครงการนี้เมื่อวาน (วันก่อนวันที่เลือก) — ป้อนปุ่ม "เหมือนเมื่อวาน" */
   yesterdaySignIns: { employee_id: string; work_units: number }[]
   /**
-   * วันนี้ใครถูกลงชื่อ "ที่ไซต์อื่น" ไปแล้วกี่วัน และไซต์ไหนบ้าง
+   * วันนี้ใครถูกลงชื่อ "ที่โครงการอื่น" ไปแล้วกี่วัน และโครงการไหนบ้าง
    *
    * เพดานคือ 1 วันต่อคนต่อวัน (guard ที่ฐานข้อมูล) — ค่านี้ทำให้หน้าจอบอกล่วงหน้า
    * แทนที่จะปล่อยให้กดแล้วเจอ error · ว่างเปล่าไม่ได้แปลว่าคนนั้นว่าง มันแปลว่า
@@ -80,7 +80,7 @@ export function AttendanceBoard({
   // คนที่ติ๊กไว้รอบันทึก — ลงชื่อทีเดียวทั้งชุด ไม่ใช่กดทีละคน
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   /**
-   * มุมมองของรายชื่อ "ยังไม่เข้า" — การ์ดเป็นค่าเริ่มต้นเพราะงานจริงคือยืนกลางไซต์
+   * มุมมองของรายชื่อ "ยังไม่เข้า" — การ์ดเป็นค่าเริ่มต้นเพราะงานจริงคือยืนกลางโครงการ
    * ถือมือถือมือเดียวแล้วไล่แตะชื่อ (เจ้าของสั่งไว้ 1 ก.ย. 2569)
    *
    * ⚠️ ไม่จำค่าไว้ใน localStorage โดยตั้งใจ — ค่าที่ฝั่งเซิร์ฟเวอร์ไม่มีทางรู้
@@ -93,12 +93,12 @@ export function AttendanceBoard({
   const inSite = employees.filter((e) => byEmployee.has(e.id))
   const notIn = employees.filter((e) => !byEmployee.has(e.id))
 
-  /** เหลือลงได้อีกกี่วันสำหรับคนนี้ (เพดาน 1 วันต่อวัน หักที่ลงไว้ที่ไซต์อื่นแล้ว) */
+  /** เหลือลงได้อีกกี่วันสำหรับคนนี้ (เพดาน 1 วันต่อวัน หักที่ลงไว้ที่โครงการอื่นแล้ว) */
   const capacityOf = (employeeId: string) =>
     Math.max(0, 1 - (bookedElsewhere[employeeId]?.units ?? 0))
 
   // ชุดของเมื่อวานที่ยังไม่ถูกลงวันนี้ คนยังอยู่ในรายชื่อ และยังมีโควตาเหลือ
-  // — คนที่เต็มวันอยู่ไซต์อื่นแล้วต้องไม่ถูกนับในปุ่ม ไม่งั้นตัวเลขบนปุ่มโกหก
+  // — คนที่เต็มวันอยู่โครงการอื่นแล้วต้องไม่ถูกนับในปุ่ม ไม่งั้นตัวเลขบนปุ่มโกหก
   const employeeIds = new Set(employees.map((e) => e.id))
   const copyFromYesterday = yesterdaySignIns.filter(
     (r) =>
@@ -107,7 +107,7 @@ export function AttendanceBoard({
       capacityOf(r.employee_id) > 0,
   )
 
-  /** เปลี่ยนวันหรือไซต์ = เปลี่ยน URL — แชร์ลิงก์ได้ กดย้อนกลับได้ */
+  /** เปลี่ยนวันหรือโครงการ = เปลี่ยน URL — แชร์ลิงก์ได้ กดย้อนกลับได้ */
   function go(next: Record<string, string>) {
     const p = new URLSearchParams(params.toString())
     for (const [k, v] of Object.entries(next)) p.set(k, v)
@@ -125,7 +125,7 @@ export function AttendanceBoard({
           employeeId,
           workDate: date,
           workUnits,
-          // ส่งเฉพาะตอนเป็นเจ้าของ · API ก็เพิกเฉยค่าที่หัวหน้าไซต์ส่งมาอีกชั้น
+          // ส่งเฉพาะตอนเป็นเจ้าของ · API ก็เพิกเฉยค่าที่หัวหน้าโครงการส่งมาอีกชั้น
           ...(canSeeMoney ? { otAmount } : {}),
         }),
       })
@@ -159,7 +159,7 @@ export function AttendanceBoard({
     }
   })
 
-  /** คนที่เลือกได้จริง — คนเต็มโควตาที่ไซต์อื่นแล้วกดยังไงก็ไม่ผ่าน */
+  /** คนที่เลือกได้จริง — คนเต็มโควตาที่โครงการอื่นแล้วกดยังไงก็ไม่ผ่าน */
   const selectable = notIn.filter((e) => capacityOf(e.id) > 0)
   const pickedIds = selectable.filter((e) => picked[e.id]).map((e) => e.id)
   const allPicked = selectable.length > 0 && pickedIds.length === selectable.length
@@ -175,7 +175,7 @@ export function AttendanceBoard({
   /**
    * ลงชื่อทุกคนที่ติ๊กไว้ในทีเดียว
    *
-   * ยิงผ่าน API เดิมทีละคน — ด่านของฐานข้อมูล (กันซ้ำ · เพดาน 1 วัน · ไซต์ที่ดูแล)
+   * ยิงผ่าน API เดิมทีละคน — ด่านของฐานข้อมูล (กันซ้ำ · เพดาน 1 วัน · โครงการที่ดูแล)
    * จึงตรวจครบทุกคนเหมือนกดทีละคน ไม่มีทางลัดไหนถูกข้าม
    */
   async function signInPicked() {
@@ -184,7 +184,7 @@ export function AttendanceBoard({
     let ok = 0
     const failures: string[] = []
     for (const id of pickedIds) {
-      // ลงครึ่งวันที่ไซต์อื่นไปแล้ว = เหลือโควตาแค่ครึ่งวัน ส่งเต็มวันไปก็โดนปฏิเสธ
+      // ลงครึ่งวันที่โครงการอื่นไปแล้ว = เหลือโควตาแค่ครึ่งวัน ส่งเต็มวันไปก็โดนปฏิเสธ
       const units = Math.min(half[id] ? 0.5 : 1, capacityOf(id))
       const code = await postSignIn(id, units, Number(ot[id] ?? 0) || 0)
       if (code === null) ok += 1
@@ -248,7 +248,7 @@ export function AttendanceBoard({
     <div className="space-y-4">
       <div className="flex flex-wrap gap-3">
         <div className="min-w-0 flex-1">
-          <label htmlFor="att-site" className="label-base">ไซต์งาน</label>
+          <label htmlFor="att-site" className="label-base">โครงการ</label>
           <select
             id="att-site"
             value={siteId}
@@ -275,7 +275,7 @@ export function AttendanceBoard({
         </div>
       </div>
 
-      {/* ทางลัดของเช้าวันปกติ — ชุดคนเหมือนเมื่อวาน ไม่ต้องไล่ติ๊กใหม่ทั้งไซต์ */}
+      {/* ทางลัดของเช้าวันปกติ — ชุดคนเหมือนเมื่อวาน ไม่ต้องไล่ติ๊กใหม่ทั้งโครงการ */}
       {copyFromYesterday.length > 0 && (
         <button
           type="button"
@@ -292,7 +292,7 @@ export function AttendanceBoard({
 
       <section className="panel">
         <div className="panel-head">
-          เข้าไซต์แล้ว
+          เข้าโครงการแล้ว
           <span className="ml-auto text-xs font-normal tnum text-muted-token">
             {inSite.length} คน
           </span>
@@ -331,7 +331,7 @@ export function AttendanceBoard({
                     type="button"
                     onClick={() => signOut(row)}
                     disabled={busy !== null || bulkBusy}
-                    aria-label={`เอา ${e.full_name} ออกจากไซต์`}
+                    aria-label={`เอา ${e.full_name} ออกจากโครงการ`}
                     className="btn-secondary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {busy === e.id ? (
@@ -390,7 +390,7 @@ export function AttendanceBoard({
               onToggleHalf={(id, next) => setHalf((h) => ({ ...h, [id]: next }))}
             />
             {/* ช่อง OT ใส่ในการ์ดขนาดนี้ไม่ได้โดยไม่ทำให้ทั้งใบกดยาก —
-                บอกทางไปแทนที่จะซ่อนความสามารถไว้เฉย ๆ · หัวหน้าไซต์ไม่เห็นบรรทัดนี้
+                บอกทางไปแทนที่จะซ่อนความสามารถไว้เฉย ๆ · หัวหน้าโครงการไม่เห็นบรรทัดนี้
                 เพราะเขาไม่มีสิทธิ์ตั้ง OT อยู่แล้ว */}
             {canSeeMoney && (
               <p className="border-t border-line-soft px-3.5 pb-3 pt-2.5 text-xs text-muted-token md:px-4">
@@ -401,7 +401,7 @@ export function AttendanceBoard({
         ) : (
           <ul>
             {notIn.map((e) => {
-              // เต็มโควตาที่ไซต์อื่นแล้ว = กดยังไงก็ไม่ผ่าน · เหลือครึ่งวัน = ลงได้แค่ครึ่งวัน
+              // เต็มโควตาที่โครงการอื่นแล้ว = กดยังไงก็ไม่ผ่าน · เหลือครึ่งวัน = ลงได้แค่ครึ่งวัน
               const other = bookedElsewhere[e.id]
               const cap = capacityOf(e.id)
               const full = Boolean(other) && cap <= 0
@@ -458,7 +458,7 @@ export function AttendanceBoard({
                             <span
                               className={full ? 'font-medium text-urgent' : 'text-status-progress'}
                             >
-                              {where ? `วันนี้อยู่ ${where}` : 'วันนี้ลงชื่อที่ไซต์อื่นแล้ว'}
+                              {where ? `วันนี้อยู่ ${where}` : 'วันนี้ลงชื่อที่โครงการอื่นแล้ว'}
                               {full ? ' (เต็มวัน)' : ' (ครึ่งวัน)'}
                             </span>
                           </>
@@ -519,7 +519,7 @@ export function AttendanceBoard({
 
       {/* ── แถบสรุปลอยล่าง — เห็นตลอดเวลาที่ไล่ติ๊กรายชื่อยาว ๆ ─────────────
           ตัวเลขมาจากเซิร์ฟเวอร์ (router.refresh() หลังทุกการติ๊ก) ไม่ใช่บวกเอง
-          บนจอเล็กลอยเหนือแถบเมนูล่าง · หัวหน้าไซต์เห็นจำนวนคน ไม่เห็นเงิน */}
+          บนจอเล็กลอยเหนือแถบเมนูล่าง · หัวหน้าโครงการเห็นจำนวนคน ไม่เห็นเงิน */}
       <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 lg:bottom-4">
         <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-e2">
           {pickedIds.length > 0 ? (
@@ -549,7 +549,7 @@ export function AttendanceBoard({
             <>
               <UserRound className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
               <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-token">เข้าไซต์แล้ว</div>
+                <div className="text-xs text-muted-token">เข้าโครงการแล้ว</div>
                 <div
                   className="truncate text-lg font-bold leading-6 tnum text-ink"
                   {...(dayWage !== undefined ? { 'data-day-wage': dayWage } : {})}

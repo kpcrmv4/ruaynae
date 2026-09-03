@@ -284,7 +284,7 @@ h2.sec a { color: var(--brand); font-size: 12.5px; font-weight: 600; text-decora
 
 .chip { display: inline-flex; align-items: center; gap: 5px; font-size: 12px; font-weight: 500;
         padding: 4px 9px; border-radius: 999px; background: var(--surface-3); color: var(--ink-2); }
-/* ผูกไซต์ = น้ำเงิน (สีแบรนด์) · ส่วนกลาง = เทากลาง มีเส้นขอบ — ต้องแยกออกจากกันในแวบเดียว */
+/* ผูกโครงการ = น้ำเงิน (สีแบรนด์) · ส่วนกลาง = เทากลาง มีเส้นขอบ — ต้องแยกออกจากกันในแวบเดียว */
 .chip.site { background: var(--brand-tint); color: var(--brand-on-tint); border: 1px solid var(--brand-tint-strong); }
 .chip.gen  { background: var(--surface); color: var(--ink-2); border: 1px dashed var(--line-strong); }
 
@@ -457,7 +457,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 .seg label { transition: border-color .16s, background-color .16s, color .16s; }
 .input { transition: border-color .16s, box-shadow .16s; }
 
-/* ติ๊กคนเข้าไซต์ / อนุมัติ — เครื่องหมายถูกเด้งขึ้นมา ไม่ใช่โผล่เฉย ๆ */
+/* ติ๊กคนเข้าโครงการ / อนุมัติ — เครื่องหมายถูกเด้งขึ้นมา ไม่ใช่โผล่เฉย ๆ */
 .tick { color: var(--brand); }
 .row.picked .tick { animation: popIn .3s cubic-bezier(.22,1,.36,1) both; }
 .row.picked { background: var(--brand-tint) !important; }
@@ -545,21 +545,21 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 
     <div class="cat">หลัก</div>
     <a href="#" class="active" data-go="home"><svg class="icon"><use href="#i-home"/></svg>
-      <span class="txt">ภาพรวม<span class="sub">สรุปเงินและทุกไซต์</span></span></a>
+      <span class="txt">ภาพรวม<span class="sub">สรุปเงินและทุกโครงการ</span></span></a>
     <a href="#" data-go="site"><svg class="icon"><use href="#i-site"/></svg>
-      <span class="txt">ไซต์งาน<span class="sub">โปรเจ็คที่กำลังทำ</span></span></a>
+      <span class="txt">โครงการ<span class="sub">โปรเจ็คที่กำลังทำ</span></span></a>
     <a href="#" data-go="ledger"><svg class="icon"><use href="#i-receipt"/></svg>
       <span class="txt">รายรับ-รายจ่าย<span class="sub">ทุกรายการ ค้นหาและกรอง</span></span></a>
 
     <div class="cat">คนและค่าแรง</div>
     <a href="#" data-go="attend"><svg class="icon"><use href="#i-cal"/></svg>
-      <span class="txt">คนเข้าไซต์<span class="sub">ลงชื่อรายวัน</span></span></a>
+      <span class="txt">คนเข้าโครงการ<span class="sub">ลงชื่อรายวัน</span></span></a>
     <a href="#" data-go="staff"><svg class="icon"><use href="#i-users"/></svg>
       <span class="txt">พนักงาน<span class="sub">ค่าแรง ค้างจ่าย เบิก</span></span></a>
 
     <div class="cat owner-only">เจ้าของ</div>
     <a href="#" class="owner-only" data-go="approve"><svg class="icon"><use href="#i-inbox"/></svg>
-      <span class="txt">รออนุมัติ<span class="sub">รายจ่ายที่หัวหน้าไซต์คีย์</span></span><span class="pill num">4</span></a>
+      <span class="txt">รออนุมัติ<span class="sub">รายจ่ายที่หัวหน้าโครงการคีย์</span></span><span class="pill num">4</span></a>
     <a href="#" class="owner-only" data-go="audit"><svg class="icon"><use href="#i-shield"/></svg>
       <span class="txt">ประวัติการแก้ไข<span class="sub">ใครแก้อะไร เมื่อไหร่</span></span></a>
     <a href="#" data-go="settings"><svg class="icon"><use href="#i-gear"/></svg>
@@ -571,7 +571,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 
     <div class="who">
       <div class="n" id="sbName">คุณประเสริฐ (เจ้าของ)</div>
-      <div class="r" id="sbRole">เห็นทุกไซต์ · อนุมัติได้</div>
+      <div class="r" id="sbRole">เห็นทุกโครงการ · อนุมัติได้</div>
     </div>
   </nav>
 
@@ -585,7 +585,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
       <div class="sp"></div>
       <div class="rolesw" title="สลับมุมมองเพื่อดูว่าแต่ละ role เห็นอะไร">
         <button class="on" onclick="setRole('owner',this)">มุมมองเจ้าของ</button>
-        <button onclick="setRole('super',this)">มุมมองหัวหน้าไซต์</button>
+        <button onclick="setRole('super',this)">มุมมองหัวหน้าโครงการ</button>
       </div>
       <button class="iconbtn" onclick="document.documentElement.classList.toggle('dark')">
         <svg class="icon icon-sm"><use href="#i-moon"/></svg> โหมดมืด
@@ -600,12 +600,12 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
           <div class="card metric up">
             <div class="lab"><svg class="icon icon-sm"><use href="#i-in"/></svg> รายรับเดือนนี้</div>
             <div class="val num">฿1,450,000</div>
-            <div class="delta">เก็บงวดได้ 3 งวด จาก 2 ไซต์</div>
+            <div class="delta">เก็บงวดได้ 3 งวด จาก 2 โครงการ</div>
           </div>
           <div class="card metric down">
             <div class="lab"><svg class="icon icon-sm"><use href="#i-out"/></svg> รายจ่ายเดือนนี้</div>
             <div class="val num">฿912,480</div>
-            <div class="delta">ผูกไซต์ ฿868,300 · ส่วนกลาง ฿44,180</div>
+            <div class="delta">ผูกโครงการ ฿868,300 · ส่วนกลาง ฿44,180</div>
           </div>
           <div class="card metric">
             <div class="lab"><svg class="icon icon-sm"><use href="#i-wallet"/></svg> กำไรขั้นต้นเดือนนี้</div>
@@ -623,16 +623,16 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
       <div class="super-only">
         <div class="note" style="margin-bottom:16px">
           <svg class="icon icon-sm"><use href="#i-site"/></svg>
-          <span>คุณอนุชาเห็นเฉพาะไซต์ที่ตัวเองดูแล — <b>บ้านคุณสมศักดิ์ ซ.รามอินทรา 65</b> · ยอดรวมทั้งบริษัทและกำไรถูกซ่อนไว้</span>
+          <span>คุณอนุชาเห็นเฉพาะโครงการที่ตัวเองดูแล — <b>บ้านคุณสมศักดิ์ ซ.รามอินทรา 65</b> · ยอดรวมทั้งบริษัทและกำไรถูกซ่อนไว้</span>
         </div>
         <div class="grid4">
           <div class="card metric down">
-            <div class="lab"><svg class="icon icon-sm"><use href="#i-out"/></svg> จ่ายวันนี้ (ไซต์นี้)</div>
+            <div class="lab"><svg class="icon icon-sm"><use href="#i-out"/></svg> จ่ายวันนี้ (โครงการนี้)</div>
             <div class="val num">฿8,940</div>
             <div class="delta">5 รายการ · รออนุมัติ 2</div>
           </div>
           <div class="card metric">
-            <div class="lab"><svg class="icon icon-sm"><use href="#i-users"/></svg> คนเข้าไซต์วันนี้</div>
+            <div class="lab"><svg class="icon icon-sm"><use href="#i-users"/></svg> คนเข้าโครงการวันนี้</div>
             <div class="val num">6 คน</div>
             <div class="delta">ค่าแรงวันนี้ ฿2,460</div>
           </div>
@@ -649,8 +649,8 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
         </div>
       </div>
 
-      <h2 class="sec owner-only">ไซต์ที่กำลังก่อสร้าง <span class="n">3 ไซต์</span><span class="sp"></span><a href="#" data-go="site">ดูทั้งหมด</a></h2>
-      <h2 class="sec super-only">ไซต์ที่คุณดูแล</h2>
+      <h2 class="sec owner-only">โครงการที่กำลังก่อสร้าง <span class="n">3 โครงการ</span><span class="sp"></span><a href="#" data-go="site">ดูทั้งหมด</a></h2>
+      <h2 class="sec super-only">โครงการที่คุณดูแล</h2>
 
       <div class="stack">
 
@@ -660,7 +660,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <div class="grow" style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:15.5px">บ้านคุณสมศักดิ์ ซ.รามอินทรา 65</div>
               <div style="color:var(--muted);font-size:12.5px;margin-top:2px">
-                ค่างานรวม <b class="num">฿2,850,000</b> · 1 มี.ค. – 31 ส.ค. 69 · หัวหน้าไซต์: อนุชา
+                ค่างานรวม <b class="num">฿2,850,000</b> · 1 มี.ค. – 31 ส.ค. 69 · หัวหน้าโครงการ: อนุชา
               </div>
             </div>
             <span class="badge b-urgent">เหลือ 1 วัน</span>
@@ -682,7 +682,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
           </div>
           <div class="flexrow" style="margin-top:12px;padding-top:11px;border-top:1px solid var(--line-soft)">
             <span class="chip">กำไรคงเหลือ <b class="num money-in" style="margin-left:3px">฿853,600</b></span>
-            <span class="chip">คนเข้าไซต์วันนี้ <b class="num" style="margin-left:3px">6</b></span>
+            <span class="chip">คนเข้าโครงการวันนี้ <b class="num" style="margin-left:3px">6</b></span>
             <span class="chip">งวดถัดไป <b style="margin-left:3px">งวดที่ 5 (ส่งมอบ)</b></span>
           </div>
         </div>
@@ -693,7 +693,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:15.5px">ต่อเติมโรงงาน บจก.ไทยพลาสติกอุตสาหกรรม</div>
               <div style="color:var(--muted);font-size:12.5px;margin-top:2px">
-                ค่างานรวม <b class="num">฿4,200,000</b> · 15 มิ.ย. 69 – 15 ธ.ค. 69 · หัวหน้าไซต์: เสกสรร
+                ค่างานรวม <b class="num">฿4,200,000</b> · 15 มิ.ย. 69 – 15 ธ.ค. 69 · หัวหน้าโครงการ: เสกสรร
               </div>
             </div>
             <span class="badge b-progress">กำลังก่อสร้าง</span>
@@ -727,7 +727,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <div style="flex:1;min-width:0">
               <div style="font-weight:600;font-size:15.5px">รีโนเวทตึกแถว 2 คูหา ตลาดพลู</div>
               <div style="color:var(--muted);font-size:12.5px;margin-top:2px">
-                ค่างานรวม <b class="num">฿980,000</b> · 1 ส.ค. 69 – 30 ก.ย. 69 · หัวหน้าไซต์: อนุชา
+                ค่างานรวม <b class="num">฿980,000</b> · 1 ส.ค. 69 – 30 ก.ย. 69 · หัวหน้าโครงการ: อนุชา
               </div>
             </div>
             <span class="badge b-progress">กำลังก่อสร้าง</span>
@@ -774,7 +774,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
           <span class="thumb"><svg class="icon icon-sm"><use href="#i-cash"/></svg></span>
           <div class="grow">
             <div class="t">ค่าน้ำมันรถกระบะ + ค่าทางด่วน</div>
-            <div class="s"><span class="chip gen">ส่วนกลาง · ไม่ผูกไซต์</span> <span class="chip"><svg class="icon" style="width:12px;height:12px"><use href="#i-cash"/></svg> เงินสด</span> คีย์โดย ประเสริฐ · 29 ส.ค. 08:40</div>
+            <div class="s"><span class="chip gen">ส่วนกลาง · ไม่ผูกโครงการ</span> <span class="chip"><svg class="icon" style="width:12px;height:12px"><use href="#i-cash"/></svg> เงินสด</span> คีย์โดย ประเสริฐ · 29 ส.ค. 08:40</div>
           </div>
           <div class="amt num money-out">−฿1,380</div>
           <span class="badge b-done">อนุมัติแล้ว</span>
@@ -800,7 +800,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
       </div>
     </section>
 
-    <!-- ══════════ 2. ไซต์งาน (รายละเอียด) ══════════ -->
+    <!-- ══════════ 2. โครงการ (รายละเอียด) ══════════ -->
     <section id="site" class="screen">
       <div class="card pad" style="margin-bottom:16px">
         <div class="flexrow" style="margin-bottom:14px">
@@ -846,14 +846,14 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <div class="row"><div class="grow"><div class="t">ผู้รับเหมาช่วง</div></div><div style="width:96px"><div class="pbar"><i style="width:5%;background:var(--bar-cost)"></i></div></div><div class="amt num">฿99,600</div></div>
           </div>
           <div class="card">
-            <div class="pad" style="border-bottom:1px solid var(--line-soft)"><b style="font-size:14px">คนเข้าไซต์วันนี้ · 6 คน</b></div>
+            <div class="pad" style="border-bottom:1px solid var(--line-soft)"><b style="font-size:14px">คนเข้าโครงการวันนี้ · 6 คน</b></div>
             <div class="pad" style="display:flex;gap:8px;flex-wrap:wrap">
               <span class="chip">สมพงษ์ · ช่างปูน</span>
               <span class="chip">วิรัตน์ · ช่างไม้</span>
               <span class="chip">บุญมี · กรรมกร</span>
               <span class="chip">ประยูร · กรรมกร</span>
               <span class="chip">สายชล · ช่างปูน</span>
-              <span class="chip">อนุชา · หัวหน้าไซต์ (รายเดือน)</span>
+              <span class="chip">อนุชา · หัวหน้าโครงการ (รายเดือน)</span>
             </div>
             <div class="pad" style="border-top:1px solid var(--line-soft);display:flex;justify-content:space-between">
               <span style="color:var(--muted);font-size:13px">ค่าแรงรายวันที่เกิดวันนี้</span>
@@ -881,15 +881,15 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
           <div class="field">
             <label>ค่าใช้จ่ายนี้เป็นของ</label>
             <div class="seg">
-              <label class="on"><svg class="icon icon-sm"><use href="#i-site"/></svg> ไซต์งาน</label>
+              <label class="on"><svg class="icon icon-sm"><use href="#i-site"/></svg> โครงการ</label>
               <label><svg class="icon icon-sm"><use href="#i-bank"/></svg> ส่วนกลาง</label>
             </div>
             <div class="hint"><svg class="icon" style="width:14px;height:14px"><use href="#i-alert"/></svg>
-              <span>เลือก "ส่วนกลาง" สำหรับค่าน้ำมัน ค่าทางด่วน ค่าออฟฟิศ ที่ไม่ได้เป็นของไซต์ไหน</span></div>
+              <span>เลือก "ส่วนกลาง" สำหรับค่าน้ำมัน ค่าทางด่วน ค่าออฟฟิศ ที่ไม่ได้เป็นของโครงการไหน</span></div>
           </div>
 
           <div class="field">
-            <label for="st">ไซต์งาน</label>
+            <label for="st">โครงการ</label>
             <select id="st" class="input">
               <option>บ้านคุณสมศักดิ์ ซ.รามอินทรา 65</option>
               <option>ต่อเติมโรงงาน บจก.ไทยพลาสติกอุตสาหกรรม</option>
@@ -966,7 +966,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
       </div>
     </section>
 
-    <!-- ══════════ 4. คนเข้าไซต์ (รายวัน) ══════════ -->
+    <!-- ══════════ 4. คนเข้าโครงการ (รายวัน) ══════════ -->
     <section id="attend" class="screen">
       <div class="card pad" style="margin-bottom:14px">
         <div class="flexrow">
@@ -975,7 +975,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <input id="ad" class="input" value="อาทิตย์ 30 ส.ค. 2569">
           </div>
           <div class="field" style="flex:2;min-width:240px;margin:0">
-            <label for="as">ไซต์งาน</label>
+            <label for="as">โครงการ</label>
             <select id="as" class="input"><option>บ้านคุณสมศักดิ์ ซ.รามอินทรา 65</option><option>ต่อเติมโรงงาน บจก.ไทยพลาสติกอุตสาหกรรม</option></select>
           </div>
         </div>
@@ -983,7 +983,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 
       <div class="note warn" style="margin-bottom:14px">
         <svg class="icon icon-sm"><use href="#i-alert"/></svg>
-        <span>คนงานไม่ได้ล็อกอินเข้าระบบ — เจ้าของหรือหัวหน้าไซต์เป็นคนติ๊กให้ · <b>ติ๊กแล้วค่าแรงจะเป็นยอดค้างจ่ายทันที</b> และต้นทุนของไซต์นี้ขึ้นทันที</span>
+        <span>คนงานไม่ได้ล็อกอินเข้าระบบ — เจ้าของหรือหัวหน้าโครงการเป็นคนติ๊กให้ · <b>ติ๊กแล้วค่าแรงจะเป็นยอดค้างจ่ายทันที</b> และต้นทุนของโครงการนี้ขึ้นทันที</span>
       </div>
 
       <div class="card">
@@ -1032,20 +1032,20 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
         </div>
         <div class="row picked" data-wage="0" onclick="toggleWorker(this)">
           <span class="avatar">อช</span>
-          <div class="grow"><div class="t">นายอนุชา พรมมา</div><div class="s">หัวหน้าไซต์ · <b>รายเดือน ฿25,000</b> · ผูกไซต์นี้ประจำ</div></div>
+          <div class="grow"><div class="t">นายอนุชา พรมมา</div><div class="s">หัวหน้าโครงการ · <b>รายเดือน ฿25,000</b> · ผูกโครงการนี้ประจำ</div></div>
           <span class="badge b-info">ไม่คิดรายวัน</span>
           <div class="amt num" style="color:var(--muted)">—</div>
           <svg class="icon tick"><use href="#i-check"/></svg>
         </div>
         <div class="row" data-wage="580" onclick="toggleWorker(this)">
           <span class="avatar" style="background:var(--surface-3);color:var(--muted);border-color:var(--line)">สร</span>
-          <div class="grow"><div class="t" style="color:var(--muted)">นายเสกสรร ปานทอง</div><div class="s">ช่างเหล็ก · รายวัน ฿580 · วันนี้อยู่ไซต์โรงงาน</div></div>
+          <div class="grow"><div class="t" style="color:var(--muted)">นายเสกสรร ปานทอง</div><div class="s">ช่างเหล็ก · รายวัน ฿580 · วันนี้อยู่โครงการโรงงาน</div></div>
           <div class="amt num" style="color:var(--muted)">฿580</div>
           <svg class="icon tick" style="opacity:.2"><use href="#i-check"/></svg>
         </div>
         <div class="row" data-wage="0" onclick="toggleWorker(this)">
           <span class="avatar" style="background:var(--surface-3);color:var(--muted);border-color:var(--line)">กว</span>
-          <div class="grow"><div class="t" style="color:var(--muted)">น.ส.กนกวรรณ ใจดี</div><div class="s">ธุรการ · รายเดือน ฿18,000 · ลงส่วนกลาง ไม่ผูกไซต์</div></div>
+          <div class="grow"><div class="t" style="color:var(--muted)">น.ส.กนกวรรณ ใจดี</div><div class="s">ธุรการ · รายเดือน ฿18,000 · ลงส่วนกลาง ไม่ผูกโครงการ</div></div>
           <div class="amt num" style="color:var(--muted)">—</div>
           <svg class="icon tick" style="opacity:.2"><use href="#i-check"/></svg>
         </div>
@@ -1103,7 +1103,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
               <td class="r num" style="color:var(--muted)">฿1,020</td><td class="r num" style="font-weight:700">฿1,020</td>
             </tr>
             <tr>
-              <td><div style="font-weight:500">นายอนุชา พรมมา</div><div style="color:var(--muted);font-size:12.5px">หัวหน้าไซต์ · ผูกไซต์บ้านคุณสมศักดิ์</div></td>
+              <td><div style="font-weight:500">นายอนุชา พรมมา</div><div style="color:var(--muted);font-size:12.5px">หัวหน้าโครงการ · ผูกโครงการบ้านคุณสมศักดิ์</div></td>
               <td><span class="badge b-brand">รายเดือน ฿25,000</span></td>
               <td class="r num" style="color:var(--muted)">—</td><td class="r num" style="color:var(--muted)">ตัดสิ้นเดือน</td>
               <td class="r num money-out">฿5,000</td><td class="r num" style="color:var(--muted)">฿20,000</td><td class="r num" style="color:var(--muted)">—</td>
@@ -1187,7 +1187,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
           <tbody>
             <tr><td class="num">30 ส.ค. 14:42</td><td>ประเสริฐ</td><td><span class="badge b-done">อนุมัติ</span></td><td>รายจ่าย · ค่าทรายหยาบ 3 คิว</td><td style="color:var(--muted)">รออนุมัติ → อนุมัติแล้ว</td></tr>
             <tr><td class="num">30 ส.ค. 14:40</td><td>อนุชา</td><td><span class="badge b-info">สร้าง</span></td><td>รายจ่าย · ปูนซีเมนต์ตราเสือ 40 ถุง</td><td style="color:var(--muted)">— → ฿5,200</td></tr>
-            <tr><td class="num">30 ส.ค. 13:05</td><td>อนุชา</td><td><span class="badge b-progress">แก้ไข</span></td><td>ลงชื่อเข้าไซต์ · บุญมี ศรีสุข</td><td style="color:var(--muted)">เต็มวัน → ครึ่งวัน</td></tr>
+            <tr><td class="num">30 ส.ค. 13:05</td><td>อนุชา</td><td><span class="badge b-progress">แก้ไข</span></td><td>ลงชื่อเข้าโครงการ · บุญมี ศรีสุข</td><td style="color:var(--muted)">เต็มวัน → ครึ่งวัน</td></tr>
             <tr><td class="num">30 ส.ค. 09:12</td><td>ประเสริฐ</td><td><span class="badge b-urgent">ตีกลับ</span></td><td>รายจ่าย · ค่าเช่าเครื่องตบดิน</td><td style="color:var(--muted)">รออนุมัติ → ตีกลับ (ใส่ยอดผิด)</td></tr>
             <tr><td class="num">29 ส.ค. 17:30</td><td>ประเสริฐ</td><td><span class="badge b-progress">แก้ไข</span></td><td>พนักงาน · สายชล บุญเรือง</td><td style="color:var(--muted)">ค่าแรง ฿500 → ฿530</td></tr>
             <tr><td class="num">29 ส.ค. 10:05</td><td>ประเสริฐ</td><td><span class="badge b-info">สร้าง</span></td><td>รายรับ · งวดที่ 4 บ้านคุณสมศักดิ์</td><td style="color:var(--muted)">— → ฿570,000</td></tr>
@@ -1204,7 +1204,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <svg class="icon icon-sm" style="position:absolute;left:12px;top:13px;color:var(--muted)"><use href="#i-search"/></svg>
             <input class="input" style="padding-left:36px" placeholder="ค้นหารายละเอียด ผู้บันทึก หรือจำนวนเงิน" value="ค่าสีทาภายนอก">
           </div>
-          <select class="input" style="flex:1;min-width:150px"><option>ทุกไซต์</option><option>ส่วนกลาง</option></select>
+          <select class="input" style="flex:1;min-width:150px"><option>ทุกโครงการ</option><option>ส่วนกลาง</option></select>
           <select class="input" style="flex:1;min-width:150px"><option>เดือนนี้</option><option>เดือนที่แล้ว</option><option>กำหนดเอง</option></select>
         </div>
       </div>
@@ -1226,7 +1226,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 
       <div class="card empty" id="ledgerEmpty" hidden>
         <svg class="icon"><use href="#i-search"/></svg>
-        <p>ไม่พบรายการที่ตรงกับ “ค่าสีทาภายนอก” ในเดือนนี้<br>ลองขยายช่วงวันที่ หรือเอาตัวกรองไซต์ออก</p>
+        <p>ไม่พบรายการที่ตรงกับ “ค่าสีทาภายนอก” ในเดือนนี้<br>ลองขยายช่วงวันที่ หรือเอาตัวกรองโครงการออก</p>
         <button class="btn-sec" onclick="toast('ล้างตัวกรองแล้ว')">ล้างตัวกรองทั้งหมด</button>
       </div>
     </section>
@@ -1279,8 +1279,8 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 
             <div id="tabUsers">
               <div class="row"><span class="avatar">ปส</span><div class="grow"><div class="t">คุณประเสริฐ รุ่งเรือง</div><div class="s">prasert@example.com · อีเมล + รหัสผ่าน</div></div><span class="badge b-brand">เจ้าของ</span></div>
-              <div class="row"><span class="avatar">อช</span><div class="grow"><div class="t">นายอนุชา พรมมา</div><div class="s">PIN 6 หลัก · ดูแล 2 ไซต์ · ผูกกับคนงาน "อนุชา พรมมา"</div></div><span class="badge b-info">หัวหน้าไซต์</span></div>
-              <div class="row"><span class="avatar">สร</span><div class="grow"><div class="t">นายเสกสรร ปานทอง</div><div class="s">PIN 6 หลัก · ดูแล 1 ไซต์ · ผูกกับคนงาน "เสกสรร ปานทอง"</div></div><span class="badge b-info">หัวหน้าไซต์</span></div>
+              <div class="row"><span class="avatar">อช</span><div class="grow"><div class="t">นายอนุชา พรมมา</div><div class="s">PIN 6 หลัก · ดูแล 2 โครงการ · ผูกกับคนงาน "อนุชา พรมมา"</div></div><span class="badge b-info">หัวหน้าโครงการ</span></div>
+              <div class="row"><span class="avatar">สร</span><div class="grow"><div class="t">นายเสกสรร ปานทอง</div><div class="s">PIN 6 หลัก · ดูแล 1 โครงการ · ผูกกับคนงาน "เสกสรร ปานทอง"</div></div><span class="badge b-info">หัวหน้าโครงการ</span></div>
               <div class="pad"><button class="btn-sec" onclick="toast('เพิ่มผู้ใช้ระบบ — ต้องเลือก role')"><svg class="icon icon-sm"><use href="#i-plus"/></svg> เพิ่มผู้ใช้ระบบ</button></div>
             </div>
 
@@ -1288,7 +1288,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
               <div class="row"><span class="avatar">สพ</span><div class="grow"><div class="t">นายสมพงษ์ ทองดี</div><div class="s">ช่างปูน · ไม่มีบัญชีล็อกอิน</div></div><span class="badge b-info">รายวัน ฿550</span></div>
               <div class="row"><span class="avatar">วร</span><div class="grow"><div class="t">นายวิรัตน์ แสงจันทร์</div><div class="s">ช่างไม้ · ไม่มีบัญชีล็อกอิน</div></div><span class="badge b-info">รายวัน ฿600</span></div>
               <div class="row"><span class="avatar">บม</span><div class="grow"><div class="t">นายบุญมี ศรีสุข</div><div class="s">กรรมกร · ไม่มีบัญชีล็อกอิน</div></div><span class="badge b-info">รายวัน ฿420</span></div>
-              <div class="row"><span class="avatar">อช</span><div class="grow"><div class="t">นายอนุชา พรมมา</div><div class="s">หัวหน้าไซต์ · ลงไซต์บ้านคุณสมศักดิ์ · มีบัญชีล็อกอิน</div></div><span class="badge b-brand">รายเดือน ฿25,000</span></div>
+              <div class="row"><span class="avatar">อช</span><div class="grow"><div class="t">นายอนุชา พรมมา</div><div class="s">หัวหน้าโครงการ · ลงโครงการบ้านคุณสมศักดิ์ · มีบัญชีล็อกอิน</div></div><span class="badge b-brand">รายเดือน ฿25,000</span></div>
               <div class="row"><span class="avatar">กว</span><div class="grow"><div class="t">น.ส.กนกวรรณ ใจดี</div><div class="s">ธุรการ · ลงส่วนกลาง · ไม่มีบัญชีล็อกอิน</div></div><span class="badge b-brand">รายเดือน ฿18,000</span></div>
               <div class="pad">
                 <button class="btn-sec" onclick="toast('เพิ่มคนงาน — ตั้งค่าแรงรายคน ไม่ต้องมี role')"><svg class="icon icon-sm"><use href="#i-plus"/></svg> เพิ่มคนงาน</button>
@@ -1405,7 +1405,7 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
             <div style="color:var(--muted);font-size:13px;margin-top:2px">ระบบรายรับ-รายจ่ายโปรเจ็ค</div>
           </div>
           <div class="tabs" style="margin-bottom:16px">
-            <button class="on" onclick="tab(this,'loginPin')">หัวหน้าไซต์ · PIN</button>
+            <button class="on" onclick="tab(this,'loginPin')">หัวหน้าโครงการ · PIN</button>
             <button onclick="tab(this,'loginMail')">เจ้าของ · อีเมล</button>
           </div>
           <div id="loginPin">
@@ -1436,9 +1436,9 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 <!-- ══ BOTTOM NAV (มือถือ) — 5 ช่อง · ช่องกลางไม่มีป้าย · ช่อง 5 = เพิ่มเติม ══ -->
 <nav class="bottomnav">
   <a href="#" class="active" data-go="home"><svg class="icon"><use href="#i-home"/></svg><span>ภาพรวม</span></a>
-  <a href="#" data-go="site"><svg class="icon"><use href="#i-site"/></svg><span>ไซต์งาน</span></a>
+  <a href="#" data-go="site"><svg class="icon"><use href="#i-site"/></svg><span>โครงการ</span></a>
   <a href="#" class="center" data-go="entry" aria-label="บันทึกรายจ่าย"><span class="fab"><svg class="icon" style="width:26px;height:26px;stroke-width:2.2"><use href="#i-plus"/></svg></span></a>
-  <a href="#" data-go="attend"><svg class="icon"><use href="#i-cal"/></svg><span>คนเข้าไซต์</span></a>
+  <a href="#" data-go="attend"><svg class="icon"><use href="#i-cal"/></svg><span>คนเข้าโครงการ</span></a>
   <a href="#" data-go="more"><svg class="icon"><use href="#i-more"/></svg><span>เพิ่มเติม</span></a>
 </nav>
 
@@ -1447,11 +1447,11 @@ table.tbl td.r, table.tbl th.r { text-align: right; }
 <script>
 const TITLES = {
   home:     ['ภาพรวม', 'วันอาทิตย์ที่ 30 สิงหาคม 2569 · เวลาไทย (Asia/Bangkok)'],
-  site:     ['ไซต์งาน', 'บ้านคุณสมศักดิ์ ซ.รามอินทรา 65'],
+  site:     ['โครงการ', 'บ้านคุณสมศักดิ์ ซ.รามอินทรา 65'],
   entry:    ['บันทึกรายจ่าย', 'ปุ่มที่ใช้บ่อยที่สุด — ช่องกลางของแถบล่าง'],
-  attend:   ['คนเข้าไซต์', 'ติ๊กคนที่มาทำงาน แล้วค่าแรงจะค้างจ่ายทันที'],
+  attend:   ['คนเข้าโครงการ', 'ติ๊กคนที่มาทำงาน แล้วค่าแรงจะค้างจ่ายทันที'],
   staff:    ['พนักงาน', 'ค่าแรงค้างจ่าย · เบิกล่วงหน้า · ปิดรอบจ่าย'],
-  approve:  ['รออนุมัติ', 'รายจ่ายที่หัวหน้าไซต์คีย์เข้ามา'],
+  approve:  ['รออนุมัติ', 'รายจ่ายที่หัวหน้าโครงการคีย์เข้ามา'],
   audit:    ['ประวัติการแก้ไข', 'บันทึกที่ระดับฐานข้อมูล ลบไม่ได้'],
   ledger:   ['รายรับ-รายจ่าย', 'ทุกรายการ ค้นหาและกรองได้'],
   settings: ['ตั้งค่า', 'แบรนด์ · ผู้ใช้และคน · แจ้งเตือน · หมวด · พื้นที่เก็บรูป'],
@@ -1479,9 +1479,9 @@ function setRole(r, btn) {
   document.body.dataset.role = r;
   document.querySelectorAll('.rolesw button').forEach(b => b.classList.toggle('on', b === btn));
   document.getElementById('sbName').textContent =
-    r === 'owner' ? 'คุณประเสริฐ (เจ้าของ)' : 'อนุชา พรมมา (หัวหน้าไซต์)';
+    r === 'owner' ? 'คุณประเสริฐ (เจ้าของ)' : 'อนุชา พรมมา (หัวหน้าโครงการ)';
   document.getElementById('sbRole').textContent =
-    r === 'owner' ? 'เห็นทุกไซต์ · อนุมัติได้' : 'เห็น 2 ไซต์ที่ดูแล · คีย์รายจ่าย';
+    r === 'owner' ? 'เห็นทุกโครงการ · อนุมัติได้' : 'เห็น 2 โครงการที่ดูแล · คีย์รายจ่าย';
   const cur = document.querySelector('.screen.on')?.id;
   if (r === 'super' && (cur === 'approve' || cur === 'audit')) go('home');
 }
@@ -1530,7 +1530,7 @@ function countTo(el, to, from) {
 }
 function bump(el) { el.classList.remove('bumped'); void el.offsetWidth; el.classList.add('bumped'); }
 
-/* ── ติ๊กคนเข้าไซต์ → ยอดค่าแรงวันนี้ขยับทันที ─────────────────────── */
+/* ── ติ๊กคนเข้าโครงการ → ยอดค่าแรงวันนี้ขยับทันที ─────────────────────── */
 function recalcAttendance(prev) {
   const rows  = [...document.querySelectorAll('#attend .row[data-wage]')];
   const picked = rows.filter(r => r.classList.contains('picked'));

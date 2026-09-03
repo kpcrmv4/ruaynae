@@ -17,9 +17,9 @@ export default async function EntryPage({ searchParams }: { searchParams: Promis
   const today = todayInBangkok()
   const isOwner = me.role === 'owner'
 
-  // 🔴 รายชื่อไซต์มาจาก RLS ไม่ใช่จาก where ที่เขียนเอง — หัวหน้าไซต์จึงเห็น
-  // เฉพาะไซต์ที่ดูแล **ณ วันนี้** โดยอัตโนมัติ · คนที่เพิ่งถูกย้ายออกจะไม่เห็น
-  // ไซต์เดิมในกล่องเลือกทันที โดยไม่ต้องมีโค้ดตรงนี้รู้เรื่องนั้นเลย
+  // 🔴 รายชื่อโครงการมาจาก RLS ไม่ใช่จาก where ที่เขียนเอง — หัวหน้าโครงการจึงเห็น
+  // เฉพาะโครงการที่ดูแล **ณ วันนี้** โดยอัตโนมัติ · คนที่เพิ่งถูกย้ายออกจะไม่เห็น
+  // โครงการเดิมในกล่องเลือกทันที โดยไม่ต้องมีโค้ดตรงนี้รู้เรื่องนั้นเลย
   const [{ data: sites, error: sErr }, { data: categories, error: cErr }, { data: mine, error: mErr }] =
     await Promise.all([
       sb
@@ -60,8 +60,8 @@ export default async function EntryPage({ searchParams }: { searchParams: Promis
   const dayIncome = daySum('income')
 
   // 🔴 `?site=` ต้องอยู่ในลิสต์ที่ RLS คืนมาจริงเท่านั้น — ไม่เชื่อค่าจาก URL
-  // ตรง ๆ · ไซต์ที่ปิดงานแล้วหรือไซต์ที่คนนี้ไม่ได้ดูแลจะตกไปใช้ค่าเริ่มต้นเดิม
-  // (กล่องเลือกไซต์ในฟอร์มแสดงชื่อไซต์ที่จะบันทึกจริงเสมอ)
+  // ตรง ๆ · โครงการที่ปิดงานแล้วหรือโครงการที่คนนี้ไม่ได้ดูแลจะตกไปใช้ค่าเริ่มต้นเดิม
+  // (กล่องเลือกโครงการในฟอร์มแสดงชื่อโครงการที่จะบันทึกจริงเสมอ)
   const requestedSite = (sites ?? []).some((s) => s.id === sp.site) ? sp.site : undefined
 
   return (

@@ -6,7 +6,7 @@ import { parseSiteFields } from '@/lib/sites'
 export const runtime = 'nodejs'
 
 /**
- * PATCH /api/sites/[id] — แก้ข้อมูลไซต์ (เจ้าของเท่านั้น)
+ * PATCH /api/sites/[id] — แก้ข้อมูลโครงการ (เจ้าของเท่านั้น)
  *
  * รับ **ทุกฟิลด์ที่แก้ได้พร้อมกัน** ไม่ใช่ทีละฟิลด์ เพราะฟอร์มแก้ไขเติมค่าเดิม
  * มาให้ครบอยู่แล้ว · ตรวจด้วย `parseSiteFields` ตัวเดียวกับ POST — เขียนกฎแยก
@@ -21,14 +21,14 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
   const sb = await getSupabaseServer()
 
   // เช็คว่ามีอยู่ก่อน — ไม่งั้น update ที่โดน 0 แถวจะแยกไม่ออกระหว่าง
-  // "ไม่มีไซต์นี้" กับ "มีแต่เขียนไม่ได้" ซึ่งต้องตอบคนละรหัส
+  // "ไม่มีโครงการนี้" กับ "มีแต่เขียนไม่ได้" ซึ่งต้องตอบคนละรหัส
   const { data: existing, error: rErr } = await sb
     .from('sites')
     .select('id')
     .eq('id', id)
     .maybeSingle()
   if (rErr) {
-    console.error('[sites] อ่านไซต์ก่อนแก้ไม่ได้', rErr.message)
+    console.error('[sites] อ่านโครงการก่อนแก้ไม่ได้', rErr.message)
     return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
   }
   if (!existing) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     .maybeSingle()
 
   if (error) {
-    console.error('[sites] แก้ไซต์ไม่สำเร็จ', error.message)
+    console.error('[sites] แก้โครงการไม่สำเร็จ', error.message)
     return NextResponse.json({ error: 'UPDATE_FAILED' }, { status: 500 })
   }
   // 🔴 RLS ที่ปฏิเสธ update ไม่คืน error — มันโดน 0 แถวแล้วตอบว่าสำเร็จ

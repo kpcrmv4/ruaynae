@@ -50,15 +50,15 @@ test.describe('P9-BUG-modal-off-screen · กล่องกลางจอต�
     await page.setViewportSize(VIEWPORT)
   })
 
-  test('เปิดฟอร์ม "เพิ่มไซต์งาน" แล้วกล่องอยู่ในจอทั้งหมด', async ({ page }) => {
-    // หน้า /sites เปิดได้แม้ยังไม่มีไซต์งานเลยสักแถว (ฐานทดสอบว่าง 0 ไซต์)
+  test('เปิดฟอร์ม "เพิ่มโครงการ" แล้วกล่องอยู่ในจอทั้งหมด', async ({ page }) => {
+    // หน้า /sites เปิดได้แม้ยังไม่มีโครงการเลยสักแถว (ฐานทดสอบว่าง 0 โครงการ)
     // ปุ่มนี้จึงเป็นเป้าหมายที่ทดสอบได้โดยไม่ต้อง seed ข้อมูลก่อน
     await page.goto('/sites')
     await page.waitForLoadState('networkidle')
 
-    // หน้านี้มีปุ่ม "เพิ่มไซต์งาน" สองจุดพร้อมกันตอนไม่มีไซต์เลย (หัวหน้า +
+    // หน้านี้มีปุ่ม "เพิ่มโครงการ" สองจุดพร้อมกันตอนไม่มีโครงการเลย (หัวหน้า +
     // การ์ดสถานะว่าง) ทั้งคู่เปิด dialog เดียวกัน — เอาอันแรกก็พอ
-    await page.getByRole('button', { name: 'เพิ่มไซต์งาน' }).first().click()
+    await page.getByRole('button', { name: 'เพิ่มโครงการ' }).first().click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()
     await waitForDialogAnimation(dialog)
@@ -84,8 +84,8 @@ test.describe('P9-BUG-modal-off-screen · กล่องกลางจอต�
    * แต่ห้ากล่องนี้ต้องมีข้อมูลจริงก่อนปุ่มที่เปิดมันถึงจะโผล่/กดได้:
    *   - "ตีกลับ" ต้องมีรายการรออนุมัติอย่างน้อยหนึ่งแถว
    *   - "เบิก" ต้องมีคนที่มียอดค้างจ่าย > 0
-   *   - "แก้ไข" / "ถอนหัวหน้าไซต์ / ลบงวด" ต้องมีไซต์งาน (แถวหลังต้องมี
-   *     หัวหน้าไซต์หรือแผนงวดผูกอยู่ด้วย ไม่งั้นส่วนนี้ไม่เรนเดอร์เลย)
+   *   - "แก้ไข" / "ถอนหัวหน้าโครงการ / ลบงวด" ต้องมีโครงการ (แถวหลังต้องมี
+   *     หัวหน้าโครงการหรือแผนงวดผูกอยู่ด้วย ไม่งั้นส่วนนี้ไม่เรนเดอร์เลย)
    * รันเฉพาะตอนที่ `node scripts/seed-demo.mjs` ใส่ข้อมูลไว้ก่อนแล้วเท่านั้น
    * (ดูขั้นตอนรันแบบเต็มใน bugfix-modal-report.md ภาคผนวก)
    */
@@ -127,12 +127,12 @@ test.describe('P9-BUG-modal-off-screen · กล่องกลางจอต�
     await expectDialogWithinViewport(dialog)
   })
 
-  test('เปิดกล่อง "แก้ไข" ไซต์งานที่ /sites/[id] แล้วกล่องอยู่ในจอทั้งหมด', async ({ page }) => {
+  test('เปิดกล่อง "แก้ไข" โครงการที่ /sites/[id] แล้วกล่องอยู่ในจอทั้งหมด', async ({ page }) => {
     await page.goto('/sites')
     await page.waitForLoadState('networkidle')
 
-    // เข้าไซต์ A ("บ้านคุณสมศักดิ์…") ที่ seed-demo.mjs สร้างไว้ — มีทั้ง
-    // หัวหน้าไซต์และแผนงวดผูกอยู่ ใช้ทดสอบกล่องถัดไปได้ด้วย
+    // เข้าโครงการ A ("บ้านคุณสมศักดิ์…") ที่ seed-demo.mjs สร้างไว้ — มีทั้ง
+    // หัวหน้าโครงการและแผนงวดผูกอยู่ ใช้ทดสอบกล่องถัดไปได้ด้วย
     await page.getByRole('link', { name: /บ้านคุณสมศักดิ์/ }).click()
     await page.waitForLoadState('networkidle')
 
@@ -152,7 +152,7 @@ test.describe('P9-BUG-modal-off-screen · กล่องกลางจอต�
     await page.waitForLoadState('networkidle')
 
     // ปุ่มลบอยู่หลัง <details>/<summary> ที่ยุบไว้ก่อน ต้องกดขยายก่อน
-    await page.getByText('ถอนหัวหน้าไซต์ / ลบงวด').click()
+    await page.getByText('ถอนหัวหน้าโครงการ / ลบงวด').click()
     await page.getByRole('button', { name: /งวด 1/ }).click()
     const dialog = page.getByRole('dialog')
     await expect(dialog).toBeVisible()

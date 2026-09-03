@@ -103,7 +103,7 @@ const supJar = await login('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN })
 // จำนวนเป็น **ตัวเลขที่พิมพ์ไว้** โดยตั้งใจ ไม่ใช่นับจาก `nav.ts`
 // นับจากไฟล์เดียวกับที่แอปอ่าน = เอาโค้ดไปเทียบกับตัวเอง แล้วแถวนี้จะไม่มีวันแดงอีกเลย
 // ต่อให้เมนูหายไปทั้งกลุ่ม · ตัวเลขที่ต้องมาแก้ตอนเพิ่มเมนูคือราคาที่ถูกกว่ามาก
-// (9 = ภาพรวม · ไซต์งาน · รายรับ-รายจ่าย · คนเข้าไซต์ · ค่าแรงและรอบจ่าย · รออนุมัติ
+// (9 = ภาพรวม · โครงการ · รายรับ-รายจ่าย · คนเข้าโครงการ · ค่าแรงและรอบจ่าย · รออนุมัติ
 //  · ประวัติการแก้ไข · ตั้งค่า · เชื่อมต่อ AI — ตัวสุดท้ายเพิ่มมาในเฟส P9)
 {
   const html = await page('/', ownerJar)
@@ -130,7 +130,7 @@ const supJar = await login('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN })
 // ── P0-UI-03a · ช่องที่ 5 คือ "เพิ่มเติม" ทั้งสอง role ──────────────────
 {
   const rows = []
-  for (const [role, jar] of [['เจ้าของ', ownerJar], ['หัวหน้าไซต์', supJar]]) {
+  for (const [role, jar] of [['เจ้าของ', ownerJar], ['หัวหน้าโครงการ', supJar]]) {
     const nav = navBlock(await page('/', jar), 'bottom')
     rows.push(`${role}:${Boolean(nav && nav.includes('เพิ่มเติม'))}`)
   }
@@ -198,13 +198,13 @@ try {
   {
     check('R5-NAV-03 เมนูที่อยู่บนแถบล่างแล้วไม่ถูกนับซ้ำที่ปุ่ม "เพิ่มเติม" · เมนูที่ไม่มีของค้างไม่มีป้าย',
       moreBadge(bar) === 0 && badgeOfHref(side, '/sites') === 0 && badgeOfHref(bar, '/sites') === null,
-      `เพิ่มเติม ${moreBadge(bar)} · ไซต์งาน(sidebar) ${badgeOfHref(side, '/sites')}`)
+      `เพิ่มเติม ${moreBadge(bar)} · โครงการ(sidebar) ${badgeOfHref(side, '/sites')}`)
   }
 
-  // ── R5-NAV-04 · หัวหน้าไซต์ ────────────────────────────────────────
+  // ── R5-NAV-04 · หัวหน้าโครงการ ────────────────────────────────────────
   {
     const supBar = navBlock(await page('/', supJar), 'bottom')
-    check('R5-NAV-04 หัวหน้าไซต์เห็นป้ายของที่ถูกตีกลับบนช่อง "รายการ" · ไม่มีช่องรออนุมัติให้ติดป้าย',
+    check('R5-NAV-04 หัวหน้าโครงการเห็นป้ายของที่ถูกตีกลับบนช่อง "รายการ" · ไม่มีช่องรออนุมัติให้ติดป้าย',
       badgeOfHref(supBar, '/ledger') >= 1 && badgeOfHref(supBar, '/approvals') === null,
       `รายการ ${badgeOfHref(supBar, '/ledger')} · รออนุมัติ ${badgeOfHref(supBar, '/approvals')}`)
   }

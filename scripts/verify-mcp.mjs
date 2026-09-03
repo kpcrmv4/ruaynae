@@ -160,7 +160,7 @@ const profileOf = (role) => sql(
   `select id::text as id from public.profiles where role='${role}' and is_active order by id limit 1`)
 const [owner] = await profileOf('owner')
 const [sup] = await profileOf('site_supervisor')
-if (!owner || !sup) bail('ต้องมีทั้งเจ้าของและหัวหน้าไซต์ใน profiles — รัน scripts/seed-users.mjs ก่อน')
+if (!owner || !sup) bail('ต้องมีทั้งเจ้าของและหัวหน้าโครงการใน profiles — รัน scripts/seed-users.mjs ก่อน')
 
 const secret = generateKey()
 const url = `${BASE}/api/mcp/${secret}`
@@ -195,7 +195,7 @@ try {
   }
   {
     const r = await page('/mcp', supJar)
-    check('P9-UI-01 หัวหน้าไซต์เปิด /mcp → เด้งออกตั้งแต่ฝั่งเซิร์ฟเวอร์ ไม่ใช่ 200',
+    check('P9-UI-01 หัวหน้าโครงการเปิด /mcp → เด้งออกตั้งแต่ฝั่งเซิร์ฟเวอร์ ไม่ใช่ 200',
       r.status >= 300 && r.status < 400 && !r.location.endsWith('/mcp'),
       `${r.status} · ${r.location || '(ไม่มี location)'}`)
   }
@@ -268,12 +268,12 @@ try {
     insert into public.transactions (id, kind, site_id, category_id, amount, txn_date, status, income_kind, note, created_by)
     values ('${F.t1}', 'income',  '${F.siteA}', '${CAT_INSTALLMENT}', ${A.incomeApproved}, date '${TODAY}' - 30, 'approved', 'installment', '${TAG} งวดที่ 1', '${owner.id}'),
            ('${F.t2}', 'income',  '${F.siteA}', '${CAT_DEPOSIT}',     ${A.incomePending},  date '${TODAY}' - 5,  'pending',  'deposit',     '${TAG} มัดจำ', '${owner.id}'),
-           ('${F.t5}', 'income',  '${F.siteB}', '${CAT_INSTALLMENT}', ${B.incomeApproved}, date '${TODAY}' - 90, 'approved', 'installment', '${TAG} งวดไซต์ ข', '${owner.id}');
+           ('${F.t5}', 'income',  '${F.siteB}', '${CAT_INSTALLMENT}', ${B.incomeApproved}, date '${TODAY}' - 90, 'approved', 'installment', '${TAG} งวดโครงการ ข', '${owner.id}');
 
     insert into public.transactions (id, kind, site_id, category_id, amount, txn_date, status, note, created_by)
     values ('${F.t3}', 'expense', '${F.siteA}', '${CAT_MATERIAL}',  ${A.costExpense},  date '${TODAY}' - 20, 'approved', '${TAG} ค่าปูนซีเมนต์และทรายหยาบ', '${owner.id}'),
            ('${F.t4}', 'expense', '${F.siteA}', '${CAT_TRANSPORT}', ${A.costPending},  date '${TODAY}' - 2,  'pending',  '${TAG} ค่าทรายถมอย่างเดียว', '${owner.id}'),
-           ('${F.t6}', 'expense', '${F.siteB}', '${CAT_TRANSPORT}', ${B.costExpense},  date '${TODAY}' - 80, 'approved', '${TAG} ค่าขนส่งไซต์ ข', '${owner.id}');
+           ('${F.t6}', 'expense', '${F.siteB}', '${CAT_TRANSPORT}', ${B.costExpense},  date '${TODAY}' - 80, 'approved', '${TAG} ค่าขนส่งโครงการ ข', '${owner.id}');
 
     insert into public.employees (id, full_name, job_title, is_active)
     values ('${F.emp}', '${TAG} ช่างปูน', 'ช่างปูน', true);
@@ -289,7 +289,7 @@ try {
             ${PAYROLL.accrued}, ${PAYROLL.advanceDeducted}, ${PAYROLL.paid});
   `)
   fixtureMade = true
-  note(`สร้างข้อมูลตัวอย่างชั่วคราว: ไซต์ 2 · รายการ 6 · คนงาน 1 · ลงชื่อ 1 · งวด 2 · รอบจ่าย 1 (ชื่อขึ้นต้นด้วย “${TAG}”)`)
+  note(`สร้างข้อมูลตัวอย่างชั่วคราว: โครงการ 2 · รายการ 6 · คนงาน 1 · ลงชื่อ 1 · งวด 2 · รอบจ่าย 1 (ชื่อขึ้นต้นด้วย “${TAG}”)`)
 
   // ══ 2 · คีย์ทดสอบ ══════════════════════════════════════════════════
   // สร้างตรงในฐานข้อมูล ไม่ผ่าน UI — ที่ทดสอบคือ endpoint ไม่ใช่ฟอร์ม
@@ -339,7 +339,7 @@ try {
         json_build_object('sub','${sup.id}','role','authenticated')::text, true);
       set local role authenticated;
       select count(*)::int as n from public.mcp_keys;`)
-    check('P9-DB-01 หัวหน้าไซต์อ่าน mcp_keys ได้ 0 แถว — ไม่มี policy ให้ role นี้เลย',
+    check('P9-DB-01 หัวหน้าโครงการอ่าน mcp_keys ได้ 0 แถว — ไม่มี policy ให้ role นี้เลย',
       (r.ok && r.rows[0].n === 0) || (!r.ok && /permission denied/i.test(r.message)),
       r.ok ? `${r.rows[0].n} แถว` : 'permission denied (แน่นกว่าที่ขอ)')
   }
@@ -475,10 +475,10 @@ try {
              and m.cost_total      = ${A.costExpense} + ${A.costWage}
              and m.cost_pending    = ${A.costPending}
              and m.profit_remaining = ${A.contract} - (${A.costExpense} + ${A.costWage}))::int as n_fix`)
-    check('P9-FN-03 ตัวเลขจาก mcp_sites = ตัวเลขจาก site_money ทุกไซต์ทุกคอลัมน์ และตรงกับยอดที่ใส่ไว้เอง',
+    check('P9-FN-03 ตัวเลขจาก mcp_sites = ตัวเลขจาก site_money ทุกโครงการทุกคอลัมน์ และตรงกับยอดที่ใส่ไว้เอง',
       cmp.n_mcp > 0 && cmp.n_join === cmp.n_mcp && cmp.n_null === 0
         && cmp.n_diff === 0 && cmp.n_fix === 1,
-      `ไซต์ ${cmp.n_mcp} · จับคู่ได้ ${cmp.n_join} · null ${cmp.n_null} · ต่าง ${cmp.n_diff} · ไซต์ตัวอย่างตรงเป๊ะ ${cmp.n_fix}/1`)
+      `โครงการ ${cmp.n_mcp} · จับคู่ได้ ${cmp.n_join} · null ${cmp.n_null} · ต่าง ${cmp.n_diff} · โครงการตัวอย่างตรงเป๊ะ ${cmp.n_fix}/1`)
   }
 
   {
@@ -518,7 +518,7 @@ try {
   }
   {
     const r = await sqlRaw(`select public.mcp_overview('${sup.id}'::uuid, null)`)
-    check('P9-FN-05 เรียก mcp_overview ด้วย id หัวหน้าไซต์ → MCP_ACTOR_NOT_OWNER ไม่คืนแถวใด ๆ',
+    check('P9-FN-05 เรียก mcp_overview ด้วย id หัวหน้าโครงการ → MCP_ACTOR_NOT_OWNER ไม่คืนแถวใด ๆ',
       !r.ok && r.message.includes('MCP_ACTOR_NOT_OWNER'),
       r.ok ? 'คืนข้อมูลออกมา (ผิด)' : 'MCP_ACTOR_NOT_OWNER')
   }
@@ -643,7 +643,7 @@ try {
     const b = await tool(url, 'list_sites', { limit: 1, offset: 1 })
     blob.push(a.text, b.text)
     const ja = toolJson(a); const jb = toolJson(b)
-    check('P9-TOOL-03 list_sites offset 0 กับ 1 คืนไซต์คนละ id — offset มีผลจริง',
+    check('P9-TOOL-03 list_sites offset 0 กับ 1 คืนโครงการคนละ id — offset มีผลจริง',
       a.status === 200 && b.status === 200 && Array.isArray(ja) && Array.isArray(jb)
         && ja.length === 1 && jb.length === 1 && ja[0].id !== jb[0].id,
       `${ja?.[0]?.name ?? '—'} ≠ ${jb?.[0]?.name ?? '—'}`)
@@ -834,7 +834,7 @@ try {
                    delete from public.employees where id in (${ids([F.emp])})`],
     ['site_milestones', `delete from public.site_milestones where id in (${ids([F.ms1, F.ms2])})`],
     ['transactions', `delete from public.transactions where id in (${ids([F.t1, F.t2, F.t3, F.t4, F.t5, F.t6])})`],
-    // payroll_runs.site_id คือ `on delete restrict` — ต้องลบรอบจ่ายก่อนลบไซต์ ไม่งั้นไซต์ลบไม่ออก
+    // payroll_runs.site_id คือ `on delete restrict` — ต้องลบรอบจ่ายก่อนลบโครงการ ไม่งั้นโครงการลบไม่ออก
     ['payroll_runs', `delete from public.payroll_runs where id in (${ids([F.run])})`],
     ['sites', `delete from public.site_finance where site_id in (${ids([F.siteA, F.siteB])});
                delete from public.sites where id in (${ids([F.siteA, F.siteB])})`],
@@ -857,7 +857,7 @@ try {
   const clean = failed.length === 0 && left.sites === 0 && left.emps === 0 && left.keys === 0 && left.runs === 0
   note(clean
     ? 'ล้างข้อมูลตัวอย่างครบแล้ว — ฐานข้อมูลกลับไปเหมือนตอนเริ่ม'
-    : `⚠️ ล้างไม่ครบ · ค้าง ไซต์ ${left.sites} · คนงาน ${left.emps} · คีย์ ${left.keys} · รอบจ่าย ${left.runs}${failed.length ? ` · ${failed.join(' | ')}` : ''}`)
+    : `⚠️ ล้างไม่ครบ · ค้าง โครงการ ${left.sites} · คนงาน ${left.emps} · คีย์ ${left.keys} · รอบจ่าย ${left.runs}${failed.length ? ` · ${failed.join(' | ')}` : ''}`)
   if (!clean) {
     results.push({ label: 'ล้างข้อมูลตัวอย่าง', ok: false })
     console.log('  ❌ ล้างข้อมูลตัวอย่างที่สคริปต์นี้สร้างไม่หมด — ลบด้วยมือก่อนรันตัวตรวจอื่น')

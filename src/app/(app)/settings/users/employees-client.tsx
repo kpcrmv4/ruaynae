@@ -235,7 +235,7 @@ export function EmployeesClient({
             {!isDaily && (
               <div>
                 <label htmlFor="emp-site" className="label-base">
-                  เงินเดือนลงไซต์ประจำ
+                  เงินเดือนลงโครงการประจำ
                 </label>
                 <select
                   id="emp-site"
@@ -243,7 +243,7 @@ export function EmployeesClient({
                   onChange={(e) => set('defaultSiteId', e.target.value)}
                   className="input-base"
                 >
-                  <option value="">ส่วนกลาง (ไม่ผูกไซต์)</option>
+                  <option value="">ส่วนกลาง (ไม่ผูกโครงการ)</option>
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}
@@ -297,7 +297,7 @@ export function EmployeesClient({
       {employees.length === 0 ? (
         <EmptyState
           icon={HardHat}
-          message="ยังไม่มีคนงาน — เพิ่มคนแรกแล้วจะลงชื่อเข้าไซต์ได้ที่หน้าคนเข้าไซต์"
+          message="ยังไม่มีคนงาน — เพิ่มคนแรกแล้วจะลงชื่อเข้าโครงการได้ที่หน้าคนเข้าโครงการ"
         />
       ) : (
         <div className="panel">

@@ -40,7 +40,7 @@ export async function uploadSlip(file: File, siteId: string | null): Promise<Upl
   // (`fileType: IMAGE.type`) เซิร์ฟเวอร์จึงได้ชนิดที่รองรับแน่นอนไม่ว่าต้นทาง
   // จะเป็นอะไร · เงื่อนไขเดียวที่แท้จริงคือ "เบราว์เซอร์ถอดรหัสรูปนี้ได้ไหม"
   // ซึ่งรู้ได้ตอนบีบเท่านั้น · เช็คชนิดให้เข้มกว่านี้จะปฏิเสธรูปที่ใช้ได้จริง
-  // บนเครื่องที่ส่ง MIME แปลก ๆ มา แล้วคนคีย์ของกลางไซต์จะแนบสลิปไม่ได้เลย
+  // บนเครื่องที่ส่ง MIME แปลก ๆ มา แล้วคนคีย์ของกลางโครงการจะแนบสลิปไม่ได้เลย
   if (!file.type.startsWith('image/')) throw uploadError('รองรับเฉพาะไฟล์รูปภาพ')
 
   // 🔴 นำเข้าไลบรารีบีบรูปแบบ dynamic — มันหนักกว่าโค้ดทั้งหน้ารวมกัน
@@ -82,7 +82,7 @@ export async function uploadSlip(file: File, siteId: string | null): Promise<Upl
 
   // 🔴 CORS ที่ไม่ครอบ origin นี้ทำให้ `fetch` โยน TypeError ซึ่งข้อความ
   // ข้างในเป็นภาษาอังกฤษของเบราว์เซอร์ ("Failed to fetch") — ห้ามให้หลุด
-  // ไปถึงตาคนที่ยืนอยู่กลางไซต์ (CLAUDE.md §17 ข้อ 11)
+  // ไปถึงตาคนที่ยืนอยู่กลางโครงการ (CLAUDE.md §17 ข้อ 11)
   const put = async (url: string, blob: Blob) => {
     let r: Response
     try {

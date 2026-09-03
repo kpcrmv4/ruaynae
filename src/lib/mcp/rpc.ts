@@ -25,12 +25,12 @@ const EXTRA_MESSAGES: Record<string, string> = {
   MCP_ACTOR_NOT_OWNER: 'คีย์นี้ไม่มีสิทธิ์แล้ว กรุณาออกคีย์ใหม่จากหน้าเชื่อมต่อ AI',
   MCP_ACTOR_REQUIRED: 'คีย์นี้ใช้ไม่ได้แล้ว กรุณาออกคีย์ใหม่จากหน้าเชื่อมต่อ AI',
   TXN_NOT_FOUND: 'ไม่พบรายการนี้ — อาจถูกลบไปแล้ว ลองค้นด้วย search_transactions อีกครั้ง',
-  SITE_NOT_FOUND: 'ไม่พบไซต์นี้ — ใช้ list_sites เพื่อดู site_id ที่ถูกต้อง',
+  SITE_NOT_FOUND: 'ไม่พบโครงการนี้ — ใช้ list_sites เพื่อดู site_id ที่ถูกต้อง',
   EMPLOYEE_NOT_FOUND: 'ไม่พบคนงานคนนี้ — ใช้ list_employees เพื่อดู employee_id ที่ถูกต้อง',
   EMPLOYEE_INACTIVE: 'คนงานคนนี้ถูกปิดใช้งานแล้ว',
   ENTRIES_REQUIRED: 'ต้องระบุอย่างน้อยหนึ่งคน',
-  WORK_UNITS_EXCEEDED: 'คนนี้ถูกลงชื่อครบวันแล้ว — ดูจาก list_employees ว่าวันนั้นเขาอยู่ไซต์ไหน',
-  ALREADY_SIGNED_IN: 'คนนี้ถูกลงชื่อที่ไซต์นี้ในวันนั้นไปแล้ว',
+  WORK_UNITS_EXCEEDED: 'คนนี้ถูกลงชื่อครบวันแล้ว — ดูจาก list_employees ว่าวันนั้นเขาอยู่โครงการไหน',
+  ALREADY_SIGNED_IN: 'คนนี้ถูกลงชื่อที่โครงการนี้ในวันนั้นไปแล้ว',
   PAYROLL_CLOSED: 'วันนั้นอยู่ในรอบจ่ายค่าแรงที่ปิดแล้ว แก้ไม่ได้',
 }
 

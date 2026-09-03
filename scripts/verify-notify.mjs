@@ -124,17 +124,17 @@ const mkTxn = async (token, amount, note) => {
 
 try {
   ;[{ id: siteId }] = (await sql(
-    "insert into public.sites(name, status) values ('ทดสอบแจ้งเตือน ไซต์ก', 'active') returning id")).rows
+    "insert into public.sites(name, status) values ('ทดสอบแจ้งเตือน โครงการก', 'active') returning id")).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${siteId}','${sup1.id}')`)
 
-  // ── P3-DB-01 · หัวหน้าไซต์คีย์ → เจ้าของได้แจ้งเตือน ──────────────
+  // ── P3-DB-01 · หัวหน้าโครงการคีย์ → เจ้าของได้แจ้งเตือน ──────────────
   {
     const before = await countFor(owner.id)
     const { row } = await mkTxn(supTok, 11111, 'ค่าปูนทดสอบแจ้งเตือน')
     const after = await countFor(owner.id)
     const notes = await byTxn(owner.id, row.id, 'txn_pending')
-    check('P3-DB-01 หัวหน้าไซต์คีย์รายจ่าย → เจ้าของได้แจ้งเตือน txn_pending 1 ใบ ลิงก์ /approvals',
+    check('P3-DB-01 หัวหน้าโครงการคีย์รายจ่าย → เจ้าของได้แจ้งเตือน txn_pending 1 ใบ ลิงก์ /approvals',
       Boolean(row) && after - before === 1 && notes.length === 1
       && notes[0].link === '/approvals' && notes[0].title.includes('รออนุมัติ'),
       `+${after - before} ใบ · link=${notes[0]?.link}`)
@@ -150,9 +150,9 @@ try {
     const midS = await countFor(sup1.id)
     await mkTxn(supTok, 33333, 'ค่าเหล็กทดสอบแจ้งเตือน')
     const afterO = await countFor(owner.id)
-    check('P3-DB-02 เจ้าของคีย์เอง (เข้าเป็น approved ทันที) → ไม่มีแจ้งเตือนใหม่เลย · ของหัวหน้าไซต์ยังเพิ่มปกติ',
+    check('P3-DB-02 เจ้าของคีย์เอง (เข้าเป็น approved ทันที) → ไม่มีแจ้งเตือนใหม่เลย · ของหัวหน้าโครงการยังเพิ่มปกติ',
       midO === beforeO && midS === beforeS && afterO === midO + 1,
-      `เจ้าของคีย์ +${midO - beforeO} · หัวหน้าไซต์คีย์ +${afterO - midO}`)
+      `เจ้าของคีย์ +${midO - beforeO} · หัวหน้าโครงการคีย์ +${afterO - midO}`)
   }
 
   // ── P3-DB-03 · อนุมัติ → คนคีย์ได้แจ้งเตือน ───────────────────────
@@ -204,11 +204,11 @@ try {
       [...got].join(', '))
   }
 
-  // ── P3-DB-05 · หัวหน้าไซต์เห็นเฉพาะของตัวเอง ──────────────────────
+  // ── P3-DB-05 · หัวหน้าโครงการเห็นเฉพาะของตัวเอง ──────────────────────
   {
     const mine = await db(supTok, `/notifications?select=id,user_id&user_id=eq.${sup1.id}`)
     const others = await db(supTok, `/notifications?select=id,user_id&user_id=eq.${owner.id}`)
-    check('P3-DB-05 หัวหน้าไซต์เห็นแจ้งเตือนของตัวเอง > 0 และเห็นของเจ้าของ 0 แถว',
+    check('P3-DB-05 หัวหน้าโครงการเห็นแจ้งเตือนของตัวเอง > 0 และเห็นของเจ้าของ 0 แถว',
       (mine.body?.length ?? 0) > 0 && (others.body?.length ?? 0) === 0,
       `ของตัวเอง ${mine.body?.length} · ของเจ้าของ ${others.body?.length}`)
   }
@@ -262,7 +262,7 @@ try {
     const before = await countFor(sup1.id)
     const r = await db(supTok, `/notifications?user_id=eq.${sup1.id}`, { method: 'DELETE' })
     const after = await countFor(sup1.id)
-    check('P3-DB-09 หัวหน้าไซต์ลบแจ้งเตือนตัวเองไม่ได้ · จำนวนเท่าเดิม',
+    check('P3-DB-09 หัวหน้าโครงการลบแจ้งเตือนตัวเองไม่ได้ · จำนวนเท่าเดิม',
       after === before && before > 0, `${before} → ${after} (สถานะ ${r.status})`)
   }
 

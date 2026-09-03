@@ -65,7 +65,7 @@ export function LoginForm({ demoEnabled }: { demoEnabled: boolean }) {
     [router],
   )
 
-  // ครบ 6 หลักแล้วส่งเอง ไม่ต้องมีปุ่มยืนยัน — คนกดบนมือถือกลางไซต์
+  // ครบ 6 หลักแล้วส่งเอง ไม่ต้องมีปุ่มยืนยัน — คนกดบนมือถือกลางโครงการ
   useEffect(() => {
     if (pin.length === PIN_LENGTH && !inFlight.current) void submit('/api/auth/pin', { pin })
   }, [pin, submit])
@@ -81,7 +81,7 @@ export function LoginForm({ demoEnabled }: { demoEnabled: boolean }) {
       <div role="tablist" className="mb-4 flex gap-1 border-b border-line">
         {(
           [
-            ['pin', 'หัวหน้าไซต์ · PIN'],
+            ['pin', 'หัวหน้าโครงการ · PIN'],
             ['email', 'เจ้าของ · อีเมล'],
           ] as const
         ).map(([id, label]) => (

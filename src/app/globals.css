@@ -287,7 +287,7 @@
            disabled:pointer-events-none disabled:opacity-50;
   }
 
-  /* แป้นตัวเลขของหน้าล็อกอิน — ปุ่มต้องใหญ่พอสำหรับนิ้วโป้งกลางไซต์
+  /* แป้นตัวเลขของหน้าล็อกอิน — ปุ่มต้องใหญ่พอสำหรับนิ้วโป้งกลางหน้างาน
      44px คือขั้นต่ำที่แตะไม่พลาด ตรงนี้ให้ใหญ่กว่านั้นเพราะเป็นงานหลักของหน้า */
   .keypad-key {
     @apply flex items-center justify-center rounded-md border border-line-strong bg-surface

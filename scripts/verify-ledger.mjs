@@ -78,9 +78,9 @@ let mineId = null
 let othersId = null
 try {
   ;[{ id: mineId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ LEDGER ไซต์ของหัวหน้า') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ LEDGER โครงการของหัวหน้า') returning id`)).rows
   ;[{ id: othersId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ LEDGER ไซต์คนอื่น') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ LEDGER โครงการคนอื่น') returning id`)).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${mineId}','${sup1.id}')`)
 
@@ -95,7 +95,7 @@ try {
       ('expense','${mineId}','${expCat.id}', 3000, '${today}', 'cash', 'rejected',
        'ค่าอะไรไม่รู้', null, 'ไม่มีสลิป'),
       ('expense','${othersId}','${expCat.id}', 4000, '${today}', 'cash', 'approved',
-       'รายจ่ายของไซต์คนอื่น', null, null),
+       'รายจ่ายของโครงการคนอื่น', null, null),
       ('expense', null, '${expCat.id}', 500, '${today}', 'cash', 'approved',
        'ค่าน้ำมันรถเจ้าของ', null, null),
       ('income','${mineId}','${incCat.id}', 400000, '${today}', 'transfer', 'approved',
@@ -104,30 +104,30 @@ try {
   // ── P2-UI-09 · เจ้าของเห็นทุกอย่าง ────────────────────────────────
   {
     const html = await page('/ledger', ownerJar)
-    const want = ['ค่าเหล็กเส้น', 'มัดจำงวดแรก', 'ค่าน้ำมันรถเจ้าของ', 'รายจ่ายของไซต์คนอื่น']
+    const want = ['ค่าเหล็กเส้น', 'มัดจำงวดแรก', 'ค่าน้ำมันรถเจ้าของ', 'รายจ่ายของโครงการคนอื่น']
     const missing = want.filter((w) => !html.includes(w))
-    check('P2-UI-09 เจ้าของเห็นทั้งรายรับ รายจ่าย ทุกไซต์ และส่วนกลาง',
+    check('P2-UI-09 เจ้าของเห็นทั้งรายรับ รายจ่าย ทุกโครงการ และส่วนกลาง',
       missing.length === 0, missing.length ? `ขาด: ${missing.join(', ')}` : '4/4')
   }
 
-  // ── P2-UI-10 · หัวหน้าไซต์เห็นเฉพาะของตัวเอง ──────────────────────
+  // ── P2-UI-10 · หัวหน้าโครงการเห็นเฉพาะของตัวเอง ──────────────────────
   {
     const html = await page('/ledger', supJar)
-    check('P2-UI-10 หัวหน้าไซต์เห็นรายจ่ายไซต์ตัวเอง · ไม่เห็นไซต์อื่น รายรับ และส่วนกลาง',
+    check('P2-UI-10 หัวหน้าโครงการเห็นรายจ่ายโครงการตัวเอง · ไม่เห็นโครงการอื่น รายรับ และส่วนกลาง',
       html.includes('ค่าเหล็กเส้น')
-      && !html.includes('รายจ่ายของไซต์คนอื่น')
+      && !html.includes('รายจ่ายของโครงการคนอื่น')
       && !html.includes('มัดจำงวดแรก')
       && !html.includes('ค่าน้ำมันรถเจ้าของ'),
       'ตรวจทั้งฝั่งเห็นและฝั่งไม่เห็นในหน้าเดียวกัน')
   }
 
-  // ── P2-UI-11 · ป้ายผูกไซต์ vs ส่วนกลาง ────────────────────────────
+  // ── P2-UI-11 · ป้ายผูกโครงการ vs ส่วนกลาง ────────────────────────────
   {
     const html = await page('/ledger', ownerJar)
     const central = html.includes('border-dashed') && html.includes('ส่วนกลาง')
-    const bound = html.includes('ทดสอบ LEDGER ไซต์ของหัวหน้า')
-    check('P2-UI-11 รายการส่วนกลางมีชิปขอบประ · รายการผูกไซต์แสดงชื่อไซต์',
-      central && bound, `ขอบประ=${central} · ชื่อไซต์=${bound}`)
+    const bound = html.includes('ทดสอบ LEDGER โครงการของหัวหน้า')
+    check('P2-UI-11 รายการส่วนกลางมีชิปขอบประ · รายการผูกโครงการแสดงชื่อโครงการ',
+      central && bound, `ขอบประ=${central} · ชื่อโครงการ=${bound}`)
   }
 
   // ── P2-UI-12 · ป้ายสถานะครบ 3 ค่า ไม่มีค่าดิบ ─────────────────────

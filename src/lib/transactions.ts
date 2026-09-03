@@ -72,7 +72,7 @@ export const MAX_NOTE = 500
  * มีปุ่มที่กดแล้วโดนปฏิเสธทุกครั้ง (CLAUDE.md §15) · ปุ่มที่ไม่ควรมี ต้อง
  * ไม่วาด ไม่ใช่วาดแล้ว disable
  *
- * เงื่อนไข `supervises_site` ไม่ต้องเช็คซ้ำที่นี่ เพราะแถวที่หัวหน้าไซต์
+ * เงื่อนไข `supervises_site` ไม่ต้องเช็คซ้ำที่นี่ เพราะแถวที่หัวหน้าโครงการ
  * **มองเห็น** ผ่าน `transactions_select` ผ่านเงื่อนไขนั้นมาแล้วทุกแถว
  */
 export function canModifyTxn(
@@ -121,7 +121,7 @@ export function parseTxnFields(b: unknown, today: string): TxnParse {
   if (!isUuid(o.categoryId ?? o.category_id)) return { ok: false, error: 'CATEGORY_REQUIRED' }
   const categoryId = String(o.categoryId ?? o.category_id)
 
-  // `null`/ว่าง = ส่วนกลาง (ไม่ผูกไซต์) ซึ่งเป็นค่าที่ตั้งใจ ไม่ใช่ "ยังไม่ได้เลือก"
+  // `null`/ว่าง = ส่วนกลาง (ไม่ผูกโครงการ) ซึ่งเป็นค่าที่ตั้งใจ ไม่ใช่ "ยังไม่ได้เลือก"
   const rawSite = o.siteId ?? o.site_id
   const siteId = rawSite === null || rawSite === undefined || rawSite === '' ? null : String(rawSite)
   if (siteId !== null && !isUuid(siteId)) return { ok: false, error: 'SITE_INVALID' }
@@ -196,8 +196,8 @@ export function parseTxnFields(b: unknown, today: string): TxnParse {
 export const TXN_MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
   FORBIDDEN: 'ไม่มีสิทธิ์ทำรายการนี้',
-  INCOME_FORBIDDEN: 'หัวหน้าไซต์บันทึกรายรับไม่ได้ — เจ้าของเป็นคนบันทึกเอง',
-  SITE_REQUIRED: 'กรุณาเลือกไซต์งาน',
+  INCOME_FORBIDDEN: 'หัวหน้าโครงการบันทึกรายรับไม่ได้ — เจ้าของเป็นคนบันทึกเอง',
+  SITE_REQUIRED: 'กรุณาเลือกโครงการ',
   KIND_INVALID: 'ชนิดรายการไม่ถูกต้อง',
   CATEGORY_REQUIRED: 'กรุณาเลือกหมวด',
   CATEGORY_KIND_MISMATCH: 'หมวดที่เลือกไม่ตรงกับชนิดรายการ',

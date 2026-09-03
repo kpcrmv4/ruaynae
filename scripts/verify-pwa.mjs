@@ -234,7 +234,7 @@ try {
 
   // ── P7-DB-01 + P7-DB-02 · สิทธิ์ ────────────────────────────────
   {
-    // หัวหน้าไซต์มี subscription ของตัวเองด้วย เพื่อให้ฝั่งบวกมีของจริง
+    // หัวหน้าโครงการมี subscription ของตัวเองด้วย เพื่อให้ฝั่งบวกมีของจริง
     await req('POST', '/api/push/subscribe', {
       endpoint: OTHER, keys: { p256dh: 'k', auth: 'a' } }, supJar)
     const supOwn = await db(supTok, '/push_subscriptions?select=id,endpoint')
@@ -242,7 +242,7 @@ try {
     const supSeesOthers = (supOwn.body ?? []).some((s) => s.endpoint === ENDPOINT)
     check('P7-DB-01 แต่ละคนเห็นเฉพาะ subscription ของตัวเอง — ไม่เห็นของอีกคนในการตรวจเดียวกัน',
       (supOwn.body?.length ?? 0) > 0 && (ownerOwn.body?.length ?? 0) > 0 && !supSeesOthers,
-      `หัวหน้าไซต์ ${supOwn.body?.length} · เจ้าของ ${ownerOwn.body?.length} · เห็นของกันและกัน=${supSeesOthers}`)
+      `หัวหน้าโครงการ ${supOwn.body?.length} · เจ้าของ ${ownerOwn.body?.length} · เห็นของกันและกัน=${supSeesOthers}`)
 
     const anon = await db('anon', '/push_subscriptions?select=id')
     check('P7-DB-02 anon อ่าน push_subscriptions ได้ 0 แถว',
@@ -335,7 +335,7 @@ try {
     check('P7-UI-01 หน้า /settings ของเจ้าของมีการ์ด "แจ้งเตือนบนเครื่องนี้"',
       ownerHtml.includes('แจ้งเตือนบนเครื่องนี้') && ownerHtml.includes('data-push-state'),
       'มีการ์ดและจุดยึดสถานะ')
-    check('P7-UI-02 หัวหน้าไซต์ก็เห็นการ์ดเดียวกัน — แจ้งเตือนไม่ใช่เรื่องเงิน',
+    check('P7-UI-02 หัวหน้าโครงการก็เห็นการ์ดเดียวกัน — แจ้งเตือนไม่ใช่เรื่องเงิน',
       supHtml.includes('แจ้งเตือนบนเครื่องนี้'), 'เห็นเหมือนกัน')
   }
 

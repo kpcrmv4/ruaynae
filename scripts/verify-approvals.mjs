@@ -88,7 +88,7 @@ let siteId = null
 
 try {
   ;[{ id: siteId }] = (await sql(
-    "insert into public.sites(name, status) values ('ทดสอบคิวอนุมัติ ไซต์ก', 'active') returning id")).rows
+    "insert into public.sites(name, status) values ('ทดสอบคิวอนุมัติ โครงการก', 'active') returning id")).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${siteId}','${sup1.id}')`)
 
@@ -109,31 +109,31 @@ try {
   // ── P3-UI-01 · เจ้าของเห็นคิว ─────────────────────────────────────
   {
     const html = await page('/approvals', ownerJar)
-    const want = [NOTE_A, NOTE_B, NOTE_C, sup1.full_name, 'ทดสอบคิวอนุมัติ ไซต์ก']
+    const want = [NOTE_A, NOTE_B, NOTE_C, sup1.full_name, 'ทดสอบคิวอนุมัติ โครงการก']
     const missing = want.filter((w) => !html.includes(w))
-    check('P3-UI-01 คิวแสดงยอดเงิน ชื่อไซต์ คนคีย์ และรายละเอียดครบทุกรายการ',
+    check('P3-UI-01 คิวแสดงยอดเงิน ชื่อโครงการ คนคีย์ และรายละเอียดครบทุกรายการ',
       missing.length === 0 && html.includes('฿1,000'),
       missing.length ? `ขาด: ${missing.join(', ')}` : `${want.length}/${want.length} + ยอดเงิน`)
   }
 
-  // ── P3-UI-02 · หัวหน้าไซต์เข้าหน้านี้ไม่ได้ ──────────────────────
+  // ── P3-UI-02 · หัวหน้าโครงการเข้าหน้านี้ไม่ได้ ──────────────────────
   {
     const r = await fetch(`${BASE}/approvals`, { headers: { cookie: supJar }, redirect: 'manual' })
     const loc = r.headers.get('location') ?? ''
     // ฝั่งบวก: หน้าที่เขาเข้าได้ยังเข้าได้อยู่ ไม่ใช่เซสชันตายไปเฉย ๆ
     const ledger = await page('/ledger', supJar)
-    check('P3-UI-02 หัวหน้าไซต์เปิด /approvals → ถูก redirect ออก · แต่ /ledger ยังเข้าได้',
+    check('P3-UI-02 หัวหน้าโครงการเปิด /approvals → ถูก redirect ออก · แต่ /ledger ยังเข้าได้',
       r.status === 307 && !loc.includes('/approvals') && ledger.includes(NOTE_A),
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }
 
-  // ── P3-API-01 · หัวหน้าไซต์กดอนุมัติไม่ได้ ───────────────────────
+  // ── P3-API-01 · หัวหน้าโครงการกดอนุมัติไม่ได้ ───────────────────────
   {
     const r = await req('PATCH', `/api/transactions/${idA}`, { action: 'approve' }, supJar)
     const b = await r.json().catch(() => ({}))
     const [{ status }] = (await sql(
       `select status from public.transactions where id = '${idA}'`)).rows
-    check('P3-API-01 หัวหน้าไซต์ยิง action=approve → 403 · แถวยัง pending',
+    check('P3-API-01 หัวหน้าโครงการยิง action=approve → 403 · แถวยัง pending',
       r.status === 403 && b.error === 'FORBIDDEN' && status === 'pending',
       `${r.status} ${b.error} · status=${status}`)
   }

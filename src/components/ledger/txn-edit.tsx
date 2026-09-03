@@ -24,7 +24,7 @@ export type EditableTxn = {
   status: TxnStatus
   createdBy: string | null
   siteId: string | null
-  /** ชื่อไซต์ของแถวนี้ — เผื่อไซต์ปิดงานไปแล้วจนไม่อยู่ในลิสต์ให้เลือก */
+  /** ชื่อโครงการของแถวนี้ — เผื่อโครงการปิดงานไปแล้วจนไม่อยู่ในลิสต์ให้เลือก */
   siteName: string | null
   categoryId: string
   /** ชื่อหมวดของแถวนี้ — เผื่อหมวดถูกปิดใช้งานไปแล้ว */
@@ -50,9 +50,9 @@ const EditCtx = createContext<{ open: OpenFn; me: Me } | null>(null)
 /**
  * ครอบลิสต์รายการเพื่อให้ทุกแถวมีปุ่มแก้ไขได้
  *
- * 🔴 **กล่องแก้ไขมีตัวเดียวต่อหน้า ไม่ใช่ตัวหนึ่งต่อแถว** — ตัวเลือกไซต์กับ
+ * 🔴 **กล่องแก้ไขมีตัวเดียวต่อหน้า ไม่ใช่ตัวหนึ่งต่อแถว** — ตัวเลือกโครงการกับ
  * หมวดเป็นชุดเดียวกันทั้งหน้า ถ้าแนบไปกับทุกแถวมันจะถูกส่งข้ามเน็ตซ้ำ
- * สามสิบรอบต่อการเปิดหนึ่งหน้า บนมือถือกลางไซต์ที่สัญญาณไม่ดี
+ * สามสิบรอบต่อการเปิดหนึ่งหน้า บนมือถือกลางโครงการที่สัญญาณไม่ดี
  */
 export function TxnEditProvider({
   me, today, sites, categories, children,
@@ -159,14 +159,14 @@ function TxnEditDialog({
 
   // 🔴 หมวดที่ถูกปิดใช้งานไปแล้วไม่อยู่ในลิสต์ — ถ้าไม่เติมกลับเข้าไป
   // การเปิดกล่องแก้ไขจะทำให้หมวดของแถวนั้นหายไปเงียบ ๆ แล้วบันทึกทับด้วย
-  // หมวดอื่น · เรื่องเดียวกับไซต์ที่ปิดงานแล้วข้างล่าง
+  // หมวดอื่น · เรื่องเดียวกับโครงการที่ปิดงานแล้วข้างล่าง
   const visibleCategories = categories.filter((c) => c.kind === txn.kind)
   const categoryOptions = visibleCategories.some((c) => c.id === txn.categoryId)
     ? visibleCategories
     : [...visibleCategories, { id: txn.categoryId, name: txn.categoryName ?? 'หมวดเดิม', kind: txn.kind }]
 
   const siteOptions = txn.siteId && !sites.some((s) => s.id === txn.siteId)
-    ? [...sites, { id: txn.siteId, name: txn.siteName ?? 'ไซต์เดิม' }]
+    ? [...sites, { id: txn.siteId, name: txn.siteName ?? 'โครงการเดิม' }]
     : sites
 
   /** ปิดกล่อง แล้วให้เซิร์ฟเวอร์คำนวณยอดใหม่ — ไม่แก้ตัวเลขในหน้าเอง */
@@ -209,7 +209,7 @@ function TxnEditDialog({
         toast.error(txnError(b.error))
         return
       }
-      // หัวหน้าไซต์แก้ของที่ถูกตีกลับ = ส่งใหม่ · ฐานข้อมูลดันสถานะกลับเป็น
+      // หัวหน้าโครงการแก้ของที่ถูกตีกลับ = ส่งใหม่ · ฐานข้อมูลดันสถานะกลับเป็น
       // `pending` ให้เอง — บอกให้ตรงกับสิ่งที่เกิดขึ้นจริง ไม่ใช่ "บันทึกแล้ว" เฉย ๆ
       done(
         txn.status === 'rejected' && b.transaction?.status === 'pending'
@@ -318,7 +318,7 @@ function TxnEditDialog({
               </Dialog.Title>
               <Dialog.Description className="mt-1 text-sm text-muted-token">
                 {txn.status === 'approved'
-                  ? 'รายการนี้อนุมัติแล้ว การลบจะทำให้ยอดรวมของไซต์และรายงานเปลี่ยนย้อนหลังทันที'
+                  ? 'รายการนี้อนุมัติแล้ว การลบจะทำให้ยอดรวมของโครงการและรายงานเปลี่ยนย้อนหลังทันที'
                   : 'รายการนี้จะหายจากทุกหน้าและจากคิวอนุมัติ'}{' '}
                 ค่าเดิมทั้งแถวยังถูกเก็บไว้ในประวัติการแก้ไข (/audit) แต่กู้กลับเป็นรายการไม่ได้
               </Dialog.Description>
@@ -352,7 +352,7 @@ function TxnEditDialog({
                 <p className="mt-3 flex gap-2 rounded-md border border-urgent-ring bg-urgent-bg px-3 py-2 text-sm text-urgent">
                   <AlertTriangle className="mt-0.5 size-4 shrink-0" strokeWidth={2} />
                   <span>
-                    รายการนี้อนุมัติแล้ว การแก้จะเปลี่ยนยอดรวมของไซต์และรายงานย้อนหลัง
+                    รายการนี้อนุมัติแล้ว การแก้จะเปลี่ยนยอดรวมของโครงการและรายงานย้อนหลัง
                     ทุกการแก้ถูกบันทึกไว้ในประวัติ (/audit)
                   </span>
                 </p>
@@ -422,7 +422,7 @@ function TxnEditDialog({
                   {err('category') && <p className="mt-1 text-sm text-urgent">{err('category')}</p>}
                 </Field>
 
-                <Field id={`site-${txn.id}`} label="ไซต์งาน">
+                <Field id={`site-${txn.id}`} label="โครงการ">
                   <select
                     id={`site-${txn.id}`}
                     value={form.siteId}
@@ -433,7 +433,7 @@ function TxnEditDialog({
                       <option key={s.id} value={s.id}>{s.name}</option>
                     ))}
                     {isOwner && txn.kind === 'expense' && (
-                      <option value={CENTRAL}>ส่วนกลาง (ไม่ผูกไซต์)</option>
+                      <option value={CENTRAL}>ส่วนกลาง (ไม่ผูกโครงการ)</option>
                     )}
                   </select>
                 </Field>

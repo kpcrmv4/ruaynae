@@ -54,11 +54,11 @@ const ownerJar = jarOf(
 )
 const supJar = jarOf(await post('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN }))
 
-// สิทธิ์: หัวหน้าไซต์เปลี่ยนโลโก้บริษัทไม่ได้ — และต้องได้ "เหตุผล" ไม่ใช่แค่ไม่ 200
+// สิทธิ์: หัวหน้าโครงการเปลี่ยนโลโก้บริษัทไม่ได้ — และต้องได้ "เหตุผล" ไม่ใช่แค่ไม่ 200
 {
   const r = await post('/api/uploads/sign', { purpose: 'logo', contentType: 'image/webp' }, { cookie: supJar })
   const b = await r.json().catch(() => ({}))
-  check('P05-R2-02 หัวหน้าไซต์ขอลิงก์อัปโหลดโลโก้ → 403 FORBIDDEN',
+  check('P05-R2-02 หัวหน้าโครงการขอลิงก์อัปโหลดโลโก้ → 403 FORBIDDEN',
     r.status === 403 && b.error === 'FORBIDDEN', `${r.status} ${b.error}`)
 }
 
@@ -264,7 +264,7 @@ for (const origin of APP_ORIGINS) {
     `หน้าจอ ${shown ?? 'ไม่มี'} · R2 จริง ${files}`)
 
   const supHtml = await settingsHtml(supJar)
-  check('P05-STORE-02 หัวหน้าไซต์ไม่เห็นการ์ดพื้นที่เก็บรูป (เป็นเรื่องค่าใช้จ่ายของเจ้าของ)',
+  check('P05-STORE-02 หัวหน้าโครงการไม่เห็นการ์ดพื้นที่เก็บรูป (เป็นเรื่องค่าใช้จ่ายของเจ้าของ)',
     !supHtml.includes('พื้นที่เก็บรูป'), supHtml.includes('พื้นที่เก็บรูป') ? 'เห็น' : 'ไม่เห็น')
 }
 

@@ -9,8 +9,8 @@ import { getBranding } from '@/lib/branding'
 import { getSupabaseServer } from '@/lib/supabase/server'
 
 const ROLE_LABEL = {
-  owner: 'เห็นทุกไซต์ · อนุมัติได้',
-  site_supervisor: 'เห็นเฉพาะไซต์ที่ดูแล',
+  owner: 'เห็นทุกโครงการ · อนุมัติได้',
+  site_supervisor: 'เห็นเฉพาะโครงการที่ดูแล',
 } as const
 
 /** กี่รายการในกล่องกระดิ่ง — เก่ากว่านั้นดูได้จากหน้าที่ลิงก์ไป */
@@ -41,13 +41,13 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
         .select('id', { count: 'exact', head: true })
         .is('read_at', null),
       // ตัวเลขค้างอนุมัติบนเมนู — เฉพาะเจ้าของ (ช่อง "รออนุมัติ" มีแค่ฝั่งนั้น)
-      // หัวหน้าไซต์ไม่ยิง query นี้เลย ไม่ใช่ยิงแล้วเอาไปซ่อน
+      // หัวหน้าโครงการไม่ยิง query นี้เลย ไม่ใช่ยิงแล้วเอาไปซ่อน
       user.role === 'owner'
         ? sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'pending')
         : Promise.resolve({ count: 0, error: null }),
       // ตัวเลขของค้างบนเมนู "รายรับ-รายจ่าย" = รายการที่ถูกตีกลับและยังไม่ถูกแก้
       // 🔴 ไม่มีเงื่อนไข role — RLS เป็นคนกำหนดขอบเขตให้เอง: เจ้าของเห็นทุกใบ
-      // ที่ตีกลับไปแล้วยังค้าง · หัวหน้าไซต์เห็นเฉพาะของไซต์ตัวเองซึ่งเป็นใบ
+      // ที่ตีกลับไปแล้วยังค้าง · หัวหน้าโครงการเห็นเฉพาะของโครงการตัวเองซึ่งเป็นใบ
       // ที่ต้องแก้แล้วส่งใหม่ · ทั้งสองคนอ่านได้ประโยคเดียวกันว่า "ค้างอยู่"
       sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
     ])

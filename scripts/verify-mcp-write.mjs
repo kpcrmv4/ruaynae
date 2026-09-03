@@ -97,8 +97,8 @@ try {
   // ── fixture ของตัวเอง ───────────────────────────────────────────────
   await sql(`
     insert into public.sites (id, name, status) values
-      (${q(F.site)}, ${q(`${TAG} ไซต์`)}, 'active'),
-      (${q(F.otherSite)}, ${q(`${TAG} ไซต์อื่น`)}, 'active');
+      (${q(F.site)}, ${q(`${TAG} โครงการ`)}, 'active'),
+      (${q(F.otherSite)}, ${q(`${TAG} โครงการอื่น`)}, 'active');
     insert into public.categories (id, name, kind, is_active, sort_order) values
       (${q(F.catExpense)}, ${q(`${TAG} หมวดจ่าย`)}, 'expense', true, 990),
       (${q(F.catIncome)},  ${q(`${TAG} หมวดรับ`)},  'income',  true, 991);
@@ -192,9 +192,9 @@ try {
       `แถว ${before}→${after} · duplicate=${b?.duplicate}`)
   }
 
-  // ══ 3 · ลงชื่อคนเข้าไซต์ ═══════════════════════════════════════════
+  // ══ 3 · ลงชื่อคนเข้าโครงการ ═══════════════════════════════════════════
   {
-    // คนที่สองไปลงชื่อไซต์อื่นไว้ก่อนแล้ว — ชุดนี้ต้องได้ 1 สำเร็จ 1 ตก
+    // คนที่สองไปลงชื่อโครงการอื่นไว้ก่อนแล้ว — ชุดนี้ต้องได้ 1 สำเร็จ 1 ตก
     await sql(`insert into public.attendance (site_id, employee_id, work_date, work_units)
                values (${q(F.otherSite)}, ${q(F.emp2)}, ${q(TODAY)}, 1)`)
     const r = await tool(k.url, 'record_attendance', {
@@ -202,7 +202,7 @@ try {
       entries: [{ employee_id: F.emp, work_units: 1 }, { employee_id: F.emp2, work_units: 1 }],
     })
     const j = jsonOf(r)
-    check('R6-TOOL-07 คนหนึ่งลงชื่อไซต์อื่นไปแล้ว → คนที่เหลือยังลงสำเร็จ และคนนั้นอยู่ใน skipped พร้อมเหตุผล',
+    check('R6-TOOL-07 คนหนึ่งลงชื่อโครงการอื่นไปแล้ว → คนที่เหลือยังลงสำเร็จ และคนนั้นอยู่ใน skipped พร้อมเหตุผล',
       j?.recorded?.length === 1 && j?.skipped?.length === 1
         && j.recorded[0].employee_id === F.emp && j.skipped[0].reason?.length > 0,
       `recorded=${j?.recorded?.length} skipped=${j?.skipped?.[0]?.reason ?? '—'}`)
@@ -210,7 +210,7 @@ try {
   {
     const j = jsonOf(await tool(k.url, 'list_employees', { on_date: TODAY }))
     const two = (j?.employees ?? []).find((e) => e.id === F.emp2)
-    check('R6-TOOL-08 list_employees บอกว่าวันนั้นใครอยู่ไซต์ไหนแล้ว (attendance_on_date)',
+    check('R6-TOOL-08 list_employees บอกว่าวันนั้นใครอยู่โครงการไหนแล้ว (attendance_on_date)',
       two?.attendance_on_date?.site_id === F.otherSite,
       `คนงานสอง → ${two?.attendance_on_date?.site_name ?? 'ว่าง'}`)
   }

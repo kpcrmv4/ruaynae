@@ -91,7 +91,7 @@ let siteId = null
 let empId = null
 let runId = null
 
-/** ต้นทุนรวมของไซต์ตามที่ RPC คำนวณ — ตัวเลขเดียวกับที่หน้าจอวาด */
+/** ต้นทุนรวมของโครงการตามที่ RPC คำนวณ — ตัวเลขเดียวกับที่หน้าจอวาด */
 const siteCost = async () => {
   const r = await db(ownerTok, `/rpc/site_money`, {
     method: 'POST', body: JSON.stringify({ p_site: siteId }) })
@@ -111,7 +111,7 @@ const countOf = async (table, filter = '') => {
 
 try {
   ;[{ id: siteId }] = (await sql(
-    `insert into public.sites(name, status) values ('${MARK} ไซต์', 'active') returning id`)).rows
+    `insert into public.sites(name, status) values ('${MARK} โครงการ', 'active') returning id`)).rows
   ;[{ id: empId }] = (await sql(
     `insert into public.employees(full_name, job_title) values ('${MARK} สมพงษ์', 'ช่างไม้') returning id`)).rows
   await sql(`insert into public.employee_wages(employee_id, wage_type, daily_rate)
@@ -144,7 +144,7 @@ try {
   // ── P5-DB-11 · 🔴 เบิกแล้วต้นทุนต้องไม่ขยับ ───────────────────────
   {
     const costNow = await siteCost()
-    check('P5-DB-11 บันทึกเบิกล่วงหน้าแล้ว ต้นทุนไซต์ไม่ขยับสักบาท (เงินสดออก ไม่ใช่ต้นทุน)',
+    check('P5-DB-11 บันทึกเบิกล่วงหน้าแล้ว ต้นทุนโครงการไม่ขยับสักบาท (เงินสดออก ไม่ใช่ต้นทุน)',
       costAfterWork === 3300 && costNow === 3300,
       `ก่อนเบิก ฿${costAfterWork} → หลังเบิก ฿${costNow}`)
   }
@@ -199,7 +199,7 @@ try {
       bad.every((s) => s >= 400), bad.join(' '))
   }
 
-  // ── P5-DB-06 · หัวหน้าไซต์ไม่เห็นและเขียนไม่ได้ ───────────────────
+  // ── P5-DB-06 · หัวหน้าโครงการไม่เห็นและเขียนไม่ได้ ───────────────────
   {
     const reads = []
     for (const t of ['advances', 'payroll_runs', 'payroll_lines']) {
@@ -211,7 +211,7 @@ try {
       body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0) }),
     })
     const ownerSees = (await db(ownerTok, '/advances?select=id')).body?.length ?? 0
-    check('P5-DB-06 หัวหน้าไซต์อ่านทั้งสามตารางได้ 0 แถวและเขียนไม่ได้ · เจ้าของอ่านได้ > 0',
+    check('P5-DB-06 หัวหน้าโครงการอ่านทั้งสามตารางได้ 0 แถวและเขียนไม่ได้ · เจ้าของอ่านได้ > 0',
       reads.every((n) => n === 0) && write.status >= 400 && ownerSees > 0,
       `อ่าน ${reads.join('/')} · เขียน ${write.status} · เจ้าของ ${ownerSees}`)
   }
@@ -246,7 +246,7 @@ try {
       method: 'POST',
       body: JSON.stringify({ period_start: day(-5), period_end: day(-1), site_id: siteId }),
     })
-    check('P5-DB-08 เปิดรอบที่ช่วงเวลาซ้อนกับรอบเดิมของไซต์เดิม → ถูกปฏิเสธ',
+    check('P5-DB-08 เปิดรอบที่ช่วงเวลาซ้อนกับรอบเดิมของโครงการเดิม → ถูกปฏิเสธ',
       r.status >= 400 && /payroll_runs_no_overlap|exclusion/.test(r.raw ?? ''),
       `${r.status}`)
   }
@@ -266,7 +266,7 @@ try {
 
     // ── P5-DB-10 · 🔴 ปิดรอบแล้วต้นทุนต้องไม่ขยับ ───────────────────
     const costAfter = await siteCost()
-    check('P5-DB-10 ปิดรอบจ่ายแล้ว ต้นทุนไซต์ไม่ขยับสักบาท — จ่ายเงินคือล้างหนี้ ไม่ใช่ต้นทุนใหม่',
+    check('P5-DB-10 ปิดรอบจ่ายแล้ว ต้นทุนโครงการไม่ขยับสักบาท — จ่ายเงินคือล้างหนี้ ไม่ใช่ต้นทุนใหม่',
       costBefore === 3300 && costAfter === 3300,
       `ก่อนปิดรอบ ฿${costBefore} → หลังปิดรอบ ฿${costAfter}`)
 

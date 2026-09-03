@@ -130,7 +130,7 @@ try {
     .every((k) => Number(mid[k]) === Number(after[k]))
   check('P8-SEED-02 รัน seed รอบสองแล้วจำนวนแถวทุกตารางเท่ารอบแรก — idempotent จริง ไม่ใช่แค่ไม่ error',
     same && Number(after.sites) >= 5 && Number(after.txns) >= 15,
-    `ไซต์ ${before.sites}→${mid.sites}→${after.sites} · ` +
+    `โครงการ ${before.sites}→${mid.sites}→${after.sites} · ` +
     `รายการ ${before.txns}→${mid.txns}→${after.txns} · ลงชื่อ ${before.att}→${mid.att}→${after.att}`)
 }
 
@@ -139,7 +139,7 @@ try {
   const { rows: st } = await sql(
     'select status, count(*)::int n from public.sites group by status order by status')
   const kinds = new Set(st.map((r) => r.status))
-  check('P8-SEED-03 ข้อมูลตัวอย่างครอบสถานะไซต์: active · done · planning (และมีไซต์ที่ยังไม่ตั้งค่างาน)',
+  check('P8-SEED-03 ข้อมูลตัวอย่างครอบสถานะโครงการ: active · done · planning (และมีโครงการที่ยังไม่ตั้งค่างาน)',
     kinds.has('active') && kinds.has('done') && kinds.has('planning'),
     st.map((r) => `${r.status}:${r.n}`).join(' · '))
 
@@ -168,7 +168,7 @@ try {
     .replace(/<script[\s\S]*?<\/script>/g, '').replace(/<!--[\s\S]*?-->/g, '')
   const want = ['฿2,850,000', '฿2,280,000', '80%', 'ต้นทุนโตเร็วกว่าเงินที่เก็บได้']
   const missing = want.filter((w) => !html.includes(w))
-  check('P8-SEED-05 หน้าภาพรวมแสดงยอดตรงกับที่ seed ตั้งใจ และป้ายต้นทุนแซงขึ้นถูกไซต์',
+  check('P8-SEED-05 หน้าภาพรวมแสดงยอดตรงกับที่ seed ตั้งใจ และป้ายต้นทุนแซงขึ้นถูกโครงการ',
     missing.length === 0, missing.length ? `ขาด: ${missing.join(', ')}` : `${want.length}/${want.length}`)
 }
 

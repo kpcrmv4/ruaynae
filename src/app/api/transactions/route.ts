@@ -54,7 +54,7 @@ export async function POST(req: NextRequest) {
       ...parsed.fields,
       // 🔴 สถานะตัดสินฝั่งเซิร์ฟเวอร์จาก role เท่านั้น — ค่าที่ client ส่งมา
       // ถูกทิ้งไปตั้งแต่ `parseTxnFields` แล้ว (ไม่มีฟิลด์ status ในนั้น)
-      // เจ้าของคีย์เอง = อนุมัติทันที · หัวหน้าไซต์คีย์ = เข้าคิวรออนุมัติ
+      // เจ้าของคีย์เอง = อนุมัติทันที · หัวหน้าโครงการคีย์ = เข้าคิวรออนุมัติ
       status: isOwner ? 'approved' : 'pending',
     })
     .select('id, status')

@@ -7,7 +7,7 @@ import { derivePassword, hashPin, isValidPin } from '@/lib/pin'
 export const runtime = 'nodejs'
 
 /**
- * POST /api/auth/pin — หัวหน้าไซต์ล็อกอินด้วย PIN 6 หลัก
+ * POST /api/auth/pin — หัวหน้าโครงการล็อกอินด้วย PIN 6 หลัก
  *
  * หน้าล็อกอินมีแต่แป้นตัวเลข ไม่ได้ถามว่าคุณคือใคร ระบบจึงหาเจ้าของ PIN
  * จาก hash ของค่าที่กด · unique index บน pin_hash คือสิ่งที่กันไม่ให้

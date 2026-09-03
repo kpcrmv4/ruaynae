@@ -50,7 +50,7 @@ async function db(token, path) {
   try { return { status: r.status, body: JSON.parse(t) } } catch { return { status: r.status, body: t } }
 }
 
-console.log('\n── P1-DB · ไซต์งานและผู้ดูแล ────────────────────────────────')
+console.log('\n── P1-DB · โครงการและผู้ดูแล ────────────────────────────────')
 
 const tok = async (email, password) => {
   const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/token?grant_type=password`, {
@@ -78,31 +78,31 @@ const [sup2] = (await sql(
 let mineId = null
 let othersId = null
 try {
-  // ── fixture: ไซต์ที่ sup1 ดูแล และไซต์ที่ sup2 ดูแล ─────────────────────
+  // ── fixture: โครงการที่ sup1 ดูแล และโครงการที่ sup2 ดูแล ─────────────────────
   ;[{ id: mineId }] = (await sql(
     `insert into public.sites(name, start_date, end_date)
-     values ('ทดสอบ ไซต์ของฉัน', current_date - 10, current_date + 10) returning id`,
+     values ('ทดสอบ โครงการของฉัน', current_date - 10, current_date + 10) returning id`,
   )).rows
   ;[{ id: othersId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ ไซต์คนอื่น') returning id`,
+    `insert into public.sites(name) values ('ทดสอบ โครงการคนอื่น') returning id`,
   )).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id) values ('${mineId}','${sup1.id}')`)
   await sql(`insert into public.site_supervisors(site_id, profile_id) values ('${othersId}','${sup2.id}')`)
 
-  // P1-DB-01 · สร้างไซต์แล้วมี audit
+  // P1-DB-01 · สร้างโครงการแล้วมี audit
   {
     const { rows } = await sql(
       `select count(*)::int as n from public.audit_log
        where table_name='sites' and action='INSERT' and row_id in ('${mineId}','${othersId}')`,
     )
-    check('P1-DB-01 สร้างไซต์แล้วมีแถว audit INSERT ครบ', rows[0].n === 2, `${rows[0].n} แถว`)
+    check('P1-DB-01 สร้างโครงการแล้วมีแถว audit INSERT ครบ', rows[0].n === 2, `${rows[0].n} แถว`)
   }
 
-  // P1-DB-03 · หัวหน้าไซต์เห็นเฉพาะไซต์ตัวเอง — ยืนยันสองฝั่งในครั้งเดียว
+  // P1-DB-03 · หัวหน้าโครงการเห็นเฉพาะโครงการตัวเอง — ยืนยันสองฝั่งในครั้งเดียว
   {
     const mine = await db(supTok, `/sites?select=id&id=eq.${mineId}`)
     const others = await db(supTok, `/sites?select=id&id=eq.${othersId}`)
-    check('P1-DB-03 หัวหน้าไซต์เห็นไซต์ตัวเอง 1 แถว และไม่เห็นไซต์คนอื่น',
+    check('P1-DB-03 หัวหน้าโครงการเห็นโครงการตัวเอง 1 แถว และไม่เห็นโครงการคนอื่น',
       mine.body?.length === 1 && others.body?.length === 0,
       `ของตัวเอง ${mine.body?.length} · ของคนอื่น ${others.body?.length}`)
   }
@@ -116,7 +116,7 @@ try {
       `anon ${Array.isArray(anon.body) ? anon.body.length : anon.status} · owner ${own.body?.length}`)
   }
 
-  // P1-DB-05 · หัวหน้าไซต์แก้ชื่อไซต์ไม่ได้ (RLS ปฏิเสธเงียบ ๆ = โดน 0 แถว)
+  // P1-DB-05 · หัวหน้าโครงการแก้ชื่อโครงการไม่ได้ (RLS ปฏิเสธเงียบ ๆ = โดน 0 แถว)
   {
     const r = await fetch(`${env.NEXT_PUBLIC_SUPABASE_URL}/rest/v1/sites?id=eq.${mineId}`, {
       method: 'PATCH',
@@ -130,27 +130,27 @@ try {
     })
     const changed = await r.json().catch(() => [])
     const { rows } = await sql(`select name from public.sites where id='${mineId}'`)
-    check('P1-DB-05 หัวหน้าไซต์แก้ข้อมูลไซต์ไม่ได้ — โดน 0 แถว และค่าเดิมไม่เปลี่ยน',
-      (Array.isArray(changed) ? changed.length : 0) === 0 && rows[0].name === 'ทดสอบ ไซต์ของฉัน',
+    check('P1-DB-05 หัวหน้าโครงการแก้ข้อมูลโครงการไม่ได้ — โดน 0 แถว และค่าเดิมไม่เปลี่ยน',
+      (Array.isArray(changed) ? changed.length : 0) === 0 && rows[0].name === 'ทดสอบ โครงการของฉัน',
       `แถวที่ถูกแก้ ${Array.isArray(changed) ? changed.length : '?'} · ชื่อ ${rows[0].name}`)
   }
 
-  // ── ค่างานตามสัญญาเป็นความลับจากหัวหน้าไซต์ (เจ้าของตัดสิน 30 ส.ค. 2569) ──
+  // ── ค่างานตามสัญญาเป็นความลับจากหัวหน้าโครงการ (เจ้าของตัดสิน 30 ส.ค. 2569) ──
 
-  // P1-DB-14 · หัวหน้าไซต์อ่านตาราง site_finance ไม่ได้เลย
+  // P1-DB-14 · หัวหน้าโครงการอ่านตาราง site_finance ไม่ได้เลย
   // 🔴 ครึ่งบวกอยู่ในการตรวจเดียวกัน: เจ้าของต้องอ่านได้ > 0 แถว
-  // ไม่งั้น "หัวหน้าไซต์เห็น 0 แถว" อาจแปลว่าไม่มีข้อมูลตั้งแต่แรก
+  // ไม่งั้น "หัวหน้าโครงการเห็น 0 แถว" อาจแปลว่าไม่มีข้อมูลตั้งแต่แรก
   {
     await sql(`update public.site_finance set contract_amount = 1000000 where site_id='${mineId}'`)
     const sup = await db(supTok, '/site_finance?select=site_id,contract_amount')
     const own = await db(ownerTok, '/site_finance?select=site_id,contract_amount')
-    check('P1-DB-14 หัวหน้าไซต์อ่าน site_finance ได้ 0 แถว · เจ้าของอ่านได้',
+    check('P1-DB-14 หัวหน้าโครงการอ่าน site_finance ได้ 0 แถว · เจ้าของอ่านได้',
       (Array.isArray(sup.body) ? sup.body.length : -1) === 0 && own.body?.length >= 1,
-      `หัวหน้าไซต์ ${Array.isArray(sup.body) ? sup.body.length : sup.status} · เจ้าของ ${own.body?.length}`)
+      `หัวหน้าโครงการ ${Array.isArray(sup.body) ? sup.body.length : sup.status} · เจ้าของ ${own.body?.length}`)
   }
 
   // P1-DB-15 · ไม่มีคอลัมน์ contract_amount บนตาราง sites อีกแล้ว
-  // ปิดทางอ้อม: ถ้ายังมีคอลัมน์อยู่ หัวหน้าไซต์อ่านผ่านแถว sites ที่เขาเห็นได้ทันที
+  // ปิดทางอ้อม: ถ้ายังมีคอลัมน์อยู่ หัวหน้าโครงการอ่านผ่านแถว sites ที่เขาเห็นได้ทันที
   {
     const { rows } = await sql(
       `select count(*)::int as n from information_schema.columns
@@ -162,7 +162,7 @@ try {
       rows[0].n === 0 && fin[0].n === 1, `sites ${rows[0].n} · site_finance ${fin[0].n}`)
   }
 
-  // P1-DB-16 · site_overview คืน null ให้หัวหน้าไซต์ ไม่ใช่ 0
+  // P1-DB-16 · site_overview คืน null ให้หัวหน้าโครงการ ไม่ใช่ 0
   // 🔴 "ศูนย์" กับ "ไม่มีสิทธิ์เห็น" เป็นคนละเรื่อง — หน้าจอซ่อนการ์ดที่ได้ null ได้
   // แต่มันจะวาด ฿0 อย่างมั่นใจ แล้วคนอ่านจะเชื่อว่านั่นคือคำตอบ
   {
@@ -180,19 +180,19 @@ try {
     }
     const sup = await rpc(supTok)
     const own = await rpc(ownerTok)
-    check('P1-DB-16 site_overview คืน active_contract = null ให้หัวหน้าไซต์ · ตัวเลขให้เจ้าของ',
+    check('P1-DB-16 site_overview คืน active_contract = null ให้หัวหน้าโครงการ · ตัวเลขให้เจ้าของ',
       sup?.active_contract === null && Number(own?.active_contract) >= 1000000,
-      `หัวหน้าไซต์ ${JSON.stringify(sup?.active_contract)} · เจ้าของ ${own?.active_contract}`)
+      `หัวหน้าโครงการ ${JSON.stringify(sup?.active_contract)} · เจ้าของ ${own?.active_contract}`)
   }
 
-  // P1-DB-17 · ทุกไซต์ต้องมีแถว site_finance (trigger สร้างให้)
+  // P1-DB-17 · ทุกโครงการต้องมีแถว site_finance (trigger สร้างให้)
   {
     const { rows } = await sql(
       `select count(*)::int as n from public.sites s
        left join public.site_finance f on f.site_id = s.id where f.site_id is null`)
     const { rows: total } = await sql('select count(*)::int as n from public.sites')
-    check('P1-DB-17 ทุกไซต์มีแถว site_finance — trigger สร้างให้ตอน insert',
-      rows[0].n === 0 && total[0].n >= 2, `ไม่มีแถวการเงิน ${rows[0].n} จาก ${total[0].n} ไซต์`)
+    check('P1-DB-17 ทุกโครงการมีแถว site_finance — trigger สร้างให้ตอน insert',
+      rows[0].n === 0 && total[0].n >= 2, `ไม่มีแถวการเงิน ${rows[0].n} จาก ${total[0].n} โครงการ`)
   }
 
   // P1-DB-07 · ช่วงเวลาทับกันถูกปฏิเสธ
@@ -204,7 +204,7 @@ try {
     const { rows } = await sql(
       `select count(*)::int as n from public.site_supervisors where profile_id='${sup1.id}'`,
     )
-    check('P1-DB-07 คนเดียวอยู่สองไซต์วันเดียวกันไม่ได้ (exclusion constraint)',
+    check('P1-DB-07 คนเดียวอยู่สองโครงการวันเดียวกันไม่ได้ (exclusion constraint)',
       Boolean(r.error) && /conflicting key|exclusion/i.test(r.error) && rows[0].n === 1,
       `ถูกปฏิเสธ=${Boolean(r.error)} · แถวของ sup1 = ${rows[0].n}`)
   }
@@ -223,20 +223,20 @@ try {
       !r.error && r.rows?.length === 1, r.error ? String(r.error).slice(0, 60) : 'เขียนได้')
   }
 
-  // P1-DB-09 · ย้ายล่วงหน้าแล้ววันนี้ยังเห็นไซต์เดิม
+  // P1-DB-09 · ย้ายล่วงหน้าแล้ววันนี้ยังเห็นโครงการเดิม
   // ("ปัจจุบัน" ต้องไม่ใช่ effective_to is null)
   {
     const mine = await db(supTok, `/sites?select=id&id=eq.${mineId}`)
     const future = await db(supTok, `/sites?select=id&id=eq.${othersId}`)
-    check('P1-DB-09 ตั้งย้ายล่วงหน้าแล้ว วันนี้ยังเห็นไซต์เดิม และยังไม่เห็นไซต์ใหม่',
+    check('P1-DB-09 ตั้งย้ายล่วงหน้าแล้ว วันนี้ยังเห็นโครงการเดิม และยังไม่เห็นโครงการใหม่',
       mine.body?.length === 1 && future.body?.length === 0,
-      `ไซต์เดิม ${mine.body?.length} · ไซต์ที่จะย้ายไป ${future.body?.length}`)
+      `โครงการเดิม ${mine.body?.length} · โครงการที่จะย้ายไป ${future.body?.length}`)
   }
 } finally {
   for (const id of [mineId, othersId]) {
     if (id) await sql(`delete from public.sites where id = '${id}'`)
   }
-  console.log('  (ลบไซต์ทดสอบแล้ว)')
+  console.log('  (ลบโครงการทดสอบแล้ว)')
 }
 
 // P1-DB-06 · ทุกตารางเปิด RLS

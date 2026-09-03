@@ -5,13 +5,13 @@ import { parseDate } from '@/lib/sites'
 
 export const runtime = 'nodejs'
 
-/** exclusion_violation — ช่วงเวลาของคนคนเดียวทับกันสองไซต์ */
+/** exclusion_violation — ช่วงเวลาของคนคนเดียวทับกันสองโครงการ */
 const EXCLUSION_VIOLATION = '23P01'
 
 /**
- * POST /api/sites/[id]/supervisors — มอบหมายหัวหน้าไซต์ พร้อมช่วงเวลา
+ * POST /api/sites/[id]/supervisors — มอบหมายหัวหน้าโครงการ พร้อมช่วงเวลา
  *
- * 🔴 ช่วงเวลาไม่ใช่ของประดับ · ถ้าเก็บแค่ "ใครดูแลไซต์ไหน" พอย้ายหัวหน้าไซต์
+ * 🔴 ช่วงเวลาไม่ใช่ของประดับ · ถ้าเก็บแค่ "ใครดูแลโครงการไหน" พอย้ายหัวหน้าโครงการ
  * รายงานย้อนหลังจะเปลี่ยนเจ้าของตามไปด้วยเงียบ ๆ งานที่ทีมเก่าทำจะไปโผล่ใต้ทีมใหม่
  */
 export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string }> }) {
@@ -24,7 +24,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const { data: site, error: sErr } = await sb
     .from('sites').select('id').eq('id', siteId).maybeSingle()
   if (sErr) {
-    console.error('[sites] อ่านไซต์ไม่ได้', sErr.message)
+    console.error('[sites] อ่านโครงการไม่ได้', sErr.message)
     return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
   }
   if (!site) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
     if (error.code === EXCLUSION_VIOLATION) {
       return NextResponse.json({ error: 'OVERLAP' }, { status: 409 })
     }
-    console.error('[sites] มอบหมายหัวหน้าไซต์ไม่สำเร็จ', error.message)
+    console.error('[sites] มอบหมายหัวหน้าโครงการไม่สำเร็จ', error.message)
     return NextResponse.json({ error: 'CREATE_FAILED' }, { status: 500 })
   }
   if (!data) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
@@ -98,7 +98,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
   if (!assignmentId) return NextResponse.json({ error: 'ASSIGNMENT_REQUIRED' }, { status: 400 })
 
   const sb = await getSupabaseServer()
-  // ผูกกับ site_id ด้วย — id เดียวโดด ๆ ทำให้ลบแถวของไซต์อื่นได้ถ้าเดา id ถูก
+  // ผูกกับ site_id ด้วย — id เดียวโดด ๆ ทำให้ลบแถวของโครงการอื่นได้ถ้าเดา id ถูก
   const { data, error } = await sb
     .from('site_supervisors')
     .delete()
@@ -108,7 +108,7 @@ export async function DELETE(req: NextRequest, ctx: { params: Promise<{ id: stri
     .maybeSingle()
 
   if (error) {
-    console.error('[sites] ถอนหัวหน้าไซต์ไม่สำเร็จ', error.message)
+    console.error('[sites] ถอนหัวหน้าโครงการไม่สำเร็จ', error.message)
     return NextResponse.json({ error: 'DELETE_FAILED' }, { status: 500 })
   }
   // delete ที่โดน 0 แถวไม่ใช่ error — ต้องแยกออกมาเองว่าไม่มีของให้ลบ

@@ -134,17 +134,17 @@ try {
 
   // สร้างประวัติจริงขึ้นมาให้ตรวจ — ห้ามให้แถวไหนผ่านบนฐานที่ว่างเปล่า
   ;[{ id: siteId }] = (await sql(
-    `insert into public.sites(name, status) values ('${MARK} ไซต์', 'planning') returning id`)).rows
+    `insert into public.sites(name, status) values ('${MARK} โครงการ', 'planning') returning id`)).rows
   // แก้ผ่าน API เพื่อให้ `actor` เป็นเจ้าของจริง ไม่ใช่ null
-  await req('PATCH', `/api/sites/${siteId}`, { name: `${MARK} ไซต์ (แก้ชื่อแล้ว)` }, ownerJar)
+  await req('PATCH', `/api/sites/${siteId}`, { name: `${MARK} โครงการ (แก้ชื่อแล้ว)` }, ownerJar)
 
-  // ── P6-DB-02 · หัวหน้าไซต์อ่านไม่ได้ ──────────────────────────────
+  // ── P6-DB-02 · หัวหน้าโครงการอ่านไม่ได้ ──────────────────────────────
   {
     const sup = await db(supTok, '/audit_log?select=id')
     const owner = await db(ownerTok, '/audit_log?select=id&limit=5')
-    check('P6-DB-02 หัวหน้าไซต์อ่าน audit_log ได้ 0 แถว · เจ้าของอ่านได้ > 0',
+    check('P6-DB-02 หัวหน้าโครงการอ่าน audit_log ได้ 0 แถว · เจ้าของอ่านได้ > 0',
       (Array.isArray(sup.body) ? sup.body.length : -1) === 0 && (owner.body?.length ?? 0) > 0,
-      `หัวหน้าไซต์ ${Array.isArray(sup.body) ? sup.body.length : '?'} · เจ้าของ ${owner.body?.length}`)
+      `หัวหน้าโครงการ ${Array.isArray(sup.body) ? sup.body.length : '?'} · เจ้าของ ${owner.body?.length}`)
   }
 
   // ── P6-DB-03 · anon ───────────────────────────────────────────────
@@ -203,16 +203,16 @@ try {
   {
     const html = await page('/audit', ownerJar)
     check('P6-UI-01 หน้า /audit แสดงชื่อตาราง ชนิดการกระทำ และเวลา',
-      html.includes('ไซต์งาน') && html.includes('แก้ไข') && html.includes('เพิ่มใหม่'),
+      html.includes('โครงการ') && html.includes('แก้ไข') && html.includes('เพิ่มใหม่'),
       'มีทั้งชื่อตารางและชนิดการกระทำ')
   }
 
-  // ── P6-UI-02 · หัวหน้าไซต์เข้าไม่ได้ ──────────────────────────────
+  // ── P6-UI-02 · หัวหน้าโครงการเข้าไม่ได้ ──────────────────────────────
   {
     const r = await fetch(`${BASE}/audit`, { headers: { cookie: supJar }, redirect: 'manual' })
     const loc = r.headers.get('location') ?? ''
     const ledger = await page('/ledger', supJar)
-    check('P6-UI-02 หัวหน้าไซต์เปิด /audit → ถูก redirect ออก · /ledger ยังเข้าได้',
+    check('P6-UI-02 หัวหน้าโครงการเปิด /audit → ถูก redirect ออก · /ledger ยังเข้าได้',
       r.status === 307 && !loc.includes('/audit') && ledger.includes('รายรับ-รายจ่าย'),
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }
@@ -222,7 +222,7 @@ try {
     const sites = await page('/audit?table=sites', ownerJar)
     const profiles = await page('/audit?table=profiles', ownerJar)
     check('P6-UI-03 กรองตามตารางเปลี่ยนผลจริง — เห็นของ sites และไม่เห็นของ profiles ในหน้าเดียวกัน',
-      sites.includes('ไซต์งาน') && !sites.includes('ผู้ใช้ระบบ')
+      sites.includes('โครงการ') && !sites.includes('ผู้ใช้ระบบ')
       && profiles.includes('ผู้ใช้ระบบ'),
       `sites มีผู้ใช้ระบบ=${sites.includes('ผู้ใช้ระบบ')}`)
   }
@@ -258,7 +258,7 @@ try {
   {
     const html = await page('/audit?table=sites&action=UPDATE', ownerJar)
     check('P6-UI-06 แถวแก้ไขแสดงเฉพาะฟิลด์ที่เปลี่ยน พร้อมค่าก่อน → ค่าหลัง ไม่ใช่ jsonb ทั้งก้อน',
-      html.includes('name: ') && html.includes(`${MARK} ไซต์ (แก้ชื่อแล้ว)`)
+      html.includes('name: ') && html.includes(`${MARK} โครงการ (แก้ชื่อแล้ว)`)
       && !html.includes('"created_at"'),
       'เห็นชื่อฟิลด์และค่าใหม่')
   }

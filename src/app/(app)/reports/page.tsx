@@ -37,7 +37,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     .order('name', { ascending: true })
     .range(0, PAGE_SIZE - 1)
 
-  // ไซต์ที่กรองต้องมีอยู่จริงและมองเห็นได้ — ไม่เชื่อค่าจาก URL
+  // โครงการที่กรองต้องมีอยู่จริงและมองเห็นได้ — ไม่เชื่อค่าจาก URL
   const siteId = (sites ?? []).some((s) => s.id === sp.site) ? sp.site! : null
   // RPC รับ `p_site` เป็น optional — `null` กับ `undefined` คนละชนิดในชั้นชนิดข้อมูล
   // แต่ความหมายเดียวกันคือ "ทั้งบริษัท" (ฝั่ง SQL เช็ค `p_site is null`)
@@ -69,7 +69,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
       .rpc('report_by_category', { p_from: period.from, p_to: period.to, p_site: siteArg })
       .order('total', { ascending: false })
       .range(0, 49),
-    // กรองไซต์อยู่แล้วก็ไม่ต้องมีตารางแยกไซต์ — มันจะเหลือแถวเดียวเสมอ
+    // กรองโครงการอยู่แล้วก็ไม่ต้องมีตารางแยกโครงการ — มันจะเหลือแถวเดียวเสมอ
     siteId
       ? Promise.resolve({ data: [], error: null })
       : sb
@@ -265,7 +265,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
           {!siteId && (bySite ?? []).length > 0 && (
             <section className="panel mb-4">
               <div className="panel-head">
-                แยกตามไซต์
+                แยกตามโครงการ
                 <span className="ml-auto text-xs font-normal tnum text-muted-token">
                   {(bySite ?? []).length} รายการ
                 </span>
@@ -352,7 +352,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
                   ตรงที่ตัวเลขอยู่ ไม่ใช่ไปอยู่ในเอกสารที่ไม่มีใครเปิด */}
               <p className="border-t border-line-soft px-4 py-3 text-xs leading-5 text-muted-token">
                 สองยอดนี้คือ <b>เงินสดที่จ่ายออกไป</b> ไม่ใช่ต้นทุน — ต้นทุนค่าแรงเกิดตั้งแต่ตอนติ๊ก
-                คนเข้าไซต์แล้ว (นับอยู่ใน &ldquo;ค่าแรงที่เกิดขึ้น&rdquo;) การนับซ้ำอีกรอบจะทำให้ต้นทุนเป็นสองเท่า
+                คนเข้าโครงการแล้ว (นับอยู่ใน &ldquo;ค่าแรงที่เกิดขึ้น&rdquo;) การนับซ้ำอีกรอบจะทำให้ต้นทุนเป็นสองเท่า
               </p>
               <div className="grid grid-cols-2 divide-x divide-y divide-line-soft border-t border-line">
                 <Cell label="จ่ายด้วยเงินสด" value={fmtBaht(Number(now?.expense_cash ?? 0))} />
@@ -393,9 +393,9 @@ function Cell({
 }
 
 /**
- * ตัวเลือกช่วงเวลาและไซต์
+ * ตัวเลือกช่วงเวลาและโครงการ
  *
- * ไม่มี state ฝั่ง client เลย — โหมดเป็นลิงก์ ส่วนช่วงกับไซต์เป็นฟอร์ม GET
+ * ไม่มี state ฝั่ง client เลย — โหมดเป็นลิงก์ ส่วนช่วงกับโครงการเป็นฟอร์ม GET
  * แบบเดียวกับ `ListToolbar` · ผลลัพธ์คือหน้ารายงานที่ **แชร์ลิงก์ได้**
  * และกดย้อนกลับได้ถูกต้องโดยไม่ต้องเขียนอะไรเพิ่ม
  */
@@ -454,7 +454,7 @@ function PeriodPicker({
         <select
           name="site"
           defaultValue={siteId ?? ''}
-          aria-label="ไซต์งาน"
+          aria-label="โครงการ"
           className="input-base w-auto min-w-36 flex-1 py-2"
         >
           <option value="">ทั้งบริษัท</option>

@@ -66,7 +66,7 @@ export default async function ApprovalsPage({
   const last = page[page.length - 1]
 
   // อายุของรายการในคิว — เทียบกับสิ้นวันนี้เวลาไทย ให้ของเมื่อวานนับเป็น 1 วัน
-  // ค้างนานคือสัญญาณว่าหัวหน้าไซต์กำลังรอคำตอบ ไม่ใช่แค่ตัวเลขประดับ
+  // ค้างนานคือสัญญาณว่าหัวหน้าโครงการกำลังรอคำตอบ ไม่ใช่แค่ตัวเลขประดับ
   const endOfToday = Date.parse(`${todayInBangkok()}T23:59:59+07:00`)
   const ageDays = (iso: string) =>
     Math.max(0, Math.floor((endOfToday - Date.parse(iso)) / 86_400_000))
@@ -77,7 +77,7 @@ export default async function ApprovalsPage({
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-ink">รออนุมัติ</h1>
           <p className="mt-0.5 text-sm text-muted-token">
-            รายจ่ายที่หัวหน้าไซต์คีย์เข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด
+            รายจ่ายที่หัวหน้าโครงการคีย์เข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด
           </p>
         </div>
         {(count ?? 0) > 0 && (
@@ -91,7 +91,7 @@ export default async function ApprovalsPage({
       {page.length === 0 ? (
         <EmptyState
           icon={Inbox}
-          message="ไม่มีรายการรออนุมัติ — ทุกอย่างที่หัวหน้าไซต์คีย์เข้ามาถูกตรวจครบแล้ว"
+          message="ไม่มีรายการรออนุมัติ — ทุกอย่างที่หัวหน้าโครงการคีย์เข้ามาถูกตรวจครบแล้ว"
           action={
             <Link href="/ledger" className="btn-secondary">
               ดูรายการทั้งหมด
@@ -136,7 +136,7 @@ export default async function ApprovalsPage({
                     </span>
                     {t.site_id ? (
                       <span className="chip border border-brand-tint-strong bg-brand-tint text-brand-on-tint ring-0">
-                        {t.sites?.name ?? 'ไซต์'}
+                        {t.sites?.name ?? 'โครงการ'}
                       </span>
                     ) : (
                       <span className="chip border border-dashed border-line-strong text-muted-token ring-0">

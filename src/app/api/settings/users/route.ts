@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
   const admin = getSupabaseAdmin()
 
-  // เจ้าของล็อกอินด้วยอีเมล · หัวหน้าไซต์ล็อกอินด้วย PIN — คนละทางกันคนละเงื่อนไข
+  // เจ้าของล็อกอินด้วยอีเมล · หัวหน้าโครงการล็อกอินด้วย PIN — คนละทางกันคนละเงื่อนไข
   if (role === 'owner') {
     if (!email.includes('@')) return NextResponse.json({ error: 'EMAIL_REQUIRED' }, { status: 400 })
     // ยาวกว่าขั้นต่ำของ Supabase เพราะบัญชีจริงไม่ควรใช้รหัสสั้นเท่าบัญชีทดสอบ

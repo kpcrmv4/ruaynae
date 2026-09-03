@@ -3,7 +3,7 @@
  * verify-attendance.mjs — ปิดแถว P4-CALC-01..06 และ P4-UI-05..10
  *
  * 🔴 ห้ามแถวใดผ่านบน `0 === 0` — ทุกแถวสร้างข้อมูลจริงก่อน แล้วคืนใน finally
- * 🔴 อ่านตัวเลขจากธาตุที่เป็นเจ้าของค่า (`data-day-wage`, การ์ดของไซต์นั้น)
+ * 🔴 อ่านตัวเลขจากธาตุที่เป็นเจ้าของค่า (`data-day-wage`, การ์ดของโครงการนั้น)
  * ไม่ใช่ regex กวาดทั้งหน้า
  */
 import { readFileSync } from 'node:fs'
@@ -32,14 +32,14 @@ const visible = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '')
 const page = async (path, cookie) =>
   visible(await (await fetch(`${BASE}${path}`, { headers: { cookie } })).text())
 
-/** ชิ้นส่วน HTML ของการ์ดไซต์ใบเดียวบนหน้าภาพรวม */
+/** ชิ้นส่วน HTML ของการ์ดโครงการใบเดียวบนหน้าภาพรวม */
 const cardOf = (html, siteId) =>
   html.split('href="/sites/').find((c) => c.startsWith(`${siteId}"`)) ?? null
 const dayWage = (html) => {
   const m = /data-day-wage="([\d.]+)"/.exec(html)
   return m ? Number(m[1]) : null
 }
-/** ต้นทุนจากการ์ด/หน้าไซต์ — อ่านจากป้าย "ต้นทุนที่จ่ายจริง" ที่เป็นเจ้าของค่า */
+/** ต้นทุนจากการ์ด/หน้าโครงการ — อ่านจากป้าย "ต้นทุนที่จ่ายจริง" ที่เป็นเจ้าของค่า */
 const costOf = (chunk) => {
   const m = /ต้นทุนที่จ่ายจริง[\s\S]{0,400}?฿([\d,]+)/.exec(chunk ?? '')
   return m ? Number(m[1].replace(/,/g, '')) : null
@@ -59,7 +59,7 @@ const sql = async (q) => {
   return { rows: JSON.parse(t) }
 }
 
-console.log('\n── P4 · คนเข้าไซต์ + ต้นทุนค่าแรง ───────────────────────────')
+console.log('\n── P4 · คนเข้าโครงการ + ต้นทุนค่าแรง ───────────────────────────')
 
 const ownerJar = jarOf(await req('POST', '/api/auth/login', {
   email: env.SEED_OWNER_EMAIL, password: env.SEED_OWNER_PASSWORD }))
@@ -79,7 +79,7 @@ const tomorrow = (() => {
   return d.toISOString().slice(0, 10)
 })()
 
-const MARK = 'ทดสอบคนเข้าไซต์'
+const MARK = 'ทดสอบคนเข้าโครงการ'
 let siteA = null
 let siteB = null
 let dailyId = null
@@ -88,12 +88,12 @@ let monthlyId = null
 try {
   ;[{ id: siteA }] = (await sql(
     `insert into public.sites(name, status, start_date, end_date)
-     values ('${MARK} ไซต์ก', 'active', '2000-01-01', '2000-06-30') returning id`)).rows
+     values ('${MARK} โครงการก', 'active', '2000-01-01', '2000-06-30') returning id`)).rows
   ;[{ id: siteB }] = (await sql(
     `insert into public.sites(name, status, start_date, end_date)
-     values ('${MARK} ไซต์ข', 'active', '2000-01-01', '2000-06-30') returning id`)).rows
+     values ('${MARK} โครงการข', 'active', '2000-01-01', '2000-06-30') returning id`)).rows
   await sql(`update public.site_finance set contract_amount = 1000000 where site_id in ('${siteA}','${siteB}')`)
-  // ดูแลไซต์ ก มาตั้งแต่ปี 2000 — วันย้อนหลังที่ P4-UI-08 ใช้จึงอยู่ในช่วงที่เขาดูแลจริง
+  // ดูแลโครงการ ก มาตั้งแต่ปี 2000 — วันย้อนหลังที่ P4-UI-08 ใช้จึงอยู่ในช่วงที่เขาดูแลจริง
   await sql(`insert into public.site_supervisors(site_id, profile_id, effective_from)
              values ('${siteA}','${sup1.id}','2000-01-01')`)
 
@@ -107,18 +107,18 @@ try {
   await sql(`insert into public.employee_wages(employee_id, wage_type, monthly_salary)
              values ('${monthlyId}', 'monthly', 18000)`)
 
-  // รายจ่ายที่อนุมัติแล้วของไซต์ ก — ฐานของ P4-CALC-01
+  // รายจ่ายที่อนุมัติแล้วของโครงการ ก — ฐานของ P4-CALC-01
   await sql(`insert into public.transactions
     (kind, site_id, category_id, amount, txn_date, pay_method, status, note)
     values ('expense','${siteA}','${expCat.id}', 300000, '${today}', 'transfer', 'approved',
             '${MARK} ค่าวัสดุ')`)
 
-  // ── P4-UI-05 · หัวหน้าไซต์เห็นเฉพาะไซต์ตัวเอง ─────────────────────
+  // ── P4-UI-05 · หัวหน้าโครงการเห็นเฉพาะโครงการตัวเอง ─────────────────────
   {
     const html = await page('/attendance', supJar)
-    check('P4-UI-05 หัวหน้าไซต์เห็นเฉพาะไซต์ที่ตัวเองดูแล · ไม่เห็นไซต์อื่นในหน้าเดียวกัน',
-      html.includes(`${MARK} ไซต์ก`) && !html.includes(`${MARK} ไซต์ข`),
-      `เห็นไซต์ก=${html.includes(`${MARK} ไซต์ก`)} · เห็นไซต์ข=${html.includes(`${MARK} ไซต์ข`)}`)
+    check('P4-UI-05 หัวหน้าโครงการเห็นเฉพาะโครงการที่ตัวเองดูแล · ไม่เห็นโครงการอื่นในหน้าเดียวกัน',
+      html.includes(`${MARK} โครงการก`) && !html.includes(`${MARK} โครงการข`),
+      `เห็นโครงการก=${html.includes(`${MARK} โครงการก`)} · เห็นโครงการข=${html.includes(`${MARK} โครงการข`)}`)
   }
 
   // ── P4-UI-10 · ลงชื่อล่วงหน้าไม่ได้ ───────────────────────────────
@@ -142,22 +142,22 @@ try {
     const b = await r.json().catch(() => ({}))
     attId = b.attendance?.id ?? null
     const costAfter = costOf(cardOf(await page('/', ownerJar), siteA))
-    // 🔴 API ไม่คืนยอดเงินกลับมาแล้ว — หัวหน้าไซต์เป็นคนยิง และเขาไม่มีสิทธิ์เห็นเงิน
+    // 🔴 API ไม่คืนยอดเงินกลับมาแล้ว — หัวหน้าโครงการเป็นคนยิง และเขาไม่มีสิทธิ์เห็นเงิน
     // จึงยืนยันที่ **แถวในฐานข้อมูล** แทน ไม่ใช่ที่ response
     const [{ n: made }] = (await sql(
       `select count(*)::int n from public.attendance where id = '${attId ?? '00000000-0000-0000-0000-000000000000'}'`)).rows
-    check('P4-UI-06 หัวหน้าไซต์ติ๊กคนเข้าไซต์ → 201 · attendance +1 · API ไม่คืนยอดเงินกลับมา',
+    check('P4-UI-06 หัวหน้าโครงการติ๊กคนเข้าโครงการ → 201 · attendance +1 · API ไม่คืนยอดเงินกลับมา',
       r.status === 201 && Boolean(attId) && Number(made) === 1
       && b.attendance?.amount === undefined,
       `${r.status} · แถว ${made} · เงินใน response=${b.attendance?.amount ?? 'ไม่มี'}`)
-    check('P4-CALC-01 ต้นทุนไซต์ = รายจ่ายอนุมัติ ฿300,000 + ค่าแรง ฿600 = ฿300,600 ทันที ไม่ต้องอนุมัติ',
+    check('P4-CALC-01 ต้นทุนโครงการ = รายจ่ายอนุมัติ ฿300,000 + ค่าแรง ฿600 = ฿300,600 ทันที ไม่ต้องอนุมัติ',
       costBefore === 300000 && costAfter === 300600,
       `ก่อน ฿${costBefore} → หลัง ฿${costAfter}`)
   }
 
   // ── P4-CALC-04 · ยอดค่าแรงวันนี้ตรงกับ SQL (เจ้าของเท่านั้น) ──────
   // 🔴 ตรวจสองฝั่งในบล็อกเดียว: เจ้าของเห็นตัวเลขตรงกับ SQL
-  // และหัวหน้าไซต์**ไม่มีการ์ดนั้นเลย** ไม่ใช่เห็นเป็น ฿0
+  // และหัวหน้าโครงการ**ไม่มีการ์ดนั้นเลย** ไม่ใช่เห็นเป็น ฿0
   {
     const ownerHtml = await page(`/attendance?site=${siteA}&date=${today}`, ownerJar)
     const supHtml = await page(`/attendance?site=${siteA}&date=${today}`, supJar)
@@ -165,17 +165,17 @@ try {
       `select coalesce(sum(aw.amount),0)::float8 n
        from public.attendance a join public.attendance_wages aw on aw.attendance_id = a.id
        where a.site_id = '${siteA}' and a.work_date = '${today}'`)).rows
-    check('P4-CALC-04 ยอด "ค่าแรงวันนี้" ของเจ้าของ = Σ amount ตรงกับ SQL · หัวหน้าไซต์ไม่มีการ์ดนี้',
+    check('P4-CALC-04 ยอด "ค่าแรงวันนี้" ของเจ้าของ = Σ amount ตรงกับ SQL · หัวหน้าโครงการไม่มีการ์ดนี้',
       Number(n) > 0 && dayWage(ownerHtml) === Number(n) && dayWage(supHtml) === null,
-      `เจ้าของ ${dayWage(ownerHtml)} · SQL ${n} · หัวหน้าไซต์ ${dayWage(supHtml) ?? 'ไม่มีการ์ด'}`)
+      `เจ้าของ ${dayWage(ownerHtml)} · SQL ${n} · หัวหน้าโครงการ ${dayWage(supHtml) ?? 'ไม่มีการ์ด'}`)
   }
 
-  // ── P4-CALC-05 · ค่าแรงไซต์ ก ไม่เข้าไซต์ ข ───────────────────────
+  // ── P4-CALC-05 · ค่าแรงโครงการ ก ไม่เข้าโครงการ ข ───────────────────────
   {
     const html = await page('/', ownerJar)
     const costA = costOf(cardOf(html, siteA))
     const costB = costOf(cardOf(html, siteB))
-    check('P4-CALC-05 ค่าแรงของไซต์ ก ไม่ถูกนับเข้าไซต์ ข ในหน้าเดียวกัน',
+    check('P4-CALC-05 ค่าแรงของโครงการ ก ไม่ถูกนับเข้าโครงการ ข ในหน้าเดียวกัน',
       costA === 300600 && costB === 0, `ก ฿${costA} · ข ฿${costB}`)
   }
 
@@ -185,7 +185,7 @@ try {
     const r = await req('POST', '/api/attendance', {
       siteId: siteA, employeeId: monthlyId, workDate: today, workUnits: 1 }, supJar)
     const after = costOf(cardOf(await page('/', ownerJar), siteA))
-    check('P4-CALC-02 ติ๊กคนรายเดือน → ต้นทุนไซต์ไม่ขยับ (เงินเดือนตัดสิ้นเดือน ไม่ใช่ต้นทุนรายวัน)',
+    check('P4-CALC-02 ติ๊กคนรายเดือน → ต้นทุนโครงการไม่ขยับ (เงินเดือนตัดสิ้นเดือน ไม่ใช่ต้นทุนรายวัน)',
       r.status === 201 && before === after && after === 300600,
       `${r.status} · ก่อน ฿${before} → หลัง ฿${after}`)
 
@@ -207,7 +207,7 @@ try {
     const html = await page(`/attendance?site=${siteA}&date=${today}`, supJar)
     check('P4-UI-07 ติ๊กออก → 200 · ชื่อกลับไปอยู่ฝั่ง "ยังไม่เข้า"',
       r.status === 200 && html.includes('ยังไม่เข้า'), `${r.status}`)
-    check('P4-CALC-03 ลบแถวลงชื่อ → ต้นทุนไซต์ลดลงเท่ากับ amount ของแถวนั้นพอดี (฿600)',
+    check('P4-CALC-03 ลบแถวลงชื่อ → ต้นทุนโครงการลดลงเท่ากับ amount ของแถวนั้นพอดี (฿600)',
       before !== null && after === before - 600, `฿${before} → ฿${after}`)
   }
 
@@ -232,22 +232,22 @@ try {
   // aria-pressed="false" (ปุ่มเลือก) และปุ่มสลับต้องชี้ไปมุมมองรายชื่อ
   {
     const html = await page(`/attendance?site=${siteA}&date=${today}`, ownerJar)
-    check('R8-UI-01 หน้าคนเข้าไซต์เริ่มที่มุมมองการ์ด · มีปุ่มสลับไปมุมมองรายชื่อ',
+    check('R8-UI-01 หน้าคนเข้าโครงการเริ่มที่มุมมองการ์ด · มีปุ่มสลับไปมุมมองรายชื่อ',
       html.includes('สลับเป็นมุมมองรายชื่อ') && html.includes('aria-pressed="false"'),
       html.includes('สลับเป็นมุมมองรายชื่อ') ? 'มีปุ่มสลับและการ์ดเลือกได้' : 'ไม่เจอปุ่มสลับ')
   }
 
-  // ── P4-CALC-06 · หัวหน้าไซต์ไม่เห็นตัวเลขเงินของไซต์เลย ───────────
-  // เจ้าของสั่งไว้ 31 ส.ค. 2569 · ฝั่งบวกคือ "ยังเปิดหน้าไซต์ตัวเองได้อยู่"
+  // ── P4-CALC-06 · หัวหน้าโครงการไม่เห็นตัวเลขเงินของโครงการเลย ───────────
+  // เจ้าของสั่งไว้ 31 ส.ค. 2569 · ฝั่งบวกคือ "ยังเปิดหน้าโครงการตัวเองได้อยู่"
   // ไม่งั้น 404 ก็ผ่านแถวนี้ได้เหมือนกันโดยไม่ได้พิสูจน์อะไร
   {
     const html = await page(`/sites/${siteA}`, supJar)
     const leaks = ['เก็บเงินแล้ว', 'กำไรคงเหลือ', 'ค่างานตามสัญญา', 'ต้นทุนที่จ่ายจริง',
-      'ต้นทุนไซต์นี้', '1,000,000', '300,000']
+      'ต้นทุนโครงการนี้', '1,000,000', '300,000']
       .filter((w) => html.includes(w))
-    check('P4-CALC-06 หัวหน้าไซต์เปิดหน้าไซต์ตัวเองได้ แต่ไม่มีตัวเลขเงินสักตัวบนหน้านั้น',
-      leaks.length === 0 && html.includes(`${MARK} ไซต์ก`) && html.includes('ความคืบหน้า'),
-      leaks.length ? `หลุด: ${leaks.join(', ')}` : 'เห็นชื่อไซต์และแถบเวลา · ไม่มีเงิน')
+    check('P4-CALC-06 หัวหน้าโครงการเปิดหน้าโครงการตัวเองได้ แต่ไม่มีตัวเลขเงินสักตัวบนหน้านั้น',
+      leaks.length === 0 && html.includes(`${MARK} โครงการก`) && html.includes('ความคืบหน้า'),
+      leaks.length ? `หลุด: ${leaks.join(', ')}` : 'เห็นชื่อโครงการและแถบเวลา · ไม่มีเงิน')
   }
   // ── P4-DB-21 · ทุกคอลัมน์มีคนเขียนจริง ────────────────────────────
   // 🔴 ตัดสตริงและคอมเมนต์ก่อน grep — คอมเมนต์ที่ "อธิบาย" คอลัมน์

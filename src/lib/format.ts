@@ -44,7 +44,7 @@ export const fmtDateLong = (iso: string | null | undefined): string =>
   iso ? dateLongFmt.format(new Date(`${iso}T00:00:00Z`)) : '—'
 
 /** `2026-08-31` → `วันจันทร์ที่ 31 สิงหาคม 2569` — หัวหน้า "วันนี้" ต้องบอกวันในสัปดาห์
- *  เพราะงานไซต์คิดเป็น จันทร์–เสาร์ ไม่ใช่เลขวันที่ */
+ *  เพราะงานก่อสร้างคิดเป็น จันทร์–เสาร์ ไม่ใช่เลขวันที่ */
 export const fmtDateWithWeekday = (iso: string | null | undefined): string =>
   iso ? dateWeekdayFmt.format(new Date(`${iso}T00:00:00Z`)) : '—'
 

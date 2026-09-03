@@ -11,10 +11,10 @@ const GUARD_CODES = ['WORK_UNITS_EXCEEDED', 'EMPLOYEE_INACTIVE', 'EMPLOYEE_NOT_F
 const guardCode = (msg: string) => GUARD_CODES.find((c) => msg.includes(c))
 
 /**
- * POST /api/attendance — ลงชื่อคนเข้าไซต์หนึ่งคน
+ * POST /api/attendance — ลงชื่อคนเข้าโครงการหนึ่งคน
  *
  * 🔴 `wage_snapshot` ไม่รับจาก client เลย — trigger เป็นคนถ่ายจากเรตในฐานข้อมูล
- * (ดู P4-DB-09) · ที่นี่ส่งแค่ ใคร · ไซต์ไหน · วันไหน · กี่ส่วน · OT เท่าไหร่
+ * (ดู P4-DB-09) · ที่นี่ส่งแค่ ใคร · โครงการไหน · วันไหน · กี่ส่วน · OT เท่าไหร่
  */
 export async function POST(req: NextRequest) {
   const me = await getCurrentUserOrNull()
@@ -49,8 +49,8 @@ export async function POST(req: NextRequest) {
   if (rawUnits !== 0.5 && rawUnits !== 1) {
     return NextResponse.json({ error: 'WORK_UNITS_INVALID' }, { status: 400 })
   }
-  // 🔴 OT เป็นเงิน — หัวหน้าไซต์ไม่เห็นและไม่ตั้ง (เจ้าของสั่งไว้ 31 ส.ค. 2569)
-  // ค่าที่หัวหน้าไซต์ส่งมาถูกเพิกเฉย ไม่ใช่ตอบ error เพราะหน้าจอของเขาไม่มีช่องนี้อยู่แล้ว
+  // 🔴 OT เป็นเงิน — หัวหน้าโครงการไม่เห็นและไม่ตั้ง (เจ้าของสั่งไว้ 31 ส.ค. 2569)
+  // ค่าที่หัวหน้าโครงการส่งมาถูกเพิกเฉย ไม่ใช่ตอบ error เพราะหน้าจอของเขาไม่มีช่องนี้อยู่แล้ว
   const ot = me.role === 'owner' ? Number(body.otAmount ?? body.ot_amount ?? 0) : 0
   if (!Number.isFinite(ot) || ot < 0 || ot > 999_999) {
     return NextResponse.json({ error: 'OT_INVALID' }, { status: 400 })

@@ -71,7 +71,7 @@ export default async function AuditPage({
   const page = hasMore ? all.slice(0, PAGE_SIZE) : all
   const last = page[page.length - 1]
 
-  // ชื่อคนทำ — `profiles` ที่หัวหน้าไซต์อ่านไม่ได้ แต่หน้านี้เป็นของเจ้าของ
+  // ชื่อคนทำ — `profiles` ที่หัวหน้าโครงการอ่านไม่ได้ แต่หน้านี้เป็นของเจ้าของ
   // และเราต้องการชื่อของคนที่อาจถูกปิดบัญชีไปแล้วด้วย จึงใช้ admin client
   const actorIds = [...new Set(page.map((r) => r.actor).filter((v): v is string => Boolean(v)))]
   const names = new Map<string, string>()

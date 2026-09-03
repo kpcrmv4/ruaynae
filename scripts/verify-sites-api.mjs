@@ -59,7 +59,7 @@ const supabaseToken = async (email, password) => {
   return j.access_token
 }
 
-console.log('\n── P1-UI / P1-API · หน้าไซต์งานและ endpoint ────────────────')
+console.log('\n── P1-UI / P1-API · หน้าโครงการและ endpoint ────────────────')
 
 const ownerJar = jarOf(
   await req('POST', '/api/auth/login', {
@@ -81,17 +81,17 @@ const [sup2] = (await sql(
 )).rows
 
 // ── P1-UI-03 · สถานะว่างจริง — ต้องทำก่อนสร้าง fixture ──────────────────
-// ตัดสินได้เฉพาะตอนฐานข้อมูลยังไม่มีไซต์เลย · ถ้ามีแล้วให้ตอบว่าตัดสินไม่ได้
+// ตัดสินได้เฉพาะตอนฐานข้อมูลยังไม่มีโครงการเลย · ถ้ามีแล้วให้ตอบว่าตัดสินไม่ได้
 // ไม่ใช่ลบข้อมูลของคนอื่นทิ้งเพื่อให้ตรวจผ่าน
 {
   const before = await siteCount()
   if (before !== 0) {
-    check('P1-UI-03 ยังไม่มีไซต์เลย → สถานะว่าง + ปุ่มเพิ่มไซต์งาน', 'skip',
-      `ฐานข้อมูลมี ${before} ไซต์อยู่แล้ว — undecided`)
+    check('P1-UI-03 ยังไม่มีโครงการเลย → สถานะว่าง + ปุ่มเพิ่มโครงการ', 'skip',
+      `ฐานข้อมูลมี ${before} โครงการอยู่แล้ว — undecided`)
   } else {
     const html = await page('/sites', ownerJar)
-    check('P1-UI-03 ยังไม่มีไซต์เลย → สถานะว่าง + ปุ่มเพิ่มไซต์งาน',
-      html.includes('ยังไม่มีไซต์งานในระบบ') && html.includes('เพิ่มไซต์งาน'),
+    check('P1-UI-03 ยังไม่มีโครงการเลย → สถานะว่าง + ปุ่มเพิ่มโครงการ',
+      html.includes('ยังไม่มีโครงการในระบบ') && html.includes('เพิ่มโครงการ'),
       'ข้อความสถานะว่างของเจ้าของ')
   }
 }
@@ -115,12 +115,12 @@ const createSite = async (body, jar = ownerJar) => {
 }
 
 try {
-  // ── P1-API-02 · หัวหน้าไซต์สร้างไซต์เองไม่ได้ ────────────────────────
+  // ── P1-API-02 · หัวหน้าโครงการสร้างโครงการเองไม่ได้ ────────────────────────
   {
     const before = await siteCount()
-    const r = await createSite({ name: 'หัวหน้าไซต์ไม่ควรสร้างได้' }, supJar)
+    const r = await createSite({ name: 'หัวหน้าโครงการไม่ควรสร้างได้' }, supJar)
     const after = await siteCount()
-    check('P1-API-02 หัวหน้าไซต์ POST /api/sites → 403 FORBIDDEN · จำนวนไซต์เท่าเดิม',
+    check('P1-API-02 หัวหน้าโครงการ POST /api/sites → 403 FORBIDDEN · จำนวนโครงการเท่าเดิม',
       r.status === 403 && r.body.error === 'FORBIDDEN' && after === before,
       `${r.status} ${r.body.error} · ${before}→${after}`)
   }
@@ -138,13 +138,13 @@ try {
         'Content-Type': 'application/json',
         Prefer: 'return=representation',
       },
-      body: JSON.stringify({ name: 'ไซต์ที่ RLS ต้องกัน' }),
+      body: JSON.stringify({ name: 'โครงการที่ RLS ต้องกัน' }),
     })
     const mid = await siteCount()
     // ครึ่งบวก: เจ้าของต้องสร้างได้ในคำสั่งถัดไป — พิสูจน์ว่าตารางไม่ได้พัง
-    const ok = await createSite({ name: 'ทดสอบ ไซต์ของเจ้าของ', contractAmount: 2000000 })
+    const ok = await createSite({ name: 'ทดสอบ โครงการของเจ้าของ', contractAmount: 2000000 })
     const after = await siteCount()
-    check('P1-DB-02 หัวหน้าไซต์ insert ตรงเข้า sites ไม่ผ่าน RLS · เจ้าของสร้างได้',
+    check('P1-DB-02 หัวหน้าโครงการ insert ตรงเข้า sites ไม่ผ่าน RLS · เจ้าของสร้างได้',
       r.status >= 400 && mid === before && ok.status === 201 && after === before + 1,
       `RLS ${r.status} · ${before}→${mid}→${after}`)
   }
@@ -164,7 +164,7 @@ try {
     const before = await siteCount()
     const r = await createSite(body)
     const after = await siteCount()
-    check(`${label} · จำนวนไซต์เท่าเดิม`,
+    check(`${label} · จำนวนโครงการเท่าเดิม`,
       r.status === 400 && r.body.error === code && after === before,
       `${r.status} ${r.body.error} · ${before}→${after}`)
   }
@@ -172,7 +172,7 @@ try {
   // ── P1-API-09 · สร้างสำเร็จแล้วมี audit และแถวโผล่ในหน้ารายการ ────────
   {
     const before = await siteCount()
-    const name = `ทดสอบ ไซต์ที่เพิ่งสร้าง ${Date.now()}`
+    const name = `ทดสอบ โครงการที่เพิ่งสร้าง ${Date.now()}`
     const r = await createSite({
       name, clientName: 'บริษัท ทดสอบ จำกัด', clientPhone: '021234567',
       address: 'ถนนทดสอบ', contractAmount: '1,500,000', status: 'active',
@@ -184,7 +184,7 @@ try {
        where table_name='sites' and action='INSERT' and row_id='${r.body.site?.id}'`,
     )
     const html = await page('/sites', ownerJar)
-    check('P1-API-09 สร้างไซต์ → 201 · sites +1 · audit_log +1 · แถวใหม่อยู่ในหน้า /sites',
+    check('P1-API-09 สร้างโครงการ → 201 · sites +1 · audit_log +1 · แถวใหม่อยู่ในหน้า /sites',
       r.status === 201 && after === before + 1 && audit[0].n === 1 && html.includes(name),
       `${r.status} · ${before}→${after} · audit ${audit[0].n} · ในหน้า ${html.includes(name)}`)
 
@@ -200,8 +200,8 @@ try {
   }
 
   // ── P1-UI-01 / 02 · ใครเห็นอะไรบ้าง ─────────────────────────────────
-  const mine = await createSite({ name: 'ทดสอบ ไซต์ที่หัวหน้าดูแล', contractAmount: 900000 })
-  const others = await createSite({ name: 'ทดสอบ ไซต์ที่หัวหน้าไม่ได้ดูแล', contractAmount: 800000 })
+  const mine = await createSite({ name: 'ทดสอบ โครงการที่หัวหน้าดูแล', contractAmount: 900000 })
+  const others = await createSite({ name: 'ทดสอบ โครงการที่หัวหน้าไม่ได้ดูแล', contractAmount: 800000 })
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${mine.body.site.id}','${sup1.id}')`)
   await sql(`insert into public.site_supervisors(site_id, profile_id)
@@ -209,22 +209,22 @@ try {
 
   {
     const html = await page('/sites', ownerJar)
-    check('P1-UI-01 เจ้าของเห็นไซต์ครบทุกไซต์',
-      html.includes('ทดสอบ ไซต์ที่หัวหน้าดูแล') && html.includes('ทดสอบ ไซต์ที่หัวหน้าไม่ได้ดูแล'),
-      'เห็นทั้งสองไซต์')
+    check('P1-UI-01 เจ้าของเห็นโครงการครบทุกโครงการ',
+      html.includes('ทดสอบ โครงการที่หัวหน้าดูแล') && html.includes('ทดสอบ โครงการที่หัวหน้าไม่ได้ดูแล'),
+      'เห็นทั้งสองโครงการ')
   }
   {
     // ครึ่งบวกและครึ่งลบอยู่ในการตรวจเดียวกัน — "ไม่เห็นอะไรเลย" ผ่านได้ทั้งที่หน้าพัง
     const html = await page('/sites', supJar)
-    check('P1-UI-02 หัวหน้าไซต์เห็นเฉพาะไซต์ตัวเอง · ชื่อไซต์คนอื่นไม่ปรากฏในหน้าเดียวกัน',
-      html.includes('ทดสอบ ไซต์ที่หัวหน้าดูแล') && !html.includes('ทดสอบ ไซต์ที่หัวหน้าไม่ได้ดูแล'),
+    check('P1-UI-02 หัวหน้าโครงการเห็นเฉพาะโครงการตัวเอง · ชื่อโครงการคนอื่นไม่ปรากฏในหน้าเดียวกัน',
+      html.includes('ทดสอบ โครงการที่หัวหน้าดูแล') && !html.includes('ทดสอบ โครงการที่หัวหน้าไม่ได้ดูแล'),
       'เห็นของตัวเอง ไม่เห็นของคนอื่น')
   }
 
   // ── P1-UI-05 · ป้ายสถานะครบทั้ง 5 ค่าของ enum ───────────────────────
-  // ตรวจทีละค่าโดยกรองหน้าให้เหลือเฉพาะไซต์ที่มีสถานะนั้น — ไม่ใช่แค่ดูว่า
+  // ตรวจทีละค่าโดยกรองหน้าให้เหลือเฉพาะโครงการที่มีสถานะนั้น — ไม่ใช่แค่ดูว่า
   // ข้อความไทยโผล่ที่ไหนสักที่ (ชิปตัวกรองมีครบทั้ง 5 คำอยู่แล้วเสมอ
-  // ตรวจแบบนั้นจะเขียวโดยไม่มีไซต์สักไซต์ที่สถานะนั้นจริง)
+  // ตรวจแบบนั้นจะเขียวโดยไม่มีโครงการสักโครงการที่สถานะนั้นจริง)
   {
     const STATUSES = [
       ['planning', 'เตรียมงาน'], ['active', 'กำลังก่อสร้าง'], ['paused', 'หยุดชั่วคราว'],
@@ -235,7 +235,7 @@ try {
       const name = `ทดสอบ สถานะ ${value}`
       const r = await createSite({ name, status: value })
       const html = await page(`/sites?status=${value}`, ownerJar)
-      // ชื่อไซต์ต้องอยู่ในหน้า และป้ายไทยต้องปรากฏมากกว่าครั้งเดียว
+      // ชื่อโครงการต้องอยู่ในหน้า และป้ายไทยต้องปรากฏมากกว่าครั้งเดียว
       // (ครั้งแรกคือชิปตัวกรอง ครั้งที่สองคือป้ายบนแถว)
       const labelCount = html.split(label).length - 1
       if (r.status !== 201 || !html.includes(name) || labelCount < 2) {
@@ -248,19 +248,19 @@ try {
       missing.length === 0, missing.length ? missing.join(' · ') : '5/5')
   }
 
-  // ── P1-UI-03b · สถานะว่างของการค้นหา ต้องคนละข้อความกับ "ยังไม่มีไซต์เลย" ─
+  // ── P1-UI-03b · สถานะว่างของการค้นหา ต้องคนละข้อความกับ "ยังไม่มีโครงการเลย" ─
   {
-    const html = await page('/sites?q=ไม่มีทางมีไซต์ชื่อนี้', ownerJar)
-    check('P1-UI-03b ค้นหาไม่เจอ → ข้อความคนละแบบกับ "ยังไม่มีไซต์งานในระบบ"',
-      html.includes('ไม่พบไซต์งานที่ตรงกับเงื่อนไขนี้') && !html.includes('ยังไม่มีไซต์งานในระบบ'),
+    const html = await page('/sites?q=ไม่มีทางมีโครงการชื่อนี้', ownerJar)
+    check('P1-UI-03b ค้นหาไม่เจอ → ข้อความคนละแบบกับ "ยังไม่มีโครงการในระบบ"',
+      html.includes('ไม่พบโครงการที่ตรงกับเงื่อนไขนี้') && !html.includes('ยังไม่มีโครงการในระบบ'),
       'แยกสองสถานะออกจากกัน')
   }
 } finally {
   for (const id of created) await sql(`delete from public.sites where id = '${id}'`)
-  console.log(`  (ลบไซต์ทดสอบ ${created.length} ไซต์แล้ว)`)
+  console.log(`  (ลบโครงการทดสอบ ${created.length} โครงการแล้ว)`)
 }
 
-console.log('\n── P1 · หน้ารายละเอียดไซต์ · แก้ไข · หัวหน้าไซต์ · งวดเงิน ──')
+console.log('\n── P1 · หน้ารายละเอียดโครงการ · แก้ไข · หัวหน้าโครงการ · งวดเงิน ──')
 
 const created2 = []
 try {
@@ -271,10 +271,10 @@ try {
     return b.site.id
   }
   const mineId = await mk({
-    name: 'ทดสอบ ไซต์ที่มีรายละเอียด', contractAmount: 3000000,
+    name: 'ทดสอบ โครงการที่มีรายละเอียด', contractAmount: 3000000,
     startDate: '2026-03-01', endDate: '2026-08-31', clientName: 'คุณสมชาย',
   })
-  const othersId = await mk({ name: 'ทดสอบ ไซต์ของคนอื่น' })
+  const othersId = await mk({ name: 'ทดสอบ โครงการของคนอื่น' })
 
   // ── P1-API-01 · ทุก endpoint ตอนไม่ล็อกอินต้องเป็น 401 JSON ─────────
   // ครบทั้ง 6 คู่ method×path ไม่ใช่แค่ตัวแรก — endpoint ที่ลืมด่านมักเป็น
@@ -300,16 +300,16 @@ try {
       bad.length === 0, bad.length ? bad.join(' · ') : '6/6')
   }
 
-  // ── P1-API-03 · PATCH ไซต์ที่ไม่มีอยู่ ────────────────────────────
+  // ── P1-API-03 · PATCH โครงการที่ไม่มีอยู่ ────────────────────────────
   {
     const r = await req('PATCH', '/api/sites/00000000-0000-0000-0000-000000000000',
-      { name: 'ไม่มีไซต์นี้' }, { cookie: ownerJar })
+      { name: 'ไม่มีโครงการนี้' }, { cookie: ownerJar })
     const b = await r.json().catch(() => ({}))
-    check('P1-API-03 PATCH ไซต์ที่ไม่มีอยู่ → 404 NOT_FOUND',
+    check('P1-API-03 PATCH โครงการที่ไม่มีอยู่ → 404 NOT_FOUND',
       r.status === 404 && b.error === 'NOT_FOUND', `${r.status} ${b.error}`)
   }
 
-  // ── P1-API-10 · หัวหน้าไซต์แก้ไซต์ไม่ได้ · ค่าเดิมไม่เปลี่ยน ───────
+  // ── P1-API-10 · หัวหน้าโครงการแก้โครงการไม่ได้ · ค่าเดิมไม่เปลี่ยน ───────
   {
     const r = await req('PATCH', `/api/sites/${mineId}`,
       { name: 'ชื่อที่ไม่ควรถูกเขียน', contractAmount: 1 }, { cookie: supJar })
@@ -317,9 +317,9 @@ try {
     const { rows } = await sql(
       `select s.name, f.contract_amount::float8 as amount from public.sites s
        join public.site_finance f on f.site_id = s.id where s.id='${mineId}'`)
-    check('P1-API-10 หัวหน้าไซต์ PATCH ไซต์ → 403 · ชื่อและค่างานไม่เปลี่ยน',
+    check('P1-API-10 หัวหน้าโครงการ PATCH โครงการ → 403 · ชื่อและค่างานไม่เปลี่ยน',
       r.status === 403 && b.error === 'FORBIDDEN'
-      && rows[0].name === 'ทดสอบ ไซต์ที่มีรายละเอียด' && rows[0].amount === 3000000,
+      && rows[0].name === 'ทดสอบ โครงการที่มีรายละเอียด' && rows[0].amount === 3000000,
       `${r.status} ${b.error} · ${rows[0].name} ${rows[0].amount}`)
   }
 
@@ -327,7 +327,7 @@ try {
   // ครึ่งบวกของแถวข้างบน — ถ้าไม่มี "403" อาจแปลว่า endpoint พังสำหรับทุกคน
   {
     const r = await req('PATCH', `/api/sites/${mineId}`, {
-      name: 'ทดสอบ ไซต์ที่แก้ชื่อแล้ว', contractAmount: 3500000,
+      name: 'ทดสอบ โครงการที่แก้ชื่อแล้ว', contractAmount: 3500000,
       startDate: '2026-03-01', endDate: '2026-09-30', status: 'paused',
       clientName: 'คุณสมชาย', clientPhone: '0891112222', address: 'ซอยทดสอบ 5',
     }, { cookie: ownerJar })
@@ -338,7 +338,7 @@ try {
        where s.id='${mineId}'`)
     const a = rows[0]
     check('P1-API-11 เจ้าของ PATCH → 200 · ทุกคอลัมน์ถูกเขียนจริง',
-      r.status === 200 && a.name === 'ทดสอบ ไซต์ที่แก้ชื่อแล้ว' && a.status === 'paused'
+      r.status === 200 && a.name === 'ทดสอบ โครงการที่แก้ชื่อแล้ว' && a.status === 'paused'
       && a.amount === 3500000 && a.ed === '2026-09-30'
       && a.client_phone === '0891112222' && a.address === 'ซอยทดสอบ 5',
       `${r.status} · ${a.status} ${a.amount} ${a.ed}`)
@@ -360,13 +360,13 @@ try {
       `แรก ${first.status} · ซ้ำ ${dup.status} ${dupBody.error} · ${before}→${after}`)
   }
 
-  // ── P1-UI-04 · หัวหน้าไซต์เปิดไซต์ที่ไม่ได้ดูแล → 404 ────────────
-  // 🔴 หน้าเปล่าที่ตอบ 200 อ่านเหมือนระบบพัง และยังยืนยันให้ด้วยว่าไซต์นี้มีจริง
-  // ต้องรันตรงนี้ — ก่อน P1-API-12 ย้าย sup1 ไปไซต์อื่น
+  // ── P1-UI-04 · หัวหน้าโครงการเปิดโครงการที่ไม่ได้ดูแล → 404 ────────────
+  // 🔴 หน้าเปล่าที่ตอบ 200 อ่านเหมือนระบบพัง และยังยืนยันให้ด้วยว่าโครงการนี้มีจริง
+  // ต้องรันตรงนี้ — ก่อน P1-API-12 ย้าย sup1 ไปโครงการอื่น
   {
     const mine = await fetch(`${BASE}/sites/${mineId}`, { headers: { cookie: supJar } })
     const other = await fetch(`${BASE}/sites/${othersId}`, { headers: { cookie: supJar } })
-    check('P1-UI-04 หัวหน้าไซต์เปิดไซต์ที่ดูแลได้ 200 · ไซต์ที่ไม่ได้ดูแลได้ 404',
+    check('P1-UI-04 หัวหน้าโครงการเปิดโครงการที่ดูแลได้ 200 · โครงการที่ไม่ได้ดูแลได้ 404',
       mine.status === 200 && other.status === 404, `ของตัวเอง ${mine.status} · ของคนอื่น ${other.status}`)
   }
 
@@ -407,7 +407,7 @@ try {
   }
 
   // ── P1-CALC-06 · "วันนี้" ต้องเป็นวันไทย ไม่ใช่วัน UTC ──────────────
-  // ไซต์ที่เริ่มและจบ "วันนี้ตามเวลาไทย" ต้องอ่านได้ว่าเหลือ 0 วัน
+  // โครงการที่เริ่มและจบ "วันนี้ตามเวลาไทย" ต้องอ่านได้ว่าเหลือ 0 วัน
   // 🔴 ตัดสินได้เฉพาะช่วง 17:00–23:59 UTC (= 00:00–06:59 ของวันถัดไปตามเวลาไทย)
   // ซึ่งเป็นช่วงเดียวที่สองเขตเวลาอยู่คนละวัน · นอกช่วงนั้นสองแบบให้คำตอบ
   // เหมือนกัน แถวนี้จึงแยกไม่ออกและต้องตอบว่าตัดสินไม่ได้ ไม่ใช่ตอบว่าผ่าน
@@ -418,7 +418,7 @@ try {
     const hourUtc = new Date().getUTCHours()
 
     const oneDayId = await mk({
-      name: 'ทดสอบ ไซต์วันเดียว', startDate: bkkToday, endDate: bkkToday,
+      name: 'ทดสอบ โครงการวันเดียว', startDate: bkkToday, endDate: bkkToday,
     })
     const html = await page(`/sites/${oneDayId}`, ownerJar)
     const ok = html.includes('เหลืออีก 0 วัน') && html.includes('100%')
@@ -435,41 +435,41 @@ try {
   // ── P1-UI-12 · หน้ารายละเอียดแสดงของที่บันทึกไว้จริง ─────────────
   {
     const html = await page(`/sites/${mineId}`, ownerJar)
-    const want = ['ทดสอบ ไซต์ที่แก้ชื่อแล้ว', 'หยุดชั่วคราว', '3,500,000',
+    const want = ['ทดสอบ โครงการที่แก้ชื่อแล้ว', 'หยุดชั่วคราว', '3,500,000',
       'งวดที่ 1 — วางฐานราก', env.SEED_SUPERVISOR1_NAME, '0891112222']
     const missing = want.filter((w) => !html.includes(w))
-    check('P1-UI-12 หน้ารายละเอียดแสดงชื่อ · สถานะไทย · ค่างาน · งวด · หัวหน้าไซต์ · เบอร์',
+    check('P1-UI-12 หน้ารายละเอียดแสดงชื่อ · สถานะไทย · ค่างาน · งวด · หัวหน้าโครงการ · เบอร์',
       missing.length === 0, missing.length ? `ขาด: ${missing.join(', ')}` : '6/6')
   }
 
-  // ── P1-UI-14 · หัวหน้าไซต์ไม่เห็นค่างานบนหน้าจอ ──────────────────
-  // ครึ่งบวก: เจ้าของเห็นทั้งตัวเลขและหัวข้อ ในไซต์เดียวกัน หน้าเดียวกัน
+  // ── P1-UI-14 · หัวหน้าโครงการไม่เห็นค่างานบนหน้าจอ ──────────────────
+  // ครึ่งบวก: เจ้าของเห็นทั้งตัวเลขและหัวข้อ ในโครงการเดียวกัน หน้าเดียวกัน
   // 🔴 นี่เป็นแค่ชั้นหน้าจอ · ชั้นที่บังคับจริงคือ RLS ของตาราง site_finance
   // ซึ่งพิสูจน์แยกที่ P1-DB-14 — ถ้ามีแค่แถวนี้ ก็คือการซ่อนปุ่ม ไม่ใช่การคุมสิทธิ์
   {
     const sup = await page(`/sites/${mineId}`, supJar)
     const own = await page(`/sites/${mineId}`, ownerJar)
-    check('P1-UI-14 หัวหน้าไซต์ไม่เห็นค่างานบนหน้ารายละเอียด · เจ้าของเห็น',
+    check('P1-UI-14 หัวหน้าโครงการไม่เห็นค่างานบนหน้ารายละเอียด · เจ้าของเห็น',
       !sup.includes('3,500,000') && !sup.includes('ค่างานตามสัญญา')
       && own.includes('3,500,000') && own.includes('ค่างานตามสัญญา'),
-      `หัวหน้าไซต์เห็นตัวเลข=${sup.includes('3,500,000')} · เจ้าของเห็น=${own.includes('3,500,000')}`)
+      `หัวหน้าโครงการเห็นตัวเลข=${sup.includes('3,500,000')} · เจ้าของเห็น=${own.includes('3,500,000')}`)
   }
 
   // ── P1-CALC-05 · ค่างาน 0 ต้องไม่หารด้วยศูนย์ ────────────────────
   // `othersId` ถูกสร้างโดยไม่ใส่ค่างาน → contract_amount = 0
-  // ครึ่งบวก: ไซต์ที่ตั้งค่างานแล้วต้องแสดงตัวเลข ไม่ใช่ข้อความเดียวกัน
+  // ครึ่งบวก: โครงการที่ตั้งค่างานแล้วต้องแสดงตัวเลข ไม่ใช่ข้อความเดียวกัน
   {
     const zero = await page(`/sites/${othersId}`, ownerJar)
     const some = await page(`/sites/${mineId}`, ownerJar)
     const noNaN = !/NaN|Infinity/.test(zero)
-    check('P1-CALC-05 ค่างาน 0 → "ยังไม่ได้ตั้งค่างาน" ไม่มี NaN/Infinity · ไซต์ที่ตั้งแล้วโชว์ตัวเลข',
+    check('P1-CALC-05 ค่างาน 0 → "ยังไม่ได้ตั้งค่างาน" ไม่มี NaN/Infinity · โครงการที่ตั้งแล้วโชว์ตัวเลข',
       zero.includes('ยังไม่ได้ตั้งค่างาน') && noNaN
       && some.includes('3,500,000') && !some.includes('ยังไม่ได้ตั้งค่างาน'),
       `ค่างาน 0: ข้อความถูก=${zero.includes('ยังไม่ได้ตั้งค่างาน')} ไม่มี NaN=${noNaN}`)
   }
 } finally {
   for (const id of created2) await sql(`delete from public.sites where id = '${id}'`)
-  console.log(`  (ลบไซต์ทดสอบชุดที่สอง ${created2.length} ไซต์แล้ว)`)
+  console.log(`  (ลบโครงการทดสอบชุดที่สอง ${created2.length} โครงการแล้ว)`)
 }
 
 console.log('\n── P1 · หน้าภาพรวม ────────────────────────────────────────')
@@ -494,15 +494,15 @@ try {
   // fixture ที่ทำให้ทุกช่องมีเลขที่ไม่ใช่ศูนย์ — ไม่งั้นทุกชั้นจะตรงกันที่ 0
   // โดยไม่ได้พิสูจน์การนับสักครั้ง
   const mineId = await mk({
-    name: 'ทดสอบ ภาพรวม ไซต์ของหัวหน้า', contractAmount: 1000000,
+    name: 'ทดสอบ ภาพรวม โครงการของหัวหน้า', contractAmount: 1000000,
     startDate: plus(-60), endDate: plus(10),          // ใกล้ครบกำหนด
   })
   await mk({
-    name: 'ทดสอบ ภาพรวม ไซต์เลยกำหนด', contractAmount: 2000000,
+    name: 'ทดสอบ ภาพรวม โครงการเลยกำหนด', contractAmount: 2000000,
     startDate: plus(-200), endDate: plus(-5),         // เลยกำหนดแล้ว
   })
   await mk({
-    name: 'ทดสอบ ภาพรวม ไซต์ปิดแล้ว', contractAmount: 5000000, status: 'done',
+    name: 'ทดสอบ ภาพรวม โครงการปิดแล้ว', contractAmount: 5000000, status: 'done',
   })
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${mineId}','${sup1.id}')`)
@@ -522,58 +522,58 @@ try {
   const ownerToken = await supabaseToken(env.SEED_OWNER_EMAIL, env.SEED_OWNER_PASSWORD)
 
   // ── P1-DB-13 · RPC เป็น security invoker จริง ────────────────────
-  // 🔴 ถ้าเผลอเขียนเป็น definer ตัวเลขทั้งบริษัทจะหลุดไปหาหัวหน้าไซต์ทันที
+  // 🔴 ถ้าเผลอเขียนเป็น definer ตัวเลขทั้งบริษัทจะหลุดไปหาหัวหน้าโครงการทันที
   // โดยหน้าจอดูปกติทุกอย่าง · เทียบสองฝั่งในการตรวจเดียวจึงเป็นทางเดียวที่จับได้
   {
     const o = await rpc(ownerToken)
     const s = await rpc(supToken)
-    // ค่างานเป็นความลับจากหัวหน้าไซต์แล้ว (P1-DB-16) แถวนี้จึงวัดที่ **การนับไซต์**
+    // ค่างานเป็นความลับจากหัวหน้าโครงการแล้ว (P1-DB-16) แถวนี้จึงวัดที่ **การนับโครงการ**
     // ซึ่งยังเป็นตัวชี้ว่า invoker ทำงาน: definer จะทำให้เขานับได้ทั้งบริษัท
-    check('P1-DB-13 site_overview() เป็น security invoker — เจ้าของนับได้ทุกไซต์ หัวหน้าไซต์นับได้แค่ของตัวเอง',
+    check('P1-DB-13 site_overview() เป็น security invoker — เจ้าของนับได้ทุกโครงการ หัวหน้าโครงการนับได้แค่ของตัวเอง',
       o?.active_count >= 2 && o?.overdue_count >= 1
       && Number(s?.active_count) === 1 && Number(s?.overdue_count) === 0
       && Number(s?.total_count) === 1,
-      `เจ้าของ active=${o?.active_count} เลยกำหนด=${o?.overdue_count} · หัวหน้าไซต์ active=${s?.active_count} total=${s?.total_count}`)
+      `เจ้าของ active=${o?.active_count} เลยกำหนด=${o?.overdue_count} · หัวหน้าโครงการ active=${s?.active_count} total=${s?.total_count}`)
   }
 
   // ── P1-UI-09 · หน้าภาพรวมของเจ้าของ ──────────────────────────────
   {
     const html = await page('/', ownerJar)
     const want = ['กำลังก่อสร้าง', 'ค่างานที่รับไว้', 'ใกล้ครบกำหนด', 'เลยกำหนดแล้ว',
-      'ทดสอบ ภาพรวม ไซต์ของหัวหน้า', 'ทดสอบ ภาพรวม ไซต์เลยกำหนด']
+      'ทดสอบ ภาพรวม โครงการของหัวหน้า', 'ทดสอบ ภาพรวม โครงการเลยกำหนด']
     const missing = want.filter((w) => !html.includes(w))
-    // ไซต์ที่ปิดแล้วต้องไม่อยู่ในรายการ "กำลังก่อสร้าง"
-    const leaked = html.includes('ทดสอบ ภาพรวม ไซต์ปิดแล้ว')
-    check('P1-UI-09 ภาพรวมของเจ้าของ: การ์ด 4 ใบ + ไซต์ที่กำลังทำ · ไซต์ที่ปิดแล้วไม่โผล่',
+    // โครงการที่ปิดแล้วต้องไม่อยู่ในรายการ "กำลังก่อสร้าง"
+    const leaked = html.includes('ทดสอบ ภาพรวม โครงการปิดแล้ว')
+    check('P1-UI-09 ภาพรวมของเจ้าของ: การ์ด 4 ใบ + โครงการที่กำลังทำ · โครงการที่ปิดแล้วไม่โผล่',
       missing.length === 0 && !leaked,
-      missing.length ? `ขาด: ${missing.join(', ')}` : `4 การ์ด · ไซต์ปิดแล้วรั่ว=${leaked}`)
+      missing.length ? `ขาด: ${missing.join(', ')}` : `4 การ์ด · โครงการปิดแล้วรั่ว=${leaked}`)
   }
 
-  // ── P1-UI-10a · หัวหน้าไซต์เห็นเฉพาะของตัวเอง ────────────────────
+  // ── P1-UI-10a · หัวหน้าโครงการเห็นเฉพาะของตัวเอง ────────────────────
   {
     const html = await page('/', supJar)
-    check('P1-UI-10a ภาพรวมของหัวหน้าไซต์: เห็นไซต์ตัวเอง · ไม่เห็นไซต์อื่น · ไม่มีตัวเลขทั้งบริษัท',
-      html.includes('ทดสอบ ภาพรวม ไซต์ของหัวหน้า')
-      && !html.includes('ทดสอบ ภาพรวม ไซต์เลยกำหนด')
-      && html.includes('ภาพรวมเฉพาะไซต์ที่คุณดูแล')
+    check('P1-UI-10a ภาพรวมของหัวหน้าโครงการ: เห็นโครงการตัวเอง · ไม่เห็นโครงการอื่น · ไม่มีตัวเลขทั้งบริษัท',
+      html.includes('ทดสอบ ภาพรวม โครงการของหัวหน้า')
+      && !html.includes('ทดสอบ ภาพรวม โครงการเลยกำหนด')
+      && html.includes('ภาพรวมเฉพาะโครงการที่คุณดูแล')
       && !html.includes('3,000,000'),
       'เห็นของตัวเอง ไม่เห็นของคนอื่น')
   }
 
-  // ── P1-UI-13 · ไซต์ที่เลยกำหนดต้องขึ้นป้ายเตือน ──────────────────
-  // ครึ่งบวก: ไซต์ที่ยังอยู่ในกำหนดต้องไม่ขึ้นป้ายนี้ในหน้าเดียวกัน
+  // ── P1-UI-13 · โครงการที่เลยกำหนดต้องขึ้นป้ายเตือน ──────────────────
+  // ครึ่งบวก: โครงการที่ยังอยู่ในกำหนดต้องไม่ขึ้นป้ายนี้ในหน้าเดียวกัน
   {
     const html = await page('/', ownerJar)
-    const overdueBlock = html.slice(html.indexOf('ทดสอบ ภาพรวม ไซต์เลยกำหนด'))
+    const overdueBlock = html.slice(html.indexOf('ทดสอบ ภาพรวม โครงการเลยกำหนด'))
       .slice(0, 900)
-    const okBlock = html.slice(html.indexOf('ทดสอบ ภาพรวม ไซต์ของหัวหน้า')).slice(0, 900)
-    check('P1-UI-13 ไซต์ที่เลยกำหนดขึ้นป้าย "เลยกำหนด" · ไซต์ที่ยังไม่เลยไม่ขึ้น',
+    const okBlock = html.slice(html.indexOf('ทดสอบ ภาพรวม โครงการของหัวหน้า')).slice(0, 900)
+    check('P1-UI-13 โครงการที่เลยกำหนดขึ้นป้าย "เลยกำหนด" · โครงการที่ยังไม่เลยไม่ขึ้น',
       overdueBlock.includes('เลยกำหนด') && !okBlock.includes('เลยมา'),
-      `ไซต์เลยกำหนด=${overdueBlock.includes('เลยกำหนด')} · ไซต์ปกติสะอาด=${!okBlock.includes('เลยมา')}`)
+      `โครงการเลยกำหนด=${overdueBlock.includes('เลยกำหนด')} · โครงการปกติสะอาด=${!okBlock.includes('เลยมา')}`)
   }
 } finally {
   for (const id of created3) await sql(`delete from public.sites where id = '${id}'`)
-  console.log(`  (ลบไซต์ทดสอบชุดที่สาม ${created3.length} ไซต์แล้ว)`)
+  console.log(`  (ลบโครงการทดสอบชุดที่สาม ${created3.length} โครงการแล้ว)`)
 }
 
 // ── P1-CALC · แถบเวลา — ตรรกะบริสุทธิ์ ไม่ต้องมีฐานข้อมูล ────────────

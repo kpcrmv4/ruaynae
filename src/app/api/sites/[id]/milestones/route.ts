@@ -5,7 +5,7 @@ import { parseAmount, parseDate, MAX_NAME } from '@/lib/sites'
 
 export const runtime = 'nodejs'
 
-/** unique_violation — งวดเลขนี้ของไซต์นี้มีอยู่แล้ว */
+/** unique_violation — งวดเลขนี้ของโครงการนี้มีอยู่แล้ว */
 const UNIQUE_VIOLATION = '23505'
 
 /**
@@ -26,7 +26,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
   const { data: site, error: sErr } = await sb
     .from('sites').select('id').eq('id', siteId).maybeSingle()
   if (sErr) {
-    console.error('[sites] อ่านไซต์ไม่ได้', sErr.message)
+    console.error('[sites] อ่านโครงการไม่ได้', sErr.message)
     return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
   }
   if (!site) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })

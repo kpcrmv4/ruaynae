@@ -70,7 +70,7 @@ const sql = async (q) => {
   return { rows: JSON.parse(t) }
 }
 
-console.log('\n── P4-DB · คนงาน + คนเข้าไซต์ ───────────────────────────────')
+console.log('\n── P4-DB · คนงาน + คนเข้าโครงการ ───────────────────────────────')
 
 const ownerTok = await signIn(env.SEED_OWNER_EMAIL, env.SEED_OWNER_PASSWORD)
 const supTok = await signIn(
@@ -111,10 +111,10 @@ const attWageOf = async (attId) =>
 
 try {
   ;[{ id: siteA }] = (await sql(
-    `insert into public.sites(name, status) values ('${MARK} ไซต์ก', 'active') returning id`)).rows
+    `insert into public.sites(name, status) values ('${MARK} โครงการก', 'active') returning id`)).rows
   ;[{ id: siteB }] = (await sql(
-    `insert into public.sites(name, status) values ('${MARK} ไซต์ข', 'active') returning id`)).rows
-  // ดูแลไซต์ ก **ตั้งแต่วันนี้** — เมื่อวานจึงอยู่นอกช่วง (ใช้ที่ P4-DB-16)
+    `insert into public.sites(name, status) values ('${MARK} โครงการข', 'active') returning id`)).rows
+  // ดูแลโครงการ ก **ตั้งแต่วันนี้** — เมื่อวานจึงอยู่นอกช่วง (ใช้ที่ P4-DB-16)
   await sql(`insert into public.site_supervisors(site_id, profile_id, effective_from)
              values ('${siteA}','${sup1.id}','${today}')`)
 
@@ -156,7 +156,7 @@ try {
       `${r.status} · daily=${w?.daily_rate} · monthly=${w?.monthly_salary}`)
   }
 
-  // ── P4-DB-04 · หัวหน้าไซต์สร้างคนงานไม่ได้ ────────────────────────
+  // ── P4-DB-04 · หัวหน้าโครงการสร้างคนงานไม่ได้ ────────────────────────
   {
     const before = (await sql("select count(*)::int n from public.employees")).rows[0].n
     const bad = await save(supTok, {
@@ -166,13 +166,13 @@ try {
     const good = await save(ownerTok, {
       p_full_name: `${MARK} กรรมกร`, p_wage_type: 'daily', p_daily: 450 })
     if (typeof good.body === 'string') empIds.push(good.body)
-    check('P4-DB-04 หัวหน้าไซต์สร้างคนงานไม่ได้ (/FORBIDDEN/) · จำนวนเท่าเดิม · เจ้าของยังสร้างได้',
+    check('P4-DB-04 หัวหน้าโครงการสร้างคนงานไม่ได้ (/FORBIDDEN/) · จำนวนเท่าเดิม · เจ้าของยังสร้างได้',
       bad.status >= 400 && /FORBIDDEN/.test(bad.raw ?? '')
       && Number(after) === Number(before) && good.status === 200,
       `${bad.status} · ${before}→${after}`)
   }
 
-  // ── P4-DB-05 · หัวหน้าไซต์เห็นเฉพาะคนที่ยังใช้งาน ─────────────────
+  // ── P4-DB-05 · หัวหน้าโครงการเห็นเฉพาะคนที่ยังใช้งาน ─────────────────
   {
     const off = await save(ownerTok, {
       p_full_name: `${MARK} คนที่ลาออกแล้ว`, p_wage_type: 'daily', p_daily: 400, p_is_active: false })
@@ -180,13 +180,13 @@ try {
     const supActive = await db(supTok, '/employees?select=id&is_active=eq.true')
     const supOff = await db(supTok, '/employees?select=id&is_active=eq.false')
     const ownerOff = await db(ownerTok, '/employees?select=id&is_active=eq.false')
-    check('P4-DB-05 หัวหน้าไซต์เห็นคนที่ยังใช้งาน > 0 และไม่เห็นคนที่ปิดใช้งาน · เจ้าของเห็นทั้งสองแบบ',
+    check('P4-DB-05 หัวหน้าโครงการเห็นคนที่ยังใช้งาน > 0 และไม่เห็นคนที่ปิดใช้งาน · เจ้าของเห็นทั้งสองแบบ',
       (supActive.body?.length ?? 0) > 0 && (supOff.body?.length ?? 0) === 0
       && (ownerOff.body?.length ?? 0) > 0,
-      `หัวหน้าไซต์ active ${supActive.body?.length} / inactive ${supOff.body?.length} · เจ้าของ inactive ${ownerOff.body?.length}`)
+      `หัวหน้าโครงการ active ${supActive.body?.length} / inactive ${supOff.body?.length} · เจ้าของ inactive ${ownerOff.body?.length}`)
   }
 
-  // ── P4-SEC-01 · หัวหน้าไซต์อ่านเรตค่าแรงไม่ได้เลย ─────────────────
+  // ── P4-SEC-01 · หัวหน้าโครงการอ่านเรตค่าแรงไม่ได้เลย ─────────────────
   // 🔴 นี่คือคำสั่งของเจ้าของเมื่อ 31 ส.ค. 2569 · ต้องตรวจทั้ง "อ่านตารางตรง ๆ"
   // และ "เห็นชื่อคนได้อยู่" ในการตรวจเดียวกัน — ไม่งั้น 0 แถวอาจแปลว่า
   // เซสชันตายไปแล้ว ซึ่งผ่านเหมือนกันแต่ไม่ได้พิสูจน์อะไร
@@ -194,7 +194,7 @@ try {
     const wages = await db(supTok, '/employee_wages?select=employee_id,daily_rate')
     const names = await db(supTok, '/employees?select=id,full_name&is_active=eq.true')
     const ownerWages = await db(ownerTok, '/employee_wages?select=employee_id,daily_rate')
-    check('P4-SEC-01 หัวหน้าไซต์อ่าน employee_wages ได้ 0 แถว แต่ยังเห็นชื่อคนงาน · เจ้าของอ่านได้ > 0',
+    check('P4-SEC-01 หัวหน้าโครงการอ่าน employee_wages ได้ 0 แถว แต่ยังเห็นชื่อคนงาน · เจ้าของอ่านได้ > 0',
       (Array.isArray(wages.body) ? wages.body.length : 0) === 0
       && (names.body?.length ?? 0) > 0 && (ownerWages.body?.length ?? 0) > 0,
       `เรต ${Array.isArray(wages.body) ? wages.body.length : '?'} · ชื่อ ${names.body?.length} · เจ้าของ ${ownerWages.body?.length}`)
@@ -206,7 +206,7 @@ try {
       `select table_name, column_name from information_schema.columns
        where table_schema = 'public' and table_name in ('employees','attendance')
          and column_name in ('daily_rate','monthly_salary','wage_type','wage_snapshot','ot_amount','amount')`)
-    check('P4-SEC-02 ไม่มีคอลัมน์เงินหลงเหลือในตารางที่หัวหน้าไซต์อ่านได้',
+    check('P4-SEC-02 ไม่มีคอลัมน์เงินหลงเหลือในตารางที่หัวหน้าโครงการอ่านได้',
       rows.length === 0,
       rows.length ? rows.map((r) => `${r.table_name}.${r.column_name}`).join(', ') : 'สะอาด')
   }
@@ -233,7 +233,7 @@ try {
     })
     attId = (Array.isArray(r.body) ? r.body[0] : null)?.id ?? null
     const w = attId ? await attWageOf(attId) : null
-    check('P4-DB-07 หัวหน้าไซต์ลงชื่อคนเข้าไซต์ตัวเองได้ · wage_snapshot = เรตของคนนั้น',
+    check('P4-DB-07 หัวหน้าโครงการลงชื่อคนเข้าโครงการตัวเองได้ · wage_snapshot = เรตของคนนั้น',
       r.status === 201 && Number(w?.wage_snapshot) === 600 && Number(w?.amount) === 600,
       `${r.status} · snapshot=${w?.wage_snapshot} · amount=${w?.amount}`)
 
@@ -248,16 +248,16 @@ try {
       forged.status >= 400, `${forged.status}`)
   }
 
-  // ── P4-SEC-03 · หัวหน้าไซต์อ่านยอดเงินของ attendance ไม่ได้ ───────
+  // ── P4-SEC-03 · หัวหน้าโครงการอ่านยอดเงินของ attendance ไม่ได้ ───────
   {
     const wages = await db(supTok, '/attendance_wages?select=attendance_id,amount')
     const rows = await db(supTok, `/attendance?select=id,employee_id&site_id=eq.${siteA}`)
-    check('P4-SEC-03 หัวหน้าไซต์อ่าน attendance_wages ได้ 0 แถว แต่ยังเห็นว่าใครมาทำงาน',
+    check('P4-SEC-03 หัวหน้าโครงการอ่าน attendance_wages ได้ 0 แถว แต่ยังเห็นว่าใครมาทำงาน',
       (Array.isArray(wages.body) ? wages.body.length : 0) === 0 && (rows.body?.length ?? 0) > 0,
       `ยอดเงิน ${Array.isArray(wages.body) ? wages.body.length : '?'} · รายชื่อ ${rows.body?.length}`)
   }
 
-  // ── P4-DB-08 · ไซต์ที่ไม่ได้ดูแล ──────────────────────────────────
+  // ── P4-DB-08 · โครงการที่ไม่ได้ดูแล ──────────────────────────────────
   {
     const before = (await sql("select count(*)::int n from public.attendance")).rows[0].n
     const bad = await db(supTok, '/attendance', {
@@ -265,7 +265,7 @@ try {
       body: JSON.stringify({ work_date: today, site_id: siteB, employee_id: dailyId }),
     })
     const after = (await sql("select count(*)::int n from public.attendance")).rows[0].n
-    check('P4-DB-08 หัวหน้าไซต์ลงชื่อเข้าไซต์ที่ไม่ได้ดูแลไม่ได้ · จำนวนเท่าเดิม',
+    check('P4-DB-08 หัวหน้าโครงการลงชื่อเข้าโครงการที่ไม่ได้ดูแลไม่ได้ · จำนวนเท่าเดิม',
       bad.status >= 400 && Number(after) === Number(before), `${bad.status} · ${before}→${after}`)
   }
 
@@ -275,7 +275,7 @@ try {
       method: 'POST',
       body: JSON.stringify({ work_date: yesterday, site_id: siteA, employee_id: dailyId }),
     })
-    check('P4-DB-16 ลงชื่อของวันที่ยังไม่ได้ดูแลไซต์นั้น (เมื่อวาน) ถูกปฏิเสธ · วันนี้ลงได้',
+    check('P4-DB-16 ลงชื่อของวันที่ยังไม่ได้ดูแลโครงการนั้น (เมื่อวาน) ถูกปฏิเสธ · วันนี้ลงได้',
       r.status >= 400 && Boolean(attId), `${r.status}`)
   }
 
@@ -288,7 +288,7 @@ try {
     const [{ n }] = (await sql(
       `select count(*)::int n from public.attendance
        where employee_id = '${dailyId}' and work_date = '${today}' and site_id = '${siteA}'`)).rows
-    check('P4-DB-13 ลงชื่อซ้ำ คนเดิม วันเดิม ไซต์เดิม → ถูกปฏิเสธ · มีแถวเดียว',
+    check('P4-DB-13 ลงชื่อซ้ำ คนเดิม วันเดิม โครงการเดิม → ถูกปฏิเสธ · มีแถวเดียว',
       r.status >= 400 && Number(n) === 1, `${r.status} · ${n} แถว`)
   }
 
@@ -307,7 +307,7 @@ try {
       method: 'POST',
       body: JSON.stringify({ work_date: today, site_id: siteB, employee_id: dailyId, work_units: 0.5 }),
     })
-    check('P4-DB-12 เต็มวันสองไซต์ในวันเดียวถูกปฏิเสธ /WORK_UNITS_EXCEEDED/ · ครึ่ง+ครึ่ง ผ่าน',
+    check('P4-DB-12 เต็มวันสองโครงการในวันเดียวถูกปฏิเสธ /WORK_UNITS_EXCEEDED/ · ครึ่ง+ครึ่ง ผ่าน',
       /WORK_UNITS_EXCEEDED/.test(full.raw ?? '') && half1.status === 201 && half2.status === 201,
       `เต็ม+เต็ม ${full.status} · ครึ่ง ${half1.status}/${half2.status}`)
     await sql(`delete from public.attendance where employee_id = '${dailyId}' and work_date = '${today}'`)

@@ -1,6 +1,6 @@
 export { isTxnKind, TXN_KIND_LABEL, TXN_KINDS, type TxnKind } from '@/lib/transactions'
 
-/** ชื่อหมวดสั้นกว่าชื่อไซต์ — มันต้องอ่านออกในชิปแคบ ๆ บนมือถือ */
+/** ชื่อหมวดสั้นกว่าชื่อโครงการ — มันต้องอ่านออกในชิปแคบ ๆ บนมือถือ */
 export const MAX_NAME_CATEGORY = 60
 
 /**

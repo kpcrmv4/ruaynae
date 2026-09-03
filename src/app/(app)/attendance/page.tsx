@@ -8,7 +8,7 @@ import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import { AttendanceBoard } from './attendance-client'
 
-export const metadata = { title: 'คนเข้าไซต์' }
+export const metadata = { title: 'คนเข้าโครงการ' }
 
 type Search = { date?: string; site?: string }
 
@@ -28,8 +28,8 @@ export default async function AttendancePage({
 
   const sb = await getSupabaseServer()
 
-  // ไซต์ที่ "คนนี้ดูแลอยู่ **ณ วันที่เลือก**" — ไม่ใช่ ณ วันนี้
-  // ย้ายไซต์แล้วต้องยังกลับไปแก้ของเก่าที่ตัวเองบันทึกไว้ได้
+  // โครงการที่ "คนนี้ดูแลอยู่ **ณ วันที่เลือก**" — ไม่ใช่ ณ วันนี้
+  // ย้ายโครงการแล้วต้องยังกลับไปแก้ของเก่าที่ตัวเองบันทึกไว้ได้
   const { data: allSites, error: sErr } = await sb
     .from('sites')
     .select('id, name, status, site_supervisors(profile_id, effective_from, effective_to)')
@@ -52,9 +52,9 @@ export default async function AttendancePage({
   const siteId = sites.some((s) => s.id === sp.site) ? sp.site! : sites[0]?.id
 
   if (sErr) {
-    console.error('[attendance] อ่านไซต์ไม่ได้', sErr.message)
+    console.error('[attendance] อ่านโครงการไม่ได้', sErr.message)
     return (
-      <DataError message="โหลดรายชื่อไซต์ไม่สำเร็จ" />
+      <DataError message="โหลดรายชื่อโครงการไม่สำเร็จ" />
     )
   }
 
@@ -66,12 +66,12 @@ export default async function AttendancePage({
           icon={HardHat}
           message={
             isOwner
-              ? 'ยังไม่มีไซต์ที่กำลังทำ — เพิ่มไซต์งานก่อนแล้วค่อยลงชื่อคนเข้าไซต์'
-              : `คุณยังไม่ได้ดูแลไซต์ไหนในวันที่ ${fmtDateLong(date)} — ให้เจ้าของมอบหมายไซต์ให้ก่อน`
+              ? 'ยังไม่มีโครงการที่กำลังทำ — เพิ่มโครงการก่อนแล้วค่อยลงชื่อคนเข้าโครงการ'
+              : `คุณยังไม่ได้ดูแลโครงการไหนในวันที่ ${fmtDateLong(date)} — ให้เจ้าของมอบหมายโครงการให้ก่อน`
           }
           action={
             isOwner ? (
-              <Link href="/sites" className="btn-primary">เพิ่มไซต์งาน</Link>
+              <Link href="/sites" className="btn-primary">เพิ่มโครงการ</Link>
             ) : undefined
           }
         />
@@ -92,7 +92,7 @@ export default async function AttendancePage({
     { data: otherSiteRows, error: oErr },
   ] =
     await Promise.all([
-      // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้เลย — หัวหน้าไซต์มีหน้าที่บันทึกว่าใครมาทำงาน
+      // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้เลย — หัวหน้าโครงการมีหน้าที่บันทึกว่าใครมาทำงาน
       // ไม่ใช่ดูเงิน (เจ้าของสั่งไว้ 31 ส.ค. 2569) · เรตอยู่ `employee_wages`
       // ซึ่ง RLS ไม่ให้เขาอ่านอยู่แล้ว การไม่ขอมาตั้งแต่แรกทำให้หน้าไม่ต้องมี if
       sb
@@ -141,7 +141,7 @@ export default async function AttendancePage({
               })),
             })),
       // 🔴 ยอดรวมมาจากฐานข้อมูล ไม่ใช่บวกแถวที่หน้านี้โหลดมา —
-      // ไซต์ที่มีคนงานเกินหนึ่งหน้า ยอดจะน้อยกว่าความจริงโดยไม่มี error
+      // โครงการที่มีคนงานเกินหนึ่งหน้า ยอดจะน้อยกว่าความจริงโดยไม่มี error
       // · RPC คืน null ให้คนที่ไม่ใช่เจ้าของ ยอดเงินจึงหายไป ไม่ใช่โชว์ ฿0
       sb.rpc('site_day_wage', { p_site: siteId, p_on: date }),
       sb
@@ -152,9 +152,9 @@ export default async function AttendancePage({
         .order('created_at', { ascending: true })
         .range(0, PAGE_SIZE - 1),
       // 🔴 คนหนึ่งคนทำงานได้ไม่เกิน 1 วันต่อวัน — guard ที่ฐานข้อมูลปฏิเสธการลงชื่อ
-      // ที่จะทำให้เกิน · เดิมหน้าจอไม่รู้เรื่องนี้เลย ปุ่ม "เข้าไซต์" จึงโชว์ให้กด
+      // ที่จะทำให้เกิน · เดิมหน้าจอไม่รู้เรื่องนี้เลย ปุ่ม "เข้าโครงการ" จึงโชว์ให้กด
       // ทั้งที่ยังไงก็ไม่ผ่าน แล้วผู้ใช้เพิ่งรู้ตอนขึ้น error หลังกด
-      // · RLS จำกัดให้เอง: หัวหน้าไซต์เห็นเฉพาะไซต์ที่ตัวเองดูแล — คนที่ไปอยู่ไซต์
+      // · RLS จำกัดให้เอง: หัวหน้าโครงการเห็นเฉพาะโครงการที่ตัวเองดูแล — คนที่ไปอยู่โครงการ
       // ของคนอื่นจะยังกดไม่ผ่านที่ฐานข้อมูลเหมือนเดิม ซึ่งเป็นตาข่ายรองที่ยังอยู่ครบ
       sb
         .from('attendance')
@@ -171,11 +171,11 @@ export default async function AttendancePage({
       eErr?.message ?? aErr?.message ?? pErr?.message ?? oErr?.message,
     )
     return (
-      <DataError message="โหลดข้อมูลคนเข้าไซต์ไม่สำเร็จ" />
+      <DataError message="โหลดข้อมูลคนเข้าโครงการไม่สำเร็จ" />
     )
   }
 
-  // รวมเป็น "วันนี้คนนี้ถูกลงชื่อที่อื่นไปแล้วกี่วัน และที่ไซต์ไหนบ้าง"
+  // รวมเป็น "วันนี้คนนี้ถูกลงชื่อที่อื่นไปแล้วกี่วัน และที่โครงการไหนบ้าง"
   const bookedElsewhere: Record<string, { units: number; siteNames: string[] }> = {}
   for (const r of otherSiteRows ?? []) {
     const cur = bookedElsewhere[r.employee_id] ?? { units: 0, siteNames: [] }
@@ -210,9 +210,9 @@ export default async function AttendancePage({
 function Header({ date }: { date: string }) {
   return (
     <div className="mb-4">
-      <h1 className="text-2xl font-bold text-ink">คนเข้าไซต์</h1>
+      <h1 className="text-2xl font-bold text-ink">คนเข้าโครงการ</h1>
       <p className="mt-0.5 text-sm text-muted-token">
-        {fmtDateLong(date)} · ติ๊กคนที่มาทำงาน — ค่าแรงเข้าต้นทุนไซต์ทันทีโดยไม่ต้องรออนุมัติ
+        {fmtDateLong(date)} · ติ๊กคนที่มาทำงาน — ค่าแรงเข้าต้นทุนโครงการทันทีโดยไม่ต้องรออนุมัติ
       </p>
     </div>
   )

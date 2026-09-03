@@ -35,13 +35,13 @@ type Site = { id: string; name: string }
 const MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
   FORBIDDEN: 'เฉพาะเจ้าของเท่านั้นที่แก้ตารางนี้ได้',
-  SITE_REQUIRED: 'กรุณาเลือกไซต์งาน',
+  SITE_REQUIRED: 'กรุณาเลือกโครงการ',
   EMPLOYEE_REQUIRED: 'ไม่พบคนงานคนนี้',
   DATE_INVALID: 'รูปแบบวันที่ไม่ถูกต้อง',
   DATE_BUDDHIST_ERA: 'ปีที่กรอกเป็น พ.ศ. — ระบบเก็บเป็น ค.ศ.',
   DATE_FUTURE: 'ลงชื่อล่วงหน้าไม่ได้ — ค่าแรงของวันที่ยังไม่มาถึงคือต้นทุนที่ยังไม่เกิด',
   WORK_UNITS_INVALID: 'ลงได้เฉพาะเต็มวันหรือครึ่งวัน',
-  WORK_UNITS_EXCEEDED: 'วันนี้คนนี้ถูกลงชื่อที่ไซต์อื่นไปแล้ว รวมกันจะเกินหนึ่งวัน',
+  WORK_UNITS_EXCEEDED: 'วันนี้คนนี้ถูกลงชื่อที่โครงการอื่นไปแล้ว รวมกันจะเกินหนึ่งวัน',
   AMOUNT_INVALID: 'ค่าแรงต้องไม่ติดลบ',
   OT_INVALID: 'ค่า OT ต้องเป็นตัวเลขที่ไม่ติดลบ',
   PAYROLL_CLOSED: 'วันนี้ถูกจ่ายไปแล้ว แก้ไม่ได้',
@@ -50,7 +50,7 @@ const MESSAGES: Record<string, string> = {
 }
 const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
 
-/** เสาร์-อาทิตย์ระบายพื้นต่างเล็กน้อย — งานไซต์ทำเสาร์ แต่อาทิตย์มักหยุด */
+/** เสาร์-อาทิตย์ระบายพื้นต่างเล็กน้อย — งานก่อสร้างทำเสาร์ แต่อาทิตย์มักหยุด */
 const isWeekend = (iso: string) => {
   const d = new Date(`${iso}T00:00:00Z`).getUTCDay()
   return d === 0 || d === 6
@@ -118,7 +118,7 @@ export function WorkGrid({
   async function save() {
     if (!open || busy) return
     if (!siteId) {
-      toast.error('กรุณาเลือกไซต์งาน')
+      toast.error('กรุณาเลือกโครงการ')
       return
     }
     const wageNum = Number(wage.replace(/,/g, ''))
@@ -310,7 +310,7 @@ export function WorkGrid({
       </div>
 
       <p className="mt-2 text-xs text-muted-token">
-        แตะช่องวันเพื่อเพิ่มหรือแก้ — เลือกไซต์และค่าแรงของวันนั้นได้ (ค่าเริ่มต้นดึงจากเรตของคนนั้น)
+        แตะช่องวันเพื่อเพิ่มหรือแก้ — เลือกโครงการและค่าแรงของวันนั้นได้ (ค่าเริ่มต้นดึงจากเรตของคนนั้น)
         · วันที่อยู่ในรอบจ่ายที่ปิดแล้วจะล็อกไว้ ทั้งที่หน้าจอและที่ฐานข้อมูล
       </p>
 
@@ -330,7 +330,7 @@ export function WorkGrid({
             <div className="mt-4 space-y-4">
               <div>
                 <label htmlFor="grid-site" className="label-base">
-                  ทำงานที่ไซต์
+                  ทำงานที่โครงการ
                 </label>
                 <select
                   id="grid-site"
@@ -338,7 +338,7 @@ export function WorkGrid({
                   onChange={(ev) => setSiteId(ev.target.value)}
                   className="input-base"
                 >
-                  {sites.length === 0 && <option value="">— ยังไม่มีไซต์งาน —</option>}
+                  {sites.length === 0 && <option value="">— ยังไม่มีโครงการ —</option>}
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>
                       {s.name}

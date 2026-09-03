@@ -10,7 +10,7 @@ export const runtime = 'nodejs'
  * (เหตุผลเดียวกับ /api/settings/users · ดู ruling ใน .loop/state.json)
  */
 
-/** POST /api/sites — สร้างไซต์งาน (เจ้าของเท่านั้น) */
+/** POST /api/sites — สร้างโครงการ (เจ้าของเท่านั้น) */
 export async function POST(req: NextRequest) {
   const me = await getCurrentUserOrNull()
   if (!me) return NextResponse.json({ error: 'UNAUTHENTICATED' }, { status: 401 })
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     // 42501 = RLS ปฏิเสธ · ไม่ควรเกิดเพราะเช็ค role ไปแล้ว แต่ถ้าเกิดแปลว่า
     // policy กับโค้ดไม่ตรงกัน ต้องตอบ 403 ไม่ใช่ 500
     if (error.code === '42501') return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
-    console.error('[sites] สร้างไซต์ไม่สำเร็จ', error.message)
+    console.error('[sites] สร้างโครงการไม่สำเร็จ', error.message)
     return NextResponse.json({ error: 'CREATE_FAILED' }, { status: 500 })
   }
   // insert ที่ไม่คืนแถวคือการปฏิเสธแบบเงียบ — ห้ามตอบสำเร็จ
@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
       .select('site_id')
       .maybeSingle()
     // 🔴 update ที่ถูก RLS ปฏิเสธไม่คืน error — มันโดน 0 แถวแล้วบอกว่าสำเร็จ
-    // ปล่อยผ่านคือไซต์ที่ผู้ใช้กรอกค่างานไว้แต่ระบบบันทึกเป็น 0 โดยไม่มีใครรู้
+    // ปล่อยผ่านคือโครงการที่ผู้ใช้กรอกค่างานไว้แต่ระบบบันทึกเป็น 0 โดยไม่มีใครรู้
     if (fErr || !fin) {
       console.error('[sites] บันทึกค่างานไม่สำเร็จ', fErr?.message ?? 'โดน 0 แถว')
       return NextResponse.json({ error: 'CONTRACT_SAVE_FAILED' }, { status: 500 })

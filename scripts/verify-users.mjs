@@ -62,7 +62,7 @@ const supJar = jarOf(await req('POST', '/api/auth/pin', { pin: env.SEED_SUPERVIS
     { fullName: 'ไม่ควรสร้างได้', role: 'site_supervisor', pin: '111222' }, { cookie: supJar })
   const b = await r.json().catch(() => ({}))
   const { 0: row } = await sql('select count(*)::int as n from public.profiles')
-  check('P05-USER-02 หัวหน้าไซต์สร้างผู้ใช้ → 403 FORBIDDEN · ไม่มีแถวเพิ่ม',
+  check('P05-USER-02 หัวหน้าโครงการสร้างผู้ใช้ → 403 FORBIDDEN · ไม่มีแถวเพิ่ม',
     r.status === 403 && b.error === 'FORBIDDEN' && row.n === 3,
     `${r.status} ${b.error} · profiles ${row.n} แถว`)
 }
@@ -122,7 +122,7 @@ try {
       { cookie: ownerJar })
     const b = await r.json().catch(() => ({}))
     newId = b.user?.id ?? null
-    check('P05-USER-07 สร้างหัวหน้าไซต์ใหม่ → 201 · role ถูก · เปิดใช้งาน',
+    check('P05-USER-07 สร้างหัวหน้าโครงการใหม่ → 201 · role ถูก · เปิดใช้งาน',
       r.status === 201 && b.user?.role === 'site_supervisor' && b.user?.is_active === true,
       `${r.status} ${b.user?.role}`)
   }

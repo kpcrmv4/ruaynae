@@ -149,12 +149,12 @@ export function McpClient({
         </div>
         <div className="space-y-3 p-4 text-sm leading-6 text-ink-2">
           <p>
-            <span className="font-semibold text-ink">ถามได้:</span> ยอดของแต่ละไซต์ ·
+            <span className="font-semibold text-ink">ถามได้:</span> ยอดของแต่ละโครงการ ·
             กำไรคงเหลือ · รายการที่รออนุมัติ · ค่าแรงค้างจ่าย
           </p>
           <p>
             <span className="font-semibold text-ink">บันทึกให้ได้:</span> รายรับ-รายจ่าย
-            (ส่งรูปสลิปในแชทให้อ่านได้เลย) · ลงชื่อคนเข้าไซต์ · เบิกล่วงหน้า ·
+            (ส่งรูปสลิปในแชทให้อ่านได้เลย) · ลงชื่อคนเข้าโครงการ · เบิกล่วงหน้า ·
             แก้หรือลบรายการที่บันทึกไปแล้ว
           </p>
           <p className="text-muted-token">

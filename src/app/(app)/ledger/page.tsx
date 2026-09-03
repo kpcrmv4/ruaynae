@@ -40,7 +40,7 @@ export default async function LedgerPage({
   const sb = await getSupabaseServer()
 
   // 🔴 RLS เป็นตัวกรองว่าใครเห็นอะไร ไม่ใช่ where ที่เขียนเอง —
-  // หัวหน้าไซต์จึงเห็นเฉพาะรายจ่ายของไซต์ที่ดูแลโดยอัตโนมัติ และถ้าวันหน้า
+  // หัวหน้าโครงการจึงเห็นเฉพาะรายจ่ายของโครงการที่ดูแลโดยอัตโนมัติ และถ้าวันหน้า
   // policy เปลี่ยน หน้านี้เปลี่ยนตามเองโดยไม่มีใครต้องจำว่ามีที่นี่อีกที่หนึ่ง
   let listQuery = sb
     .from('transactions')
@@ -86,8 +86,8 @@ export default async function LedgerPage({
       .order('txn_date', { ascending: false })
       .order('id', { ascending: false })
       .range(0, PAGE_SIZE),
-    // ชื่อไซต์ที่กำลังกรองอยู่ — ตัวกรองที่มองไม่เห็นคือตัวกรองที่ทำให้คนอ่าน
-    // ตัวเลขผิดขอบเขตโดยไม่รู้ตัว · RLS กรองอีกชั้น ไซต์ที่ไม่มีสิทธิ์เห็นคืนค่าว่าง
+    // ชื่อโครงการที่กำลังกรองอยู่ — ตัวกรองที่มองไม่เห็นคือตัวกรองที่ทำให้คนอ่าน
+    // ตัวเลขผิดขอบเขตโดยไม่รู้ตัว · RLS กรองอีกชั้น โครงการที่ไม่มีสิทธิ์เห็นคืนค่าว่าง
     sp.site && sp.site !== 'central'
       ? sb
           .from('sites')
@@ -97,8 +97,8 @@ export default async function LedgerPage({
           .then(({ data }) => data?.name ?? null)
       : Promise.resolve(null),
     // ตัวเลือกของกล่องแก้ไข — ชุดเดียวกับที่ `/entry` ใช้ตอนสร้างรายการ
-    // 🔴 RLS เป็นคนกรองว่าใครเห็นไซต์ไหน · หัวหน้าไซต์จึงย้ายรายการข้ามไป
-    // ไซต์ที่ตัวเองไม่ได้ดูแลไม่ได้ โดยไม่ต้องมีเงื่อนไขตรงนี้รู้เรื่องนั้นเลย
+    // 🔴 RLS เป็นคนกรองว่าใครเห็นโครงการไหน · หัวหน้าโครงการจึงย้ายรายการข้ามไป
+    // โครงการที่ตัวเองไม่ได้ดูแลไม่ได้ โดยไม่ต้องมีเงื่อนไขตรงนี้รู้เรื่องนั้นเลย
     sb
       .from('sites')
       .select('id, name')
@@ -194,7 +194,7 @@ export default async function LedgerPage({
   const isFiltered = terms.length > 0 || status !== 'all' || kind !== 'all'
     || Boolean(sp.site) || Boolean(sp.from) || Boolean(sp.to)
 
-  // ลิงก์ถอดตัวกรองไซต์ออก โดยเก็บตัวกรองอื่นไว้ทั้งหมด
+  // ลิงก์ถอดตัวกรองโครงการออก โดยเก็บตัวกรองอื่นไว้ทั้งหมด
   const clearSite = new URLSearchParams(keep)
   clearSite.delete('site')
   const clearSiteHref = clearSite.toString() ? `/ledger?${clearSite}` : '/ledger'
@@ -209,11 +209,11 @@ export default async function LedgerPage({
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-ink">รายรับ-รายจ่าย</h1>
         <p className="mt-0.5 text-sm text-muted-token">
-          {isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของไซต์ที่คุณดูแล'}
+          {isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของโครงการที่คุณดูแล'}
         </p>
       </div>
 
-      {/* เจ้าของเท่านั้นที่มีทั้งสองชนิดให้สลับ — หัวหน้าไซต์เห็นแต่รายจ่าย
+      {/* เจ้าของเท่านั้นที่มีทั้งสองชนิดให้สลับ — หัวหน้าโครงการเห็นแต่รายจ่าย
           ปุ่มกรองที่มีตัวเลือกเดียวคือปุ่มที่ไม่ทำอะไร */}
       {isOwner && (
         <div className="mb-3 flex flex-wrap gap-1.5">
@@ -245,7 +245,7 @@ export default async function LedgerPage({
         activeFilter={status}
         placeholder="ค้นหาจากรายละเอียด…"
         // ตัวกรองที่ไม่มีปุ่มของตัวเองบนแถบนี้ ต้องติดไปกับชิปและการค้นหาด้วย
-        // ไม่งั้นกดชิปสถานะแล้วขอบเขต "เฉพาะไซต์นี้" หายไปเงียบ ๆ
+        // ไม่งั้นกดชิปสถานะแล้วขอบเขต "เฉพาะโครงการนี้" หายไปเงียบ ๆ
         extra={{
           ...(kind !== 'all' ? { kind } : {}),
           ...(sp.site ? { site: sp.site } : {}),
@@ -254,19 +254,19 @@ export default async function LedgerPage({
         }}
       />
 
-      {/* ── ขอบเขตที่กำลังดูอยู่ — มาจากปุ่มลัดบนหน้าไซต์หรือการ์ดงานวันนี้ ──
+      {/* ── ขอบเขตที่กำลังดูอยู่ — มาจากปุ่มลัดบนหน้าโครงการหรือการ์ดงานวันนี้ ──
           ต้องเห็นว่ากรองอยู่ และต้องออกจากมันได้ในแตะเดียว */}
       {sp.site && (
         <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-brand-tint-strong bg-brand-tint px-3 py-2">
           <Warehouse className="size-4 shrink-0 text-brand-on-tint" strokeWidth={1.8} />
           <span className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-on-tint">
-            เฉพาะ{sp.site === 'central' ? 'รายการส่วนกลาง (ไม่ผูกไซต์)' : `ไซต์ ${siteFilterName ?? 'ที่เลือก'}`}
+            เฉพาะ{sp.site === 'central' ? 'รายการส่วนกลาง (ไม่ผูกโครงการ)' : `โครงการ ${siteFilterName ?? 'ที่เลือก'}`}
           </span>
           <Link
             href={clearSiteHref}
             className="shrink-0 rounded-sm px-2 py-0.5 text-sm font-semibold text-brand-on-tint underline underline-offset-2"
           >
-            ดูทุกไซต์
+            ดูทุกโครงการ
           </Link>
         </div>
       )}

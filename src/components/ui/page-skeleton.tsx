@@ -10,7 +10,7 @@ import { ListSkeleton, MetricSkeleton, Skeleton } from '@/components/ui/states'
  * 🔴 **ไม่มี `loading.tsx` ที่ระดับกลุ่ม `(app)` โดยเจตนา** — `loading.tsx`
  * เปลี่ยน response ของ segment นั้นเป็นแบบสตรีม ซึ่งทำให้ `notFound()`
  * ตั้งรหัส 404 ไม่ได้อีก (`/sites/[id]` เรียก `notFound()` อยู่) · ถ้าวางไฟล์
- * ไว้ที่ระดับกลุ่ม มันจะครอบ `[id]` ไปด้วยแล้วไซต์ที่ไม่มีอยู่จริงจะตอบ 200
+ * ไว้ที่ระดับกลุ่ม มันจะครอบ `[id]` ไปด้วยแล้วโครงการที่ไม่มีอยู่จริงจะตอบ 200
  * เงียบ ๆ · จึงวางเป็นรายหน้าเท่านั้น และตั้งใจไม่วางใน `sites/[id]`
  */
 export function PageSkeleton({

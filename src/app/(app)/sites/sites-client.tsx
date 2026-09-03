@@ -9,15 +9,15 @@ import { SITE_STATUSES, SITE_STATUS_LABEL, type SiteStatus } from '@/lib/sites'
 
 export const SITE_ERRORS: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
-  FORBIDDEN: 'เฉพาะเจ้าของเท่านั้นที่เพิ่มหรือแก้ไซต์งานได้',
-  NAME_REQUIRED: 'กรุณากรอกชื่อไซต์งาน',
+  FORBIDDEN: 'เฉพาะเจ้าของเท่านั้นที่เพิ่มหรือแก้โครงการได้',
+  NAME_REQUIRED: 'กรุณากรอกชื่อโครงการ',
   AMOUNT_INVALID: 'ค่างานต้องเป็นตัวเลขที่ไม่ติดลบ',
   DATE_INVALID: 'รูปแบบวันที่ไม่ถูกต้อง',
   DATE_BUDDHIST_ERA: 'ปีที่กรอกเป็น พ.ศ. — ระบบเก็บเป็น ค.ศ. กรุณาเลือกวันจากปฏิทิน',
   DATE_RANGE_INVALID: 'วันสิ้นสุดต้องไม่มาก่อนวันเริ่ม',
   STATUS_INVALID: 'สถานะไม่ถูกต้อง',
-  NOT_FOUND: 'ไม่พบไซต์งานนี้',
-  OVERLAP: 'ช่วงเวลาทับกับไซต์อื่นที่คนนี้ดูแลอยู่',
+  NOT_FOUND: 'ไม่พบโครงการนี้',
+  OVERLAP: 'ช่วงเวลาทับกับโครงการอื่นที่คนนี้ดูแลอยู่',
   CREATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
 }
 export const siteError = (code?: string) => SITE_ERRORS[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
@@ -48,7 +48,7 @@ export function NewSiteButton() {
     // เพราะการกดรัว ๆ ยิง onClick ได้ก่อนที่ React จะ re-render ปุ่มเป็น disabled
     if (busy) return
     if (!form.name.trim()) {
-      setFieldError('กรุณากรอกชื่อไซต์งาน')
+      setFieldError('กรุณากรอกชื่อโครงการ')
       return
     }
     setFieldError('')
@@ -65,7 +65,7 @@ export function NewSiteButton() {
         toast.error(siteError(b.error))
         return
       }
-      toast.success('เพิ่มไซต์งานแล้ว')
+      toast.success('เพิ่มโครงการแล้ว')
       setForm(EMPTY)
       setOpen(false)
       router.refresh()
@@ -87,19 +87,19 @@ export function NewSiteButton() {
     >
       <Dialog.Trigger className="btn-primary shrink-0">
         <Plus className="size-4" />
-        เพิ่มไซต์งาน
+        เพิ่มโครงการ
       </Dialog.Trigger>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 animate-fade-in" />
         <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90svh] w-[min(34rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-5 shadow-e3 animate-pop-in">
-          <Dialog.Title className="text-lg font-bold text-ink">เพิ่มไซต์งาน</Dialog.Title>
+          <Dialog.Title className="text-lg font-bold text-ink">เพิ่มโครงการ</Dialog.Title>
           <Dialog.Description className="mt-0.5 text-sm text-muted-token">
-            กรอกแค่ชื่อก็บันทึกได้ ค่างานและช่วงเวลาเติมทีหลังได้ในหน้าไซต์
+            กรอกแค่ชื่อก็บันทึกได้ ค่างานและช่วงเวลาเติมทีหลังได้ในหน้าโครงการ
           </Dialog.Description>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="sm:col-span-2">
-              <label htmlFor="site-name" className="label-base">ชื่อไซต์งาน</label>
+              <label htmlFor="site-name" className="label-base">ชื่อโครงการ</label>
               <input
                 id="site-name"
                 value={form.name}

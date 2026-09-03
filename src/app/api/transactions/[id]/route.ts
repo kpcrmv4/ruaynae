@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     Object.assign(patch, parsed.fields)
     // client_ref เป็นของ "ครั้งที่กดบันทึก" ไม่ใช่ของแถว — แก้ทีหลังไม่ต้องแตะ
     delete patch.client_ref
-    // 🔴 สถานะไม่อยู่ใน patch โดยตั้งใจ · หัวหน้าไซต์ที่แก้ของที่ถูกตีกลับ
+    // 🔴 สถานะไม่อยู่ใน patch โดยตั้งใจ · หัวหน้าโครงการที่แก้ของที่ถูกตีกลับ
     // จะถูก guard trigger ดันกลับเป็น `pending` ให้เอง (= ส่งใหม่)
     // ฝั่งนี้จึงไม่ต้องรู้เรื่องนั้นเลย และเปลี่ยนสถานะเองไม่ได้ด้วย
   }
@@ -107,7 +107,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 /**
  * DELETE /api/transactions/[id] — ลบรายการทิ้ง
  *
- * เจ้าของลบได้ทุกแถว · หัวหน้าไซต์ลบได้เฉพาะของตัวเองที่ยังไม่อนุมัติ
+ * เจ้าของลบได้ทุกแถว · หัวหน้าโครงการลบได้เฉพาะของตัวเองที่ยังไม่อนุมัติ
  * แถวที่ถูกลบยังอยู่ครบใน `audit_log` (ค่าเดิมทั้งแถวใน `before`)
  * ซึ่งเจ้าของเปิดดูย้อนหลังได้ที่ /audit
  */

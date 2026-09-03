@@ -55,7 +55,7 @@ export default async function UsersPage({
       sb
         .from('employees')
         // ค่าแรงอยู่ `employee_wages` ที่เจ้าของอ่านได้คนเดียว — หน้านี้เป็นของ
-        // เจ้าของอยู่แล้ว จึง embed มาได้ · หัวหน้าไซต์เข้าหน้านี้ไม่ได้ตั้งแต่แรก
+        // เจ้าของอยู่แล้ว จึง embed มาได้ · หัวหน้าโครงการเข้าหน้านี้ไม่ได้ตั้งแต่แรก
         .select('id, full_name, job_title, default_site_id, is_active, profile_id, employee_wages(wage_type, daily_rate, monthly_salary)')
         // คนที่ยังทำงานอยู่ขึ้นก่อน แล้วเรียงตามชื่อ
         .order('is_active', { ascending: false })

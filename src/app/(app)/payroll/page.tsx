@@ -20,7 +20,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   // สองมุมมองสลับกันได้ · สถานะอยู่บน URL เหมือนหน้าอื่นทั้งแอป — แชร์ลิงก์ได้
   const tab = sp.tab === 'grid' ? 'grid' : 'balances'
   // ซ่อนเมนูอย่างเดียวไม่พอ — คนพิมพ์ URL ตรงได้ ต้องกันที่หน้าเองด้วย
-  // เบิกและรอบจ่ายเป็นเรื่องเงินทั้งหมด · หัวหน้าไซต์ไม่เกี่ยว
+  // เบิกและรอบจ่ายเป็นเรื่องเงินทั้งหมด · หัวหน้าโครงการไม่เกี่ยว
   if (me.role !== 'owner') redirect('/')
 
   const sb = await getSupabaseServer()
@@ -100,7 +100,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       <div className="mb-5">
         <h1 className="text-2xl font-bold text-ink">ค่าแรงและรอบจ่าย</h1>
         <p className="mt-0.5 text-sm text-muted-token">
-          ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าไซต์ · การเบิกและปิดรอบคือ{' '}
+          ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าโครงการ · การเบิกและปิดรอบคือ{' '}
           <span className="font-medium text-ink-2">เงินสดออก ไม่ใช่ต้นทุนใหม่</span>
         </p>
       </div>
@@ -213,7 +213,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       ) : rows.length === 0 && (runs ?? []).length === 0 ? (
         <EmptyState
           icon={Wallet}
-          message="ยังไม่มีค่าแรงค้างจ่าย — ติ๊กคนเข้าไซต์ที่หน้าคนเข้าไซต์ก่อน แล้วยอดจะขึ้นที่นี่"
+          message="ยังไม่มีค่าแรงค้างจ่าย — ติ๊กคนเข้าโครงการที่หน้าคนเข้าโครงการก่อน แล้วยอดจะขึ้นที่นี่"
         />
       ) : (
         <PayrollBoard

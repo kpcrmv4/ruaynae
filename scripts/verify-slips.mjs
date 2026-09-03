@@ -89,9 +89,9 @@ let othersId = null
 const keysToClean = []
 try {
   ;[{ id: mineId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ SLIP ไซต์ของหัวหน้า') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ SLIP โครงการของหัวหน้า') returning id`)).rows
   ;[{ id: othersId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ SLIP ไซต์คนอื่น') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ SLIP โครงการคนอื่น') returning id`)).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${mineId}','${sup1.id}')`)
 
@@ -101,13 +101,13 @@ try {
   const sign = (jar, body) =>
     req('POST', '/api/uploads/sign', { purpose: 'slip', contentType: 'image/png', ...body }, { cookie: jar })
 
-  // ── P2-R2-01 · ขอลิงก์ของไซต์ที่ไม่ได้ดูแล ────────────────────────
+  // ── P2-R2-01 · ขอลิงก์ของโครงการที่ไม่ได้ดูแล ────────────────────────
   {
     const before = await intentCount()
     const r = await sign(supJar, { siteId: othersId })
     const b = await r.json().catch(() => ({}))
     const after = await intentCount()
-    check('P2-R2-01 หัวหน้าไซต์ขอลิงก์อัปโหลดของไซต์ที่ไม่ได้ดูแล → 403 · ไม่มี intent ใหม่',
+    check('P2-R2-01 หัวหน้าโครงการขอลิงก์อัปโหลดของโครงการที่ไม่ได้ดูแล → 403 · ไม่มี intent ใหม่',
       r.status === 403 && b.error === 'FORBIDDEN' && after === before,
       `${r.status} ${b.error} · ${before}→${after}`)
   }
@@ -124,7 +124,7 @@ try {
       `${bad.status} / ${big.status} · ${before}→${after}`)
   }
 
-  // ── P2-R2-02 · ขอลิงก์ของไซต์ตัวเอง ──────────────────────────────
+  // ── P2-R2-02 · ขอลิงก์ของโครงการตัวเอง ──────────────────────────────
   let signed = null
   {
     const before = await intentCount()
@@ -135,7 +135,7 @@ try {
     const { rows } = await sql(
       `select expires_at > now() as future, consumed_at is null as unused
        from public.upload_intents where object_key = '${signed.key}'`)
-    check('P2-R2-02 ขอลิงก์ของไซต์ตัวเอง → 200 · presigned 2 อัน · intent +1 ยังไม่ถูกใช้',
+    check('P2-R2-02 ขอลิงก์ของโครงการตัวเอง → 200 · presigned 2 อัน · intent +1 ยังไม่ถูกใช้',
       r.status === 200 && Boolean(signed.url) && Boolean(signed.thumbUrl)
       && after === before + 1 && rows[0]?.future === true && rows[0]?.unused === true,
       `${r.status} · ${before}→${after} · หมดอายุในอนาคต=${rows[0]?.future}`)
@@ -207,7 +207,7 @@ try {
       `${r.status} · สลิป ${rows.length} · ${rows[0]?.byte_size}B · ปิด intent=${intent[0]?.used}`)
   }
 
-  // ── P2-R2-07 · เปิดสลิปของไซต์ตัวเอง ─────────────────────────────
+  // ── P2-R2-07 · เปิดสลิปของโครงการตัวเอง ─────────────────────────────
   let signedGetUrl = null
   {
     const r = await fetch(`${BASE}/api/uploads/${attachmentId}`, {
@@ -215,7 +215,7 @@ try {
     signedGetUrl = r.headers.get('location')
     const got = signedGetUrl ? await fetch(signedGetUrl) : null
     const bytes = got?.ok ? (await got.arrayBuffer()).byteLength : -1
-    check('P2-R2-07 เปิดสลิปของไซต์ตัวเอง → 302 ไป presigned GET · ไบต์เท่าที่อัปไป',
+    check('P2-R2-07 เปิดสลิปของโครงการตัวเอง → 302 ไป presigned GET · ไบต์เท่าที่อัปไป',
       r.status === 302 && Boolean(signedGetUrl?.includes('X-Amz-Signature')) && bytes === PNG.length,
       `${r.status} · มีลายเซ็น=${Boolean(signedGetUrl?.includes('X-Amz-Signature'))} · ${bytes}B`)
   }
@@ -228,7 +228,7 @@ try {
       Boolean(bare) && !r.ok, `${r.status}`)
   }
 
-  // ── P2-R2-06 · เปิดสลิปของไซต์ที่ไม่ได้ดูแล ──────────────────────
+  // ── P2-R2-06 · เปิดสลิปของโครงการที่ไม่ได้ดูแล ──────────────────────
   // ครึ่งบวกอยู่ที่ P2-R2-07 ซึ่งพิสูจน์ว่า endpoint นี้ทำงานได้จริง
   {
     const other = await sign(ownerJar, { siteId: othersId, byteSize: PNG.length })
@@ -246,7 +246,7 @@ try {
       `select id from public.attachments where transaction_id = '${mb.transaction.id}'`)
     const r = await fetch(`${BASE}/api/uploads/${rows[0].id}`, {
       headers: { cookie: supJar }, redirect: 'manual' })
-    check('P2-R2-06 หัวหน้าไซต์เปิดสลิปของไซต์ที่ไม่ได้ดูแล → 403 ไม่ใช่ 302',
+    check('P2-R2-06 หัวหน้าโครงการเปิดสลิปของโครงการที่ไม่ได้ดูแล → 403 ไม่ใช่ 302',
       r.status === 403, `${r.status}`)
   }
 

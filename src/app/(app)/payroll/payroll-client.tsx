@@ -118,7 +118,7 @@ export function PayrollBoard({
         </div>
         {rows.length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-token">
-            ยังไม่มีใครมียอดค้างจ่าย — ค่าแรงจะขึ้นที่นี่เมื่อติ๊กคนเข้าไซต์
+            ยังไม่มีใครมียอดค้างจ่าย — ค่าแรงจะขึ้นที่นี่เมื่อติ๊กคนเข้าโครงการ
           </p>
         ) : (
           <ul>
@@ -231,7 +231,7 @@ export function PayrollBoard({
                     {fmtDate(run.period_start)} – {fmtDate(run.period_end)}
                   </div>
                   <div className="truncate text-xs text-muted-token">
-                    {run.site_name ?? 'ทุกไซต์'}
+                    {run.site_name ?? 'ทุกโครงการ'}
                     {run.status === 'closed' &&
                       ` · ค่าแรง ${fmtBaht(run.total_accrued)} − เบิก ${fmtBaht(run.total_advance_deducted)} = จ่ายจริง ${fmtBaht(run.total_paid)}`}
                   </div>
@@ -281,7 +281,7 @@ export function PayrollBoard({
             <Dialog.Description className="mt-0.5 text-sm text-muted-token">
               เบิกได้ไม่เกิน{' '}
               <span className="font-semibold tnum text-ink">{fmtBaht(advanceFor?.balance ?? 0)}</span>{' '}
-              · การเบิกคือเงินสดออก ไม่ทำให้ต้นทุนไซต์เพิ่ม
+              · การเบิกคือเงินสดออก ไม่ทำให้ต้นทุนโครงการเพิ่ม
             </Dialog.Description>
 
             <div className="mt-4">
@@ -368,14 +368,14 @@ export function PayrollBoard({
                 />
               </div>
               <div className="sm:col-span-2">
-                <label htmlFor="run-site" className="label-base">เฉพาะไซต์ (ไม่บังคับ)</label>
+                <label htmlFor="run-site" className="label-base">เฉพาะโครงการ (ไม่บังคับ)</label>
                 <select
                   id="run-site"
                   value={period.siteId}
                   onChange={(e) => setPeriod((p) => ({ ...p, siteId: e.target.value }))}
                   className="input-base"
                 >
-                  <option value="">ทุกไซต์</option>
+                  <option value="">ทุกโครงการ</option>
                   {sites.map((s) => (
                     <option key={s.id} value={s.id}>{s.name}</option>
                   ))}

@@ -108,7 +108,7 @@ export default async function SettingsPage() {
       <PushToggle vapidPublicKey={process.env.NEXT_PUBLIC_VAPID_PUBLIC_KEY ?? ''} />
 
       {/* พื้นที่เก็บรูปเป็นเรื่องของค่าใช้จ่าย → เจ้าของเท่านั้น
-          หัวหน้าไซต์ไม่ได้ตัดสินใจเรื่องโควตาและไม่ควรเห็นภาพรวมทั้งระบบ */}
+          หัวหน้าโครงการไม่ได้ตัดสินใจเรื่องโควตาและไม่ควรเห็นภาพรวมทั้งระบบ */}
       {isOwner && <StorageCard />}
     </div>
   )

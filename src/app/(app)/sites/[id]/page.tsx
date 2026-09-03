@@ -24,10 +24,10 @@ import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
 import { SiteDetailActions } from './site-detail-client'
 
-/** กี่แถวล่าสุดที่โชว์ในหน้าไซต์ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
+/** กี่แถวล่าสุดที่โชว์ในหน้าโครงการ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
 const RECENT_TXN = 10
 
-export const metadata = { title: 'รายละเอียดไซต์งาน' }
+export const metadata = { title: 'รายละเอียดโครงการ' }
 
 export default async function SiteDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const [me, { id }] = await Promise.all([getCurrentUser(), params])
@@ -40,16 +40,16 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
     .maybeSingle()
 
   if (error) {
-    console.error('[sites] อ่านไซต์ไม่ได้', error.message)
+    console.error('[sites] อ่านโครงการไม่ได้', error.message)
     return (
       <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดข้อมูลไซต์งานไม่สำเร็จ</p>
+        <p className="text-sm text-urgent">โหลดข้อมูลโครงการไม่สำเร็จ</p>
         <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
       </div>
     )
   }
-  // 🔴 หัวหน้าไซต์ที่ไม่ได้ดูแลไซต์นี้จะได้ 0 แถวจาก RLS → 404 ไม่ใช่หน้าเปล่า
-  // หน้าเปล่าอ่านเหมือนระบบพัง และยังบอกใบ้ด้วยว่า "ไซต์นี้มีอยู่จริงนะ"
+  // 🔴 หัวหน้าโครงการที่ไม่ได้ดูแลโครงการนี้จะได้ 0 แถวจาก RLS → 404 ไม่ใช่หน้าเปล่า
+  // หน้าเปล่าอ่านเหมือนระบบพัง และยังบอกใบ้ด้วยว่า "โครงการนี้มีอยู่จริงนะ"
   if (!site) notFound()
 
   const isOwner = me.role === 'owner'
@@ -75,7 +75,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
       .eq('site_id', id)
       .order('seq', { ascending: true })
       .range(0, PAGE_SIZE - 1),
-    // รายชื่อสำหรับกล่องมอบหมาย — หัวหน้าไซต์อ่าน profiles คนอื่นไม่ได้ตาม RLS
+    // รายชื่อสำหรับกล่องมอบหมาย — หัวหน้าโครงการอ่าน profiles คนอื่นไม่ได้ตาม RLS
     // จึงดึงเฉพาะตอนเป็นเจ้าของ ไม่ใช่ดึงทุกครั้งแล้วได้ลิสต์ว่างเงียบ ๆ
     me.role === 'owner'
       ? sb
@@ -86,11 +86,11 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           .order('full_name', { ascending: true })
           .range(0, PAGE_SIZE - 1)
           .then(({ data, error: pErr }) => {
-            if (pErr) console.error('[sites] อ่านรายชื่อหัวหน้าไซต์ไม่ได้', pErr.message)
+            if (pErr) console.error('[sites] อ่านรายชื่อหัวหน้าโครงการไม่ได้', pErr.message)
             return data ?? []
           })
       : Promise.resolve([]),
-    // ยอดเงินของไซต์นี้ · RPC เป็น `security invoker` จึงคืน `null` ให้หัวหน้าไซต์
+    // ยอดเงินของโครงการนี้ · RPC เป็น `security invoker` จึงคืน `null` ให้หัวหน้าโครงการ
     // เอง — `null` แปลว่า "ไม่มีสิทธิ์เห็น" ซึ่งไม่เหมือน 0 ที่แปลว่า
     // "ยังไม่ได้ตั้ง" — สองอย่างนี้ห้ามปนกัน
     sb
@@ -105,8 +105,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           wage: Number(row?.cost_wage ?? 0),
         }
       }),
-    // ── รายรับ-รายจ่ายล่าสุดของไซต์นี้ ────────────────────────────────
-    // 🔴 ไม่มี `.eq('kind', …)` — RLS เป็นคนตัดสินว่าใครเห็นอะไร หัวหน้าไซต์
+    // ── รายรับ-รายจ่ายล่าสุดของโครงการนี้ ────────────────────────────────
+    // 🔴 ไม่มี `.eq('kind', …)` — RLS เป็นคนตัดสินว่าใครเห็นอะไร หัวหน้าโครงการ
     // จึงเห็นเฉพาะรายจ่ายโดยอัตโนมัติ ส่วนเจ้าของเห็นทั้งสองฝั่ง
     // ดึงเกินมา 1 แถวเพื่อรู้ว่ายังมีต่อ โดยไม่ต้องนับทั้งตาราง
     sb
@@ -128,7 +128,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
       .order('name', { ascending: true })
       .range(0, PAGE_SIZE - 1)
       .then(({ data, error: e }) => {
-        if (e) console.error('[sites] อ่านรายชื่อไซต์ไม่ได้', e.message)
+        if (e) console.error('[sites] อ่านรายชื่อโครงการไม่ได้', e.message)
         return data ?? []
       }),
     sb
@@ -144,7 +144,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   ])
 
   const today = todayInBangkok()
-  // สถานะที่ปลายทางของปุ่มลัดยอมรับไซต์นี้ — ต้องตรงกับกล่องเลือกไซต์ของสองหน้านั้น
+  // สถานะที่ปลายทางของปุ่มลัดยอมรับโครงการนี้ — ต้องตรงกับกล่องเลือกโครงการของสองหน้านั้น
   const canRecord = ['planning', 'active', 'paused'].includes(site.status)
   const canAttend = ['planning', 'active'].includes(site.status)
   const progress = timeProgress(site.start_date, site.end_date, today)
@@ -161,7 +161,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-token transition-colors hover:text-ink"
       >
         <ArrowLeft className="size-4" />
-        ไซต์งานทั้งหมด
+        โครงการทั้งหมด
       </Link>
 
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -187,16 +187,16 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
       </div>
 
-      {/* ── ปุ่มลัดของไซต์นี้ ─────────────────────────────────────────
-          เปิดหน้าไซต์แล้วงานถัดไปเกือบทุกครั้งคือ "บันทึกของไซต์นี้" —
-          เดิมต้องถอยออกไปเมนูรวมแล้วเลือกไซต์เดิมซ้ำอีกรอบ · ทุกปุ่มพาไปหน้าเดิม
-          ของระบบพร้อมไซต์นี้ถูกเลือกไว้ให้แล้ว (สิทธิ์และลอจิกปลายทางเหมือนเดิมทุกอย่าง)
+      {/* ── ปุ่มลัดของโครงการนี้ ─────────────────────────────────────────
+          เปิดหน้าโครงการแล้วงานถัดไปเกือบทุกครั้งคือ "บันทึกของโครงการนี้" —
+          เดิมต้องถอยออกไปเมนูรวมแล้วเลือกโครงการเดิมซ้ำอีกรอบ · ทุกปุ่มพาไปหน้าเดิม
+          ของระบบพร้อมโครงการนี้ถูกเลือกไว้ให้แล้ว (สิทธิ์และลอจิกปลายทางเหมือนเดิมทุกอย่าง)
 
-          🔴 ปุ่มบันทึก/ลงชื่อโผล่เฉพาะสถานะที่ปลายทาง**รับไซต์นี้ได้จริง** —
-          กล่องเลือกไซต์ของ `/entry` มีแค่ planning/active/paused และของ
-          `/attendance` มีแค่ active/planning · ถ้าโชว์ปุ่มบนไซต์ที่ปิดงานแล้ว
-          กดไปจะเด้งไปไซต์อื่นเงียบ ๆ แล้วคนคีย์ลงผิดไซต์โดยไม่มีอะไรเตือน */}
-      <nav aria-label="ทางลัดของไซต์นี้" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+          🔴 ปุ่มบันทึก/ลงชื่อโผล่เฉพาะสถานะที่ปลายทาง**รับโครงการนี้ได้จริง** —
+          กล่องเลือกโครงการของ `/entry` มีแค่ planning/active/paused และของ
+          `/attendance` มีแค่ active/planning · ถ้าโชว์ปุ่มบนโครงการที่ปิดงานแล้ว
+          กดไปจะเด้งไปโครงการอื่นเงียบ ๆ แล้วคนคีย์ลงผิดโครงการโดยไม่มีอะไรเตือน */}
+      <nav aria-label="ทางลัดของโครงการนี้" className="mb-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
         {canRecord && (
           <SiteAction
             href={`/entry?site=${site.id}`}
@@ -218,20 +218,20 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             href={`/attendance?site=${site.id}`}
             icon={CalendarDays}
             tone="brand"
-            label="ลงชื่อคนเข้าไซต์"
+            label="ลงชื่อคนเข้าโครงการ"
           />
         )}
         <SiteAction
           href={`/ledger?site=${site.id}`}
           icon={Receipt}
           tone="brand"
-          label="รายการของไซต์นี้"
+          label="รายการของโครงการนี้"
         />
       </nav>
 
       {/* ── ความคืบหน้า — สามแถบ (DESIGN.md §5.1) ─────────────────────
           เวลา · เก็บเงินแล้ว · ต้นทุนที่จ่ายจริง
-          หัวหน้าไซต์เห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ เพราะเปอร์เซ็นต์
+          หัวหน้าโครงการเห็นแค่ยอดรายจ่าย ไม่มีเปอร์เซ็นต์ เพราะเปอร์เซ็นต์
           ต้องหารด้วยค่างาน ซึ่งเป็นความลับจากเขา */}
       <section className="panel mb-4 p-4">
         <div className="mb-2 flex flex-wrap items-baseline justify-between gap-x-3 gap-y-1">
@@ -278,7 +278,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
 
         {bars.kind !== 'hidden' && (
           <p className="mt-3 border-t border-line-soft pt-3 text-xs text-muted-token">
-            ต้นทุนนับจากรายจ่ายที่อนุมัติแล้ว บวกค่าแรงจากการลงชื่อคนเข้าไซต์
+            ต้นทุนนับจากรายจ่ายที่อนุมัติแล้ว บวกค่าแรงจากการลงชื่อคนเข้าโครงการ
             ซึ่งเกิดขึ้นทันทีที่ติ๊ก ไม่ต้องรออนุมัติ
           </p>
         )}
@@ -339,17 +339,17 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         </dl>
       </section>
 
-      {/* ── หัวหน้าไซต์ ────────────────────────────────────────────── */}
+      {/* ── หัวหน้าโครงการ ────────────────────────────────────────────── */}
       <section className="panel mb-4">
         <div className="panel-head">
-          หัวหน้าไซต์
+          หัวหน้าโครงการ
           <span className="ml-auto text-xs font-normal text-muted-token">
             {(crew ?? []).length} รายการ
           </span>
         </div>
         {(crew ?? []).length === 0 ? (
           <p className="px-4 py-6 text-center text-sm text-muted-token">
-            ยังไม่มีใครดูแลไซต์นี้ — หัวหน้าไซต์จะเห็นและคีย์รายจ่ายของไซต์นี้ได้หลังถูกมอบหมาย
+            ยังไม่มีใครดูแลโครงการนี้ — หัวหน้าโครงการจะเห็นและคีย์รายจ่ายของโครงการนี้ได้หลังถูกมอบหมาย
           </p>
         ) : (
           <ul>
@@ -371,7 +371,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
                   </span>
                   {/* "ปัจจุบัน" คือช่วงที่ครอบวันนี้ ไม่ใช่ช่วงที่ยังไม่มีวันสิ้นสุด —
                       การย้ายล่วงหน้าจะปิดช่วงปัจจุบันไว้ ถ้าดูที่ effective_to
-                      คนจะหายจากไซต์ทันทีที่บันทึกการย้าย ทั้งที่ยังไม่ถึงวัน */}
+                      คนจะหายจากโครงการทันทีที่บันทึกการย้าย ทั้งที่ยังไม่ถึงวัน */}
                   {current && (
                     <span className="ml-auto">
                       <Badge tone="done">ดูแลอยู่ตอนนี้</Badge>
@@ -420,7 +420,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
       </section>
 
-      {/* ── รายรับ-รายจ่ายของไซต์นี้ ──────────────────────────────────
+      {/* ── รายรับ-รายจ่ายของโครงการนี้ ──────────────────────────────────
           เดิมหน้านี้บอกแค่ "ยอดรวมเท่าไร" แล้วให้เดินออกไปอีกหน้าเพื่อดูว่า
           ยอดนั้นมาจากอะไร · ตัวเลขที่ไล่ที่มาไม่ได้คือตัวเลขที่ไม่มีใครเชื่อ
           · โชว์ล่าสุดแค่ RECENT_TXN แถว ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรอง
@@ -445,11 +445,11 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
 
           {txnResult.error ? (
             <p className="px-4 py-6 text-center text-sm text-urgent">
-              โหลดรายการของไซต์นี้ไม่สำเร็จ — ลองรีเฟรชหน้านี้อีกครั้ง
+              โหลดรายการของโครงการนี้ไม่สำเร็จ — ลองรีเฟรชหน้านี้อีกครั้ง
             </p>
           ) : recentTxns.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-token">
-              ยังไม่มีรายการของไซต์นี้
+              ยังไม่มีรายการของโครงการนี้
               {canRecord && ' — กดปุ่มบันทึกรายจ่ายด้านบนเพื่อเริ่มรายการแรก'}
             </p>
           ) : (
@@ -460,7 +460,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
               {hasMoreTxn && (
                 <div className="px-4 py-3 text-center">
                   <Link href={`/ledger?site=${site.id}`} className="btn-secondary">
-                    ดูรายการทั้งหมดของไซต์นี้
+                    ดูรายการทั้งหมดของโครงการนี้
                   </Link>
                 </div>
               )}

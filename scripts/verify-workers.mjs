@@ -56,7 +56,7 @@ const MARK = 'ทดสอบแท็บคนงาน'
 const made = []
 
 try {
-  // ── P4-API-01 · หัวหน้าไซต์เพิ่มคนงานไม่ได้ ───────────────────────
+  // ── P4-API-01 · หัวหน้าโครงการเพิ่มคนงานไม่ได้ ───────────────────────
   {
     const before = (await sql('select count(*)::int n from public.employees')).rows[0].n
     const r = await req('POST', '/api/employees', {
@@ -64,7 +64,7 @@ try {
     }, supJar)
     const b = await r.json().catch(() => ({}))
     const after = (await sql('select count(*)::int n from public.employees')).rows[0].n
-    check('P4-API-01 หัวหน้าไซต์ยิง POST /api/employees → 403 FORBIDDEN · ไม่มีแถวใหม่',
+    check('P4-API-01 หัวหน้าโครงการยิง POST /api/employees → 403 FORBIDDEN · ไม่มีแถวใหม่',
       r.status === 403 && b.error === 'FORBIDDEN' && Number(after) === Number(before),
       `${r.status} ${b.error} · ${before}→${after}`)
   }
@@ -170,7 +170,7 @@ try {
   }
 
   // ── P4-UI-01c · คนงานมีปุ่มของตัวเองบนหน้าตั้งค่า ─────────────────
-  // 🔴 ฝั่งลบสำคัญพอ ๆ กับฝั่งบวก — ปุ่มที่หัวหน้าไซต์เห็นแล้วกดไปเจอ redirect
+  // 🔴 ฝั่งลบสำคัญพอ ๆ กับฝั่งบวก — ปุ่มที่หัวหน้าโครงการเห็นแล้วกดไปเจอ redirect
   // คือปุ่มที่โกหก (§15: role ที่อนุญาตต้องตรงกับที่ปุ่มนั้นอยู่)
   {
     const ownerSettings = await page('/settings', ownerJar)
@@ -179,10 +179,10 @@ try {
     // ต้องอยู่ **หลัง** ปุ่มผู้ใช้ระบบ ตามที่เจ้าของสั่ง — เทียบตำแหน่งในหน้า
     const posUsers = ownerSettings.indexOf('href="/settings/users"')
     const posWorkers = ownerSettings.search(linkRe)
-    check('P4-UI-01c หน้าตั้งค่ามีปุ่ม "คนงาน" ต่อจาก "ผู้ใช้ระบบ" · หัวหน้าไซต์ไม่เห็นปุ่มนี้',
+    check('P4-UI-01c หน้าตั้งค่ามีปุ่ม "คนงาน" ต่อจาก "ผู้ใช้ระบบ" · หัวหน้าโครงการไม่เห็นปุ่มนี้',
       posUsers >= 0 && posWorkers > posUsers && ownerSettings.includes('คนงาน')
         && !linkRe.test(supSettings),
-      `เจ้าของ: ผู้ใช้ระบบ@${posUsers} · คนงาน@${posWorkers} · หัวหน้าไซต์เห็นปุ่ม=${linkRe.test(supSettings)}`)
+      `เจ้าของ: ผู้ใช้ระบบ@${posUsers} · คนงาน@${posWorkers} · หัวหน้าโครงการเห็นปุ่ม=${linkRe.test(supSettings)}`)
   }
 
   // ── R7 · ลบคนงาน ─────────────────────────────────────────────────
@@ -202,7 +202,7 @@ try {
       del.status === 200 && Number(gone) === 0, `${del.status} · เหลือ ${gone} แถว`)
   }
   {
-    // คนที่ลงชื่อเข้าไซต์ไว้ (ยังไม่ปิดรอบ) → ลบได้ และประวัติหายตามไปด้วย
+    // คนที่ลงชื่อเข้าโครงการไว้ (ยังไม่ปิดรอบ) → ลบได้ และประวัติหายตามไปด้วย
     const r0 = await req('POST', '/api/employees', {
       fullName: `${MARK} มีประวัติ`, wageType: 'daily', dailyRate: '400',
     }, ownerJar)
@@ -243,13 +243,13 @@ try {
   }
   {
     const r0 = await req('POST', '/api/employees', {
-      fullName: `${MARK} หัวหน้าไซต์ลบไม่ได้`, wageType: 'daily', dailyRate: '500',
+      fullName: `${MARK} หัวหน้าโครงการลบไม่ได้`, wageType: 'daily', dailyRate: '500',
     }, ownerJar)
     const id = (await r0.json().catch(() => ({}))).employee?.id
     if (id) made.push(id)
     const del = await req('DELETE', `/api/employees/${id}`, undefined, supJar)
     const still = (await sql(`select count(*)::int n from public.employees where id = '${id}'`)).rows[0].n
-    check('R7-API-04 หัวหน้าไซต์ยิง DELETE → 403 · แถวยังอยู่',
+    check('R7-API-04 หัวหน้าโครงการยิง DELETE → 403 · แถวยังอยู่',
       del.status === 403 && Number(still) === 1, `${del.status} · เหลือ ${still} แถว`)
   }
   {
@@ -259,14 +259,14 @@ try {
       Number(rows) === 0, `${rows} แถว`)
   }
 
-  // ── P4-UI-02 · หัวหน้าไซต์เข้าไม่ได้ ──────────────────────────────
+  // ── P4-UI-02 · หัวหน้าโครงการเข้าไม่ได้ ──────────────────────────────
   {
     const r = await fetch(`${BASE}/settings/users?tab=workers`, {
       headers: { cookie: supJar }, redirect: 'manual' })
     const loc = r.headers.get('location') ?? ''
     // ฝั่งบวก: หน้าที่เขาเข้าได้ยังเข้าได้อยู่
     const settings = await page('/settings', supJar)
-    check('P4-UI-02 หัวหน้าไซต์เปิดหน้าคนงาน → ถูก redirect ออก · /settings ยังเข้าได้',
+    check('P4-UI-02 หัวหน้าโครงการเปิดหน้าคนงาน → ถูก redirect ออก · /settings ยังเข้าได้',
       r.status === 307 && !loc.includes('/users') && settings.length > 500,
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }

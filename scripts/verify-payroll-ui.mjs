@@ -90,7 +90,7 @@ let runId = null
 
 try {
   ;[{ id: siteId }] = (await sql(
-    `insert into public.sites(name, status) values ('${MARK} ไซต์', 'active') returning id`)).rows
+    `insert into public.sites(name, status) values ('${MARK} โครงการ', 'active') returning id`)).rows
   ;[{ id: empId }] = (await sql(
     `insert into public.employees(full_name, job_title) values ('${MARK} สมพงษ์', 'ช่างไม้') returning id`)).rows
   await sql(`insert into public.employee_wages(employee_id, wage_type, daily_rate)
@@ -109,25 +109,25 @@ try {
       `คงเหลือบนจอ ฿${balanceOnPage(html, empId)}`)
   }
 
-  // ── P5-UI-02 · หัวหน้าไซต์เข้าไม่ได้ ──────────────────────────────
+  // ── P5-UI-02 · หัวหน้าโครงการเข้าไม่ได้ ──────────────────────────────
   {
     const r = await fetch(`${BASE}/payroll`, { headers: { cookie: supJar }, redirect: 'manual' })
     const loc = r.headers.get('location') ?? ''
     // ฝั่งบวก: หน้าที่เขาเข้าได้ยังเข้าได้อยู่
     const att = await page('/attendance', supJar)
-    check('P5-UI-02 หัวหน้าไซต์เปิด /payroll → ถูก redirect ออก · /attendance ยังเข้าได้',
-      r.status === 307 && !loc.includes('/payroll') && att.includes('คนเข้าไซต์'),
+    check('P5-UI-02 หัวหน้าโครงการเปิด /payroll → ถูก redirect ออก · /attendance ยังเข้าได้',
+      r.status === 307 && !loc.includes('/payroll') && att.includes('คนเข้าโครงการ'),
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }
 
-  // ── P5-API-01 · หัวหน้าไซต์บันทึกเบิกไม่ได้ ───────────────────────
+  // ── P5-API-01 · หัวหน้าโครงการบันทึกเบิกไม่ได้ ───────────────────────
   {
     const before = await countOf('advances')
     const r = await req('POST', '/api/advances', {
       employeeId: empId, amount: '500', advanceDate: today }, supJar)
     const b = await r.json().catch(() => ({}))
     const after = await countOf('advances')
-    check('P5-API-01 หัวหน้าไซต์ยิง POST /api/advances → 403 FORBIDDEN · ไม่มีแถวใหม่',
+    check('P5-API-01 หัวหน้าโครงการยิง POST /api/advances → 403 FORBIDDEN · ไม่มีแถวใหม่',
       r.status === 403 && b.error === 'FORBIDDEN' && after === before,
       `${r.status} ${b.error} · ${before}→${after}`)
   }

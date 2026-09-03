@@ -82,7 +82,7 @@ let siteId = null
 
 try {
   ;[{ id: siteId }] = (await sql(
-    "insert into public.sites(name, status) values ('ทดสอบกระดิ่ง ไซต์ก', 'active') returning id")).rows
+    "insert into public.sites(name, status) values ('ทดสอบกระดิ่ง โครงการก', 'active') returning id")).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${siteId}','${sup1.id}')`)
 
@@ -95,7 +95,7 @@ try {
     return b.transaction?.id ?? b.id ?? null
   }
 
-  // หัวหน้าไซต์คีย์ → เจ้าของได้แจ้งเตือน · เจ้าของตีกลับ → หัวหน้าไซต์ได้แจ้งเตือน
+  // หัวหน้าโครงการคีย์ → เจ้าของได้แจ้งเตือน · เจ้าของตีกลับ → หัวหน้าโครงการได้แจ้งเตือน
   const idA = await mk(1200, 'ค่าปูนทดสอบกระดิ่ง')
   const idB = await mk(3400, 'ค่าเหล็กทดสอบกระดิ่ง')
   if (!idA || !idB) throw new Error('สร้างรายการทดสอบไม่สำเร็จ')
@@ -121,10 +121,10 @@ try {
     const supN = await unreadOf(sup1.id)
     const ownerHtml = await page('/', ownerJar)
     const supHtml = await page('/', supJar)
-    check('P3-UI-09 กระดิ่งของแต่ละคนนับเฉพาะของตัวเอง — เจ้าของกับหัวหน้าไซต์ได้คนละเลข',
+    check('P3-UI-09 กระดิ่งของแต่ละคนนับเฉพาะของตัวเอง — เจ้าของกับหัวหน้าโครงการได้คนละเลข',
       ownerN !== supN && supN > 0
       && badge(ownerHtml) === ownerN && badge(supHtml) === supN,
-      `เจ้าของ จอ ${badge(ownerHtml)}/SQL ${ownerN} · หัวหน้าไซต์ จอ ${badge(supHtml)}/SQL ${supN}`)
+      `เจ้าของ จอ ${badge(ownerHtml)}/SQL ${ownerN} · หัวหน้าโครงการ จอ ${badge(supHtml)}/SQL ${supN}`)
   }
 
   // ── P3-API-05 · ไม่ล็อกอิน ────────────────────────────────────────
@@ -169,7 +169,7 @@ try {
     const [afterGood] = (await sql(
       `select read_at from public.notifications where id = '${supNote.id}'`)).rows
 
-    check('P3-API-06 หัวหน้าไซต์ทำแจ้งเตือนของเจ้าของเป็นอ่านแล้วไม่ได้ (404 · read_at ยัง null) แต่ของตัวเองได้',
+    check('P3-API-06 หัวหน้าโครงการทำแจ้งเตือนของเจ้าของเป็นอ่านแล้วไม่ได้ (404 · read_at ยัง null) แต่ของตัวเองได้',
       bad.status === 404 && afterBad.read_at === null
       && good.status === 200 && Boolean(afterGood.read_at),
       `ของคนอื่น ${bad.status}/read_at=${afterBad.read_at} · ของตัวเอง ${good.status}/read_at=${Boolean(afterGood.read_at)}`)
@@ -197,7 +197,7 @@ try {
     check('P3-API-07 อ่านทั้งหมด → 200 · ของตัวเองเหลือ 0 · ของอีกคนไม่เปลี่ยน',
       r.status === 200 && typeof b.updated === 'number' && b.updated > 0
       && ownerAfter === 0 && supAfter === supBefore,
-      `${r.status} updated=${b.updated} · เจ้าของเหลือ ${ownerAfter} · หัวหน้าไซต์ ${supBefore}→${supAfter}`)
+      `${r.status} updated=${b.updated} · เจ้าของเหลือ ${ownerAfter} · หัวหน้าโครงการ ${supBefore}→${supAfter}`)
 
     // ── P3-UI-08 · ไม่มีของค้าง = ไม่มีป้าย ─────────────────────────
     const html = await page('/', ownerJar)

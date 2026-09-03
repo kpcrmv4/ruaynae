@@ -246,7 +246,7 @@ test.describe('P8-E2E-05 · โหมดสว่างและมืด', () =
 })
 
 test.describe('P8-E2E-07 · loading.tsx ต้องไม่กลืนสถานะ 404', () => {
-  test('P8-E2E-07 ไซต์ที่ไม่มีอยู่จริงตอบ 404 ไม่ใช่ 200', async ({ request }) => {
+  test('P8-E2E-07 โครงการที่ไม่มีอยู่จริงตอบ 404 ไม่ใช่ 200', async ({ request }) => {
     // 🔴 `loading.tsx` เปลี่ยน segment เป็นสตรีม ซึ่งทำให้ `notFound()`
     // ตั้งรหัสสถานะไม่ได้ · ถ้าแถวนี้แดง ให้ถอด loading.tsx ของ segment นั้นออก
     const res = await request.get('/sites/00000000-0000-0000-0000-000000000000')

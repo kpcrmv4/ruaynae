@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { TxnEditButton } from '@/components/ledger/txn-edit'
 
 /**
- * หนึ่งแถวของรายรับ-รายจ่าย — รูปเดียวกันทั้ง `/ledger` และหน้าไซต์
+ * หนึ่งแถวของรายรับ-รายจ่าย — รูปเดียวกันทั้ง `/ledger` และหน้าโครงการ
  *
  * เป็น Server Component · ปุ่มแก้ไข (`TxnEditButton`) เป็น client island
  * ใบเล็กที่แขวนอยู่ท้ายแถว และมันเป็นคนตัดสินเองว่าจะวาดปุ่มไหม จาก role
@@ -41,9 +41,9 @@ export function TxnRow({
   showDate = false,
 }: {
   txn: TxnRowData
-  /** ปิดเมื่ออยู่ในหน้าไซต์ — ชิปชื่อไซต์เดิมซ้ำทุกแถวคือหมึกที่ไม่บอกอะไร */
+  /** ปิดเมื่ออยู่ในหน้าโครงการ — ชิปชื่อโครงการเดิมซ้ำทุกแถวคือหมึกที่ไม่บอกอะไร */
   showSite?: boolean
-  /** เปิดเมื่อลิสต์ไม่ได้จัดกลุ่มตามวัน (หน้าไซต์) */
+  /** เปิดเมื่อลิสต์ไม่ได้จัดกลุ่มตามวัน (หน้าโครงการ) */
   showDate?: boolean
 }) {
   return (
@@ -57,12 +57,12 @@ export function TxnRow({
           <span className="truncate font-semibold text-ink">
             {t.categories?.name ?? 'ไม่มีหมวด'}
           </span>
-          {/* ผูกไซต์ = ชิปขอบทึบ · ส่วนกลาง = ชิปขอบประ (DESIGN §5.2)
+          {/* ผูกโครงการ = ชิปขอบทึบ · ส่วนกลาง = ชิปขอบประ (DESIGN §5.2)
               ต้องแยกออกในแวบเดียวเพราะสองอย่างนี้เข้าคนละยอดรวม */}
           {showSite &&
             (t.site_id ? (
               <span className="chip border border-brand-tint-strong bg-brand-tint text-brand-on-tint ring-0">
-                {t.sites?.name ?? 'ไซต์'}
+                {t.sites?.name ?? 'โครงการ'}
               </span>
             ) : (
               <span className="chip border border-dashed border-line-strong text-muted-token ring-0">

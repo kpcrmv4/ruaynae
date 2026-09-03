@@ -61,7 +61,7 @@ const [owner] = await sql("select id from public.profiles where role = 'owner' l
 const sups = await sql(
   "select id, full_name from public.profiles where role = 'site_supervisor' order by created_at")
 if (!owner) throw new Error('ยังไม่มีบัญชีเจ้าของ — รัน `node scripts/seed-users.mjs` ก่อน')
-if (sups.length < 2) throw new Error('ต้องมีหัวหน้าไซต์อย่างน้อยสองคน — รัน `node scripts/seed-users.mjs` ก่อน')
+if (sups.length < 2) throw new Error('ต้องมีหัวหน้าโครงการอย่างน้อยสองคน — รัน `node scripts/seed-users.mjs` ก่อน')
 
 const [expCat] = await sql(
   "select id from public.categories where kind='expense' and name like 'ค่าวัสดุ%' limit 1")
@@ -71,7 +71,7 @@ const [incCat] = await sql(
   "select id from public.categories where kind='income' order by sort_order limit 1")
 
 /**
- * สร้างไซต์ทั้งชุดในคำสั่งเดียว
+ * สร้างโครงการทั้งชุดในคำสั่งเดียว
  *
  * 🔴 หนึ่งแถวหนึ่ง request ไม่ได้ — Management API มี rate limit
  * และ seed ที่ยิงแปดสิบครั้งจะโดน `ThrottlerException` กลางทาง
@@ -101,7 +101,7 @@ async function seedSites(rows) {
       values ${values}
     )`
 
-  // คำสั่งที่ 1 — สร้างไซต์ที่ยังไม่มี
+  // คำสั่งที่ 1 — สร้างโครงการที่ยังไม่มี
   await sql(`
     with ${wanted}
     insert into public.sites(name, client_name, client_phone, address, start_date, end_date, status)
@@ -125,7 +125,7 @@ async function seedSites(rows) {
   return new Map(out.map((r) => [r.name, r.id]))
 }
 
-// ── ไซต์ที่ครอบทุกสถานะที่การ์ดวาดได้ ────────────────────────────────
+// ── โครงการที่ครอบทุกสถานะที่การ์ดวาดได้ ────────────────────────────────
 // 1) ใกล้ครบกำหนด + กำไรดี   2) ต้นทุนแซงเงินที่เก็บได้   3) ยังไม่ได้ตั้งค่างาน
 // 4) ปิดงานแล้ว              5) วางแผนไว้ ยังไม่เริ่ม
 const SITES = [
@@ -150,10 +150,10 @@ const siteA = siteIds.get(SITES[0].name)
 const siteB = siteIds.get(SITES[1].name)
 const siteC = siteIds.get(SITES[2].name)
 
-// ── หัวหน้าไซต์ ──────────────────────────────────────────────────────
-// 🔴 คนหนึ่งคนดูแลได้ทีละไซต์ — `site_supervisors` มี exclusion constraint
-// กันช่วงเวลาซ้อนกัน (P1) · seed ที่ผูกคนเดียวสองไซต์พร้อมกันจะถูกปฏิเสธ
-// ซึ่งถูกแล้ว · ไซต์ C จงใจไม่มีใครดูแล — เป็นสถานะที่หน้าจอต้องวาดได้ด้วย
+// ── หัวหน้าโครงการ ──────────────────────────────────────────────────────
+// 🔴 คนหนึ่งคนดูแลได้ทีละโครงการ — `site_supervisors` มี exclusion constraint
+// กันช่วงเวลาซ้อนกัน (P1) · seed ที่ผูกคนเดียวสองโครงการพร้อมกันจะถูกปฏิเสธ
+// ซึ่งถูกแล้ว · โครงการ C จงใจไม่มีใครดูแล — เป็นสถานะที่หน้าจอต้องวาดได้ด้วย
 await sql(`
   insert into public.site_supervisors(site_id, profile_id, effective_from)
   select v.site_id::uuid, v.profile_id::uuid, v.d::date
@@ -165,7 +165,7 @@ await sql(`
     select 1 from public.site_supervisors x
     where x.site_id = v.site_id::uuid and x.profile_id = v.profile_id::uuid)`)
 
-// ── แผนงวดของไซต์ A ─────────────────────────────────────────────────
+// ── แผนงวดของโครงการ A ─────────────────────────────────────────────────
 await sql(`
   insert into public.site_milestones(site_id, seq, name, planned_amount, planned_date)
   select ${q(siteA)}, v.seq, v.name, v.amount, v.d::date
@@ -182,8 +182,8 @@ await sql(`
     where m.site_id = ${q(siteA)} and m.seq = v.seq)`)
 
 // ── รายรับและรายจ่าย ────────────────────────────────────────────────
-// ไซต์ A เก็บได้ ฿2,280,000 (80%) · รายจ่ายอนุมัติ ฿1,700,000 → กำไรยังบวก
-// ไซต์ B เก็บได้ ฿1,680,000 (40%) · ต้นทุน ฿1,970,000 (47%) → ป้ายต้นทุนแซง
+// โครงการ A เก็บได้ ฿2,280,000 (80%) · รายจ่ายอนุมัติ ฿1,700,000 → กำไรยังบวก
+// โครงการ B เก็บได้ ฿1,680,000 (40%) · ต้นทุน ฿1,970,000 (47%) → ป้ายต้นทุนแซง
 const TXNS = [
   // [kind, site, amount, date, method, status, note, incomeKind, seq, reason, by]
   ['income', siteA, 285000, day(-150), 'transfer', 'approved', 'เงินมัดจำ', 'deposit', null, null, null],
@@ -206,7 +206,7 @@ const TXNS = [
   ['expense', siteB, 520000, day(-25), 'transfer', 'approved', 'ค่าเทพื้นคอนกรีตโกดัง', null, null, null, sups[1].id],
   ['expense', siteB, 88000, day(-2), 'cash', 'pending', 'ค่าเช่ารถเครนรายวัน', null, null, null, sups[1].id],
   ['expense', siteC, 221900, day(-10), 'cash', 'approved', 'ค่ารื้อถอนและวัสดุรีโนเวท', null, null, null, null],
-  // ส่วนกลาง — ต้องไม่ถูกนับเข้าไซต์ไหน
+  // ส่วนกลาง — ต้องไม่ถูกนับเข้าโครงการไหน
   ['expense', null, 12500, day(-5), 'cash', 'approved', 'ค่าน้ำมันรถกระบะเดือนนี้', null, null, null, null],
   ['expense', null, 8900, day(-4), 'transfer', 'approved', 'ค่าเช่าออฟฟิศและอินเทอร์เน็ต', null, null, null, null],
 ]
@@ -264,7 +264,7 @@ const empRows = await sql(
   `select id, full_name from public.employees where full_name in (${WORKERS.map((w) => q(w[0])).join(', ')})`)
 const emp = new Map(empRows.map((r) => [r.full_name, r.id]))
 
-// ── ลงชื่อเข้าไซต์ย้อนหลัง — ค่าแรงเข้าต้นทุนไซต์ทันที ───────────────
+// ── ลงชื่อเข้าโครงการย้อนหลัง — ค่าแรงเข้าต้นทุนโครงการทันที ───────────────
 // สมพงษ์ 6 วัน × ฿550 = ฿3,300 (ตัวเลขเดียวกับตัวอย่างใน DESIGN.md §5.4)
 const CREW = [
   ['สมพงษ์ ใจดี', siteA, 6], ['บุญมี แซ่ลิ้ม', siteA, 5], ['วิชัย ทองสุข', siteA, 6],
@@ -297,7 +297,7 @@ await sql(`
     select 1 from public.advances a
     where a.employee_id = v.emp::uuid and a.amount = v.amount)`)
 
-console.log('  ✅ ไซต์ 5 แห่ง · รายรับ 8 · รายจ่าย 12 · คนงาน 6 · ลงชื่อ 27 วัน · เบิก 2 ใบ')
+console.log('  ✅ โครงการ 5 แห่ง · รายรับ 8 · รายจ่าย 12 · คนงาน 6 · ลงชื่อ 27 วัน · เบิก 2 ใบ')
 
 // ── ตรวจว่ายอดที่ได้ตรงกับที่ตั้งใจ ─────────────────────────────────
 // 🔴 ไม่ได้เขียนยอดรวมลงฐานข้อมูลเลย — ให้ RPC เดียวกับที่หน้าจอใช้เป็นคนบวก
@@ -336,12 +336,12 @@ for (const row of money) {
     ` · ต้นทุน ฿${cost.toLocaleString()} (${costPct}%) · กำไรคงเหลือ ฿${(contract - cost).toLocaleString()}`,
   )
   if (row.name.startsWith('บ้านคุณสมศักดิ์')) {
-    if (income !== 2280000) problems.push(`ไซต์ A เก็บเงินควรเป็น ฿2,280,000 แต่ได้ ฿${income}`)
-    if (paidPct <= costPct) problems.push('ไซต์ A ไม่ควรขึ้นป้ายต้นทุนแซง')
+    if (income !== 2280000) problems.push(`โครงการ A เก็บเงินควรเป็น ฿2,280,000 แต่ได้ ฿${income}`)
+    if (paidPct <= costPct) problems.push('โครงการ A ไม่ควรขึ้นป้ายต้นทุนแซง')
   }
   if (row.name.startsWith('โกดัง')) {
-    if (income !== 1680000) problems.push(`ไซต์ B เก็บเงินควรเป็น ฿1,680,000 แต่ได้ ฿${income}`)
-    if (costPct <= paidPct) problems.push('ไซต์ B ต้องขึ้นป้ายต้นทุนแซง แต่ต้นทุนยังไม่แซง')
+    if (income !== 1680000) problems.push(`โครงการ B เก็บเงินควรเป็น ฿1,680,000 แต่ได้ ฿${income}`)
+    if (costPct <= paidPct) problems.push('โครงการ B ต้องขึ้นป้ายต้นทุนแซง แต่ต้นทุนยังไม่แซง')
   }
 }
 

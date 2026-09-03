@@ -85,9 +85,9 @@ let mineId = null
 let othersId = null
 try {
   ;[{ id: mineId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ P2 ไซต์ของหัวหน้า') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ P2 โครงการของหัวหน้า') returning id`)).rows
   ;[{ id: othersId }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ P2 ไซต์คนอื่น') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ P2 โครงการคนอื่น') returning id`)).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${mineId}','${sup1.id}')`)
 
@@ -106,7 +106,7 @@ try {
     amount: 1000, txn_date: today, pay_method: 'cash', ...over,
   })
 
-  // ── P2-DB-01 · หัวหน้าไซต์คีย์รายจ่ายของไซต์ตัวเอง ────────────────
+  // ── P2-DB-01 · หัวหน้าโครงการคีย์รายจ่ายของโครงการตัวเอง ────────────────
   let mineTxn = null
   {
     const before = await txnCount()
@@ -116,23 +116,23 @@ try {
     const { rows: audit } = await sql(
       `select count(*)::int as n from public.audit_log
        where table_name='transactions' and action='INSERT' and row_id='${mineTxn}'`)
-    check('P2-DB-01 หัวหน้าไซต์คีย์รายจ่ายไซต์ตัวเองได้ · status=pending · มี audit',
+    check('P2-DB-01 หัวหน้าโครงการคีย์รายจ่ายโครงการตัวเองได้ · status=pending · มี audit',
       r.status === 201 && after === before + 1
       && r.body?.[0]?.status === 'pending' && audit[0].n === 1,
       `${r.status} · ${before}→${after} · status ${r.body?.[0]?.status} · audit ${audit[0].n}`)
   }
 
-  // ── P2-DB-02 · ไซต์ที่ไม่ได้ดูแล ──────────────────────────────────
+  // ── P2-DB-02 · โครงการที่ไม่ได้ดูแล ──────────────────────────────────
   {
     const before = await txnCount()
     const bad = await post(supTok, expense({ site_id: othersId }))
     const mid = await txnCount()
-    // ครึ่งบวก: ของไซต์ตัวเองยังเขียนได้ในคำสั่งถัดไป → ตารางไม่ได้พัง
+    // ครึ่งบวก: ของโครงการตัวเองยังเขียนได้ในคำสั่งถัดไป → ตารางไม่ได้พัง
     const good = await post(supTok, expense({ amount: 250 }))
     const after = await txnCount()
-    check('P2-DB-02 หัวหน้าไซต์คีย์รายจ่ายไซต์ที่ไม่ได้ดูแลไม่ได้ · ของตัวเองยังได้',
+    check('P2-DB-02 หัวหน้าโครงการคีย์รายจ่ายโครงการที่ไม่ได้ดูแลไม่ได้ · ของตัวเองยังได้',
       bad.status >= 400 && mid === before && good.status === 201 && after === before + 1,
-      `ไซต์คนอื่น ${bad.status} · ${before}→${mid}→${after}`)
+      `โครงการคนอื่น ${bad.status} · ${before}→${mid}→${after}`)
   }
 
   // ── P2-DB-03 · ตั้ง status='approved' ตอน insert ──────────────────
@@ -141,7 +141,7 @@ try {
     const before = await txnCount()
     const r = await post(supTok, expense({ status: 'approved' }))
     const after = await txnCount()
-    check('P2-DB-03 หัวหน้าไซต์ตั้ง status=approved ตอนสร้าง → APPROVE_FORBIDDEN',
+    check('P2-DB-03 หัวหน้าโครงการตั้ง status=approved ตอนสร้าง → APPROVE_FORBIDDEN',
       /APPROVE_FORBIDDEN/.test(msgOf(r)) && after === before,
       `${r.status} · ${msgOf(r).slice(0, 60)}`)
   }
@@ -155,7 +155,7 @@ try {
     })
     const { rows } = await sql(
       `select status::text as s from public.transactions where id='${mineTxn}'`)
-    check('P2-DB-04 หัวหน้าไซต์อนุมัติรายการตัวเองไม่ได้ → APPROVE_FORBIDDEN · ยัง pending',
+    check('P2-DB-04 หัวหน้าโครงการอนุมัติรายการตัวเองไม่ได้ → APPROVE_FORBIDDEN · ยัง pending',
       /APPROVE_FORBIDDEN/.test(msgOf(r)) && rows[0].s === 'pending',
       `${r.status} · สถานะ ${rows[0].s}`)
   }
@@ -216,10 +216,10 @@ try {
       `${r.status} · ${rows[0].s} · audit ${audit[0].n}`)
   }
 
-  // ── P2-DB-05 · ยอดของรายการที่อนุมัติแล้ว — หัวหน้าไซต์แตะไม่ได้ ────
+  // ── P2-DB-05 · ยอดของรายการที่อนุมัติแล้ว — หัวหน้าโครงการแตะไม่ได้ ────
   // 🔴 แก้ความหมายเมื่อ R4: **เจ้าของ**แก้ได้แล้ว (รายการที่เจ้าของคีย์เอง
   // เกิดมาเป็น approved ทันที ล็อกไว้แปลว่าพิมพ์ผิดแล้วแก้ไม่ได้ตลอดกาล)
-  // ส่วนหัวหน้าไซต์ยังแตะไม่ได้เหมือนเดิม — การอนุมัติจึงยังมีความหมาย
+  // ส่วนหัวหน้าโครงการยังแตะไม่ได้เหมือนเดิม — การอนุมัติจึงยังมีความหมาย
   {
     const blocked = await db(supTok, `/transactions?id=eq.${mineTxn}`, {
       method: 'PATCH',
@@ -228,7 +228,7 @@ try {
     })
     const { rows: kept } = await sql(
       `select amount::float8 as a from public.transactions where id='${mineTxn}'`)
-    check('P2-DB-05 หัวหน้าไซต์แก้ยอดของรายการที่อนุมัติแล้วไม่ได้ · ยอดเดิมคงอยู่',
+    check('P2-DB-05 หัวหน้าโครงการแก้ยอดของรายการที่อนุมัติแล้วไม่ได้ · ยอดเดิมคงอยู่',
       kept[0].a === 1000 && (blocked.status === 200 ? blocked.body?.length === 0 : true),
       `${blocked.status} · ยอด ${kept[0].a}`)
 
@@ -248,14 +248,14 @@ try {
       `${r.status} · ยอด ${rows[0].a} · audit ${audit[0].n}`)
   }
 
-  // ── P2-DB-11 · ลบรายการที่ approved แล้ว — หัวหน้าไซต์ไม่ได้ เจ้าของได้ ──
+  // ── P2-DB-11 · ลบรายการที่ approved แล้ว — หัวหน้าโครงการไม่ได้ เจ้าของได้ ──
   // 🔴 แก้ความหมายเมื่อ R4 ด้วยเหตุผลเดียวกับ P2-DB-05 · ร่องรอยของแถวที่
   // ถูกลบยังอยู่ครบใน audit_log ซึ่งเป็นที่ที่ความรับผิดชอบอยู่จริง
   {
     const before = await txnCount()
     const blocked = await db(supTok, `/transactions?id=eq.${mineTxn}`, { method: 'DELETE' })
     const still = await txnCount()
-    check('P2-DB-11 หัวหน้าไซต์ลบรายการที่อนุมัติแล้วไม่ได้ · จำนวนเท่าเดิม',
+    check('P2-DB-11 หัวหน้าโครงการลบรายการที่อนุมัติแล้วไม่ได้ · จำนวนเท่าเดิม',
       still === before, `${blocked.status} · ${before}→${still}`)
 
     const r = await db(ownerTok, `/transactions?id=eq.${mineTxn}`, { method: 'DELETE' })
@@ -269,7 +269,7 @@ try {
       `${r.status} · ${before}→${after} · audit ${audit[0].n}`)
   }
 
-  // ── P2-DB-07 · หัวหน้าไซต์คีย์รายรับไม่ได้ ────────────────────────
+  // ── P2-DB-07 · หัวหน้าโครงการคีย์รายรับไม่ได้ ────────────────────────
   {
     const before = await txnCount()
     const r = await post(supTok, {
@@ -277,11 +277,11 @@ try {
       amount: 500000, txn_date: today, pay_method: 'transfer', income_kind: 'deposit',
     })
     const after = await txnCount()
-    check('P2-DB-07 หัวหน้าไซต์บันทึกรายรับไม่ได้ → ถูกปฏิเสธ · จำนวนเท่าเดิม',
+    check('P2-DB-07 หัวหน้าโครงการบันทึกรายรับไม่ได้ → ถูกปฏิเสธ · จำนวนเท่าเดิม',
       r.status >= 400 && after === before, `${r.status} · ${msgOf(r).slice(0, 50)}`)
   }
 
-  // ── P2-DB-08 · หัวหน้าไซต์อ่านรายรับของไซต์ตัวเองไม่ได้ ───────────
+  // ── P2-DB-08 · หัวหน้าโครงการอ่านรายรับของโครงการตัวเองไม่ได้ ───────────
   {
     await sql(`insert into public.transactions(kind, site_id, category_id, amount, txn_date,
                  pay_method, status, income_kind)
@@ -290,22 +290,22 @@ try {
     const inc = await db(supTok, `/transactions?select=id&kind=eq.income&site_id=eq.${mineId}`)
     const exp = await db(supTok, `/transactions?select=id&kind=eq.expense&site_id=eq.${mineId}`)
     const ownerInc = await db(ownerTok, `/transactions?select=id&kind=eq.income&site_id=eq.${mineId}`)
-    check('P2-DB-08 หัวหน้าไซต์เห็นรายรับ 0 แถว · เห็นรายจ่ายของไซต์เดียวกัน > 0 · เจ้าของเห็นรายรับ',
+    check('P2-DB-08 หัวหน้าโครงการเห็นรายรับ 0 แถว · เห็นรายจ่ายของโครงการเดียวกัน > 0 · เจ้าของเห็นรายรับ',
       (Array.isArray(inc.body) ? inc.body.length : -1) === 0
       && exp.body?.length > 0 && ownerInc.body?.length > 0,
       `รายรับ ${Array.isArray(inc.body) ? inc.body.length : inc.status} · รายจ่าย ${exp.body?.length} · เจ้าของ ${ownerInc.body?.length}`)
   }
 
-  // ── P2-DB-09 · รายจ่ายส่วนกลางไม่หลุดไปหาหัวหน้าไซต์ ──────────────
+  // ── P2-DB-09 · รายจ่ายส่วนกลางไม่หลุดไปหาหัวหน้าโครงการ ──────────────
   {
     await sql(`insert into public.transactions(kind, site_id, category_id, amount, txn_date,
                  pay_method, status)
                values ('expense', null, '${expCat.id}', 777, '${today}', 'cash', 'approved')`)
     const sup = await db(supTok, '/transactions?select=id&site_id=is.null')
     const own = await db(ownerTok, '/transactions?select=id&site_id=is.null')
-    check('P2-DB-09 หัวหน้าไซต์เห็นรายจ่ายส่วนกลาง 0 แถว · เจ้าของเห็น > 0',
+    check('P2-DB-09 หัวหน้าโครงการเห็นรายจ่ายส่วนกลาง 0 แถว · เจ้าของเห็น > 0',
       (Array.isArray(sup.body) ? sup.body.length : -1) === 0 && own.body?.length > 0,
-      `หัวหน้าไซต์ ${Array.isArray(sup.body) ? sup.body.length : sup.status} · เจ้าของ ${own.body?.length}`)
+      `หัวหน้าโครงการ ${Array.isArray(sup.body) ? sup.body.length : sup.status} · เจ้าของ ${own.body?.length}`)
   }
 
   // ── P2-DB-10 · anon ไม่เห็นอะไรเลย ────────────────────────────────
@@ -377,9 +377,9 @@ let tempCategoryId = null
 const apiTxns = []
 try {
   ;[{ id: apiSite }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ P2API ไซต์ของหัวหน้า') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ P2API โครงการของหัวหน้า') returning id`)).rows
   ;[{ id: apiOther }] = (await sql(
-    `insert into public.sites(name) values ('ทดสอบ P2API ไซต์คนอื่น') returning id`)).rows
+    `insert into public.sites(name) values ('ทดสอบ P2API โครงการคนอื่น') returning id`)).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id)
              values ('${apiSite}','${sup1.id}')`)
 
@@ -415,12 +415,12 @@ try {
       bad.length === 0, bad.length ? bad.join(' · ') : '3/3')
   }
 
-  // ── P2-API-02 · หัวหน้าไซต์บันทึกรายรับ ───────────────────────────
+  // ── P2-API-02 · หัวหน้าโครงการบันทึกรายรับ ───────────────────────────
   {
     const before = await txnCount()
     const r = await create(supJar, { kind: 'income', categoryId: incCat.id, incomeKind: 'deposit' })
     const after = await txnCount()
-    check('P2-API-02 หัวหน้าไซต์ POST รายรับ → 403 INCOME_FORBIDDEN · ไม่มีแถวใหม่',
+    check('P2-API-02 หัวหน้าโครงการ POST รายรับ → 403 INCOME_FORBIDDEN · ไม่มีแถวใหม่',
       r.status === 403 && r.body.error === 'INCOME_FORBIDDEN' && after === before,
       `${r.status} ${r.body.error} · ${before}→${after}`)
   }
@@ -432,18 +432,18 @@ try {
     supTxn = r.body.transaction?.id
     const { rows } = await sql(
       `select status::text as s from public.transactions where id='${supTxn}'`)
-    check('P2-API-07 หัวหน้าไซต์ส่ง status=approved มาด้วย → ถูกเพิกเฉย แถวเป็น pending',
+    check('P2-API-07 หัวหน้าโครงการส่ง status=approved มาด้วย → ถูกเพิกเฉย แถวเป็น pending',
       r.status === 201 && rows[0].s === 'pending', `${r.status} · สถานะ ${rows[0].s}`)
   }
 
-  // ── P2-API-03 · หัวหน้าไซต์อนุมัติผ่าน API ────────────────────────
+  // ── P2-API-03 · หัวหน้าโครงการอนุมัติผ่าน API ────────────────────────
   {
     const r = await req('PATCH', `/api/transactions/${supTxn}`,
       { action: 'approve' }, { cookie: supJar })
     const b = await r.json().catch(() => ({}))
     const { rows } = await sql(
       `select status::text as s from public.transactions where id='${supTxn}'`)
-    check('P2-API-03 หัวหน้าไซต์ PATCH approve → 403 · สถานะยัง pending',
+    check('P2-API-03 หัวหน้าโครงการ PATCH approve → 403 · สถานะยัง pending',
       r.status === 403 && rows[0].s === 'pending', `${r.status} ${b.error} · ${rows[0].s}`)
   }
 
@@ -503,26 +503,26 @@ try {
   {
     const sup = await page('/entry', supJar)
     const own = await page('/entry', ownerJar)
-    check('P2-UI-01 P2-UI-02 หัวหน้าไซต์ไม่มีปุ่มสลับไปรายรับ · เจ้าของมีทั้งสองปุ่ม',
+    check('P2-UI-01 P2-UI-02 หัวหน้าโครงการไม่มีปุ่มสลับไปรายรับ · เจ้าของมีทั้งสองปุ่ม',
       !sup.includes('aria-pressed') && sup.includes('บันทึกรายจ่าย')
       && own.includes('aria-pressed') && own.includes('รายรับ'),
-      `หัวหน้าไซต์มีปุ่มสลับ=${sup.includes('aria-pressed')} · เจ้าของมี=${own.includes('aria-pressed')}`)
+      `หัวหน้าโครงการมีปุ่มสลับ=${sup.includes('aria-pressed')} · เจ้าของมี=${own.includes('aria-pressed')}`)
   }
 
-  // ── P2-UI-03 / 04 · ตัวเลือกไซต์ ──────────────────────────────────
+  // ── P2-UI-03 / 04 · ตัวเลือกโครงการ ──────────────────────────────────
   {
     const sup = await page('/entry', supJar)
     const own = await page('/entry', ownerJar)
-    check('P2-UI-03 P2-UI-04 หัวหน้าไซต์เห็นเฉพาะไซต์ตัวเองและไม่มี "ส่วนกลาง" · เจ้าของมีครบ',
-      sup.includes('ทดสอบ P2API ไซต์ของหัวหน้า')
-      && !sup.includes('ทดสอบ P2API ไซต์คนอื่น')
-      && !sup.includes('ส่วนกลาง (ไม่ผูกไซต์)')
-      && own.includes('ทดสอบ P2API ไซต์คนอื่น')
-      && own.includes('ส่วนกลาง (ไม่ผูกไซต์)'),
+    check('P2-UI-03 P2-UI-04 หัวหน้าโครงการเห็นเฉพาะโครงการตัวเองและไม่มี "ส่วนกลาง" · เจ้าของมีครบ',
+      sup.includes('ทดสอบ P2API โครงการของหัวหน้า')
+      && !sup.includes('ทดสอบ P2API โครงการคนอื่น')
+      && !sup.includes('ส่วนกลาง (ไม่ผูกโครงการ)')
+      && own.includes('ทดสอบ P2API โครงการคนอื่น')
+      && own.includes('ส่วนกลาง (ไม่ผูกโครงการ)'),
       'ตรวจทั้งฝั่งมีและฝั่งไม่มี')
   }
 
-  // ── P2-API-09 · หัวหน้าไซต์เพิ่มหมวดไม่ได้ ─────────────────────────
+  // ── P2-API-09 · หัวหน้าโครงการเพิ่มหมวดไม่ได้ ─────────────────────────
   {
     const catCount = async () =>
       (await sql('select count(*)::int as n from public.categories')).rows[0].n
@@ -536,7 +536,7 @@ try {
       { name: 'ทดสอบ หมวดชั่วคราว', kind: 'expense', sortOrder: 950 }, { cookie: ownerJar })
     const ob = await own.json().catch(() => ({}))
     if (ob.category?.id) tempCategoryId = ob.category.id
-    check('P2-API-09 หัวหน้าไซต์ POST หมวด → 403 · ไม่มีแถวใหม่ · เจ้าของเพิ่มได้',
+    check('P2-API-09 หัวหน้าโครงการ POST หมวด → 403 · ไม่มีแถวใหม่ · เจ้าของเพิ่มได้',
       r.status === 403 && b.error === 'FORBIDDEN' && after === before && own.status === 201
       && ob.category?.sort_order === 950,
       `${r.status} ${b.error} · ${before}→${after} · เจ้าของ ${own.status} ลำดับ ${ob.category?.sort_order}`)

@@ -32,7 +32,7 @@ export function EntryForm({
   categories: Category[]
   /** เปิดหน้าจากแผ่นบันทึกประจำวันด้วย ?kind=income — หน้า page กรอง role ให้แล้ว */
   initialKind?: TxnKind
-  /** เปิดหน้าจากปุ่มลัดบนหน้าไซต์ด้วย ?site= — หน้า page ตรวจแล้วว่าไซต์นี้เลือกได้จริง */
+  /** เปิดหน้าจากปุ่มลัดบนหน้าโครงการด้วย ?site= — หน้า page ตรวจแล้วว่าโครงการนี้เลือกได้จริง */
   initialSiteId?: string
 }) {
   const router = useRouter()
@@ -73,7 +73,7 @@ export function EntryForm({
   const switchKind = (next: TxnKind) => {
     setKind(next)
     // หมวดของอีกชนิดใช้ไม่ได้ — ล้างทิ้งแทนที่จะปล่อยให้ส่งไปแล้วโดนปฏิเสธ
-    // ไซต์ที่เลือกไว้ต้องอยู่ต่อ (เข้ามาจากปุ่มลัดของไซต์ก็ยังเป็นไซต์นั้น) —
+    // โครงการที่เลือกไว้ต้องอยู่ต่อ (เข้ามาจากปุ่มลัดของโครงการก็ยังเป็นโครงการนั้น) —
     // ยกเว้น "ส่วนกลาง" ซึ่งฝั่งรายรับไม่มีตัวเลือกนี้
     setForm((f) => ({
       ...f,
@@ -101,7 +101,7 @@ export function EntryForm({
       setSlips((cur) => [...cur, slip])
     } catch (e) {
       // แสดงเฉพาะข้อความที่เราเขียนเอง — error จากเบราว์เซอร์หรือจากการโหลด
-      // chunk เป็นภาษาอังกฤษล้วน และไม่บอกอะไรกับคนที่ยืนอยู่กลางไซต์
+      // chunk เป็นภาษาอังกฤษล้วน และไม่บอกอะไรกับคนที่ยืนอยู่กลางโครงการ
       toast.error(slipUploadError(e))
     } finally {
       setUploading(false)
@@ -127,7 +127,7 @@ export function EntryForm({
     if (busy) return
     if (!amountValid) return setFieldError({ field: 'amount', text: 'จำนวนเงินต้องมากกว่า 0' })
     if (!form.categoryId) return setFieldError({ field: 'category', text: 'กรุณาเลือกหมวด' })
-    if (!isOwner && !form.siteId) return setFieldError({ field: 'site', text: 'กรุณาเลือกไซต์งาน' })
+    if (!isOwner && !form.siteId) return setFieldError({ field: 'site', text: 'กรุณาเลือกโครงการ' })
 
     setBusy(true)
     try {
@@ -167,7 +167,7 @@ export function EntryForm({
       for (const s of slips) URL.revokeObjectURL(s.preview)
       setSlips([])
       setForm((f) => ({ ...f, amount: '', note: '', installmentNo: '' }))
-      // จังหวะ "บันทึกรายการต่อ" — ไซต์ หมวด วันที่ วิธีจ่าย ค้างไว้ให้
+      // จังหวะ "บันทึกรายการต่อ" — โครงการ หมวด วันที่ วิธีจ่าย ค้างไว้ให้
       // เคอร์เซอร์กลับไปที่ช่องยอดเงิน คีย์บิลใบถัดไปได้เลย
       amountRef.current?.focus()
       router.refresh()
@@ -192,7 +192,7 @@ export function EntryForm({
       </p>
 
       {/* ── สลับรายรับ/รายจ่าย — เจ้าของเท่านั้น ─────────────────────
-          หัวหน้าไซต์ไม่มีปุ่มนี้เลย ไม่ใช่มีแล้วกดไม่ได้ · ปุ่มที่กดแล้วถูก
+          หัวหน้าโครงการไม่มีปุ่มนี้เลย ไม่ใช่มีแล้วกดไม่ได้ · ปุ่มที่กดแล้วถูก
           ปฏิเสธทุกครั้งคือปุ่มที่ไม่ควรมี */}
       {isOwner && (
         <div className="mb-4 grid grid-cols-2 gap-2">
@@ -283,7 +283,7 @@ export function EntryForm({
 
         <div className="grid gap-4 sm:grid-cols-2">
           <div>
-            <label htmlFor="site" className="label-base">ไซต์งาน</label>
+            <label htmlFor="site" className="label-base">โครงการ</label>
             <select
               id="site"
               value={form.siteId}
@@ -291,14 +291,14 @@ export function EntryForm({
               aria-invalid={err('site') ? 'true' : undefined}
               className="input-base"
             >
-              {sites.length === 0 && <option value="">— ยังไม่มีไซต์ที่คุณดูแล —</option>}
+              {sites.length === 0 && <option value="">— ยังไม่มีโครงการที่คุณดูแล —</option>}
               {sites.map((s) => (
                 <option key={s.id} value={s.id}>{s.name}</option>
               ))}
-              {/* ส่วนกลาง = ค่าน้ำมัน ค่าทางด่วน ค่าออฟฟิศ ที่ไม่ใช่ต้นทุนของไซต์ไหน
-                  หัวหน้าไซต์ไม่มีตัวเลือกนี้ — เป็นค่าใช้จ่ายของเจ้าของ */}
+              {/* ส่วนกลาง = ค่าน้ำมัน ค่าทางด่วน ค่าออฟฟิศ ที่ไม่ใช่ต้นทุนของโครงการไหน
+                  หัวหน้าโครงการไม่มีตัวเลือกนี้ — เป็นค่าใช้จ่ายของเจ้าของ */}
               {isOwner && kind === 'expense' && (
-                <option value={CENTRAL}>ส่วนกลาง (ไม่ผูกไซต์)</option>
+                <option value={CENTRAL}>ส่วนกลาง (ไม่ผูกโครงการ)</option>
               )}
             </select>
             {err('site') && <p className="mt-1 text-sm text-urgent">{err('site')}</p>}
@@ -392,7 +392,7 @@ export function EntryForm({
 
         {/* ── แนบสลิป ─────────────────────────────────────────────────
             🔴 **สองปุ่มแยกกัน** ไม่ใช่ปุ่มเดียวแล้วให้ระบบถาม —
-            คนกลางไซต์ที่ถือมือถือเปื้อนปูนรู้อยู่แล้วว่าจะถ่ายใหม่หรือหยิบรูปเก่า
+            คนกลางโครงการที่ถือมือถือเปื้อนปูนรู้อยู่แล้วว่าจะถ่ายใหม่หรือหยิบรูปเก่า
             การถามซ้ำคือการเพิ่มขั้นตอนให้คนที่ตัดสินใจไปแล้ว
             · capture="environment" เปิดกล้องหลังตรง ๆ ไม่ผ่านตัวเลือกไฟล์ */}
         <div>

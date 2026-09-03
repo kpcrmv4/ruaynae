@@ -40,16 +40,16 @@ export const NAV: NavGroup[] = [
   {
     heading: 'หลัก',
     items: [
-      { href: '/', label: 'วันนี้', sub: 'งานประจำวันและสรุปทุกไซต์', icon: Home },
-      { href: '/sites', label: 'ไซต์งาน', sub: 'โปรเจ็คที่กำลังทำ', icon: Warehouse },
+      { href: '/', label: 'วันนี้', sub: 'งานประจำวันและสรุปทุกโครงการ', icon: Home },
+      { href: '/sites', label: 'โครงการ', sub: 'งานที่กำลังทำอยู่', icon: Warehouse },
       { href: '/ledger', label: 'รายรับ-รายจ่าย', sub: 'ทุกรายการ ค้นหาและกรอง', icon: Receipt },
     ],
   },
   {
     heading: 'คนและค่าแรง',
     items: [
-      { href: '/attendance', label: 'คนเข้าไซต์', sub: 'ลงชื่อรายวัน', icon: CalendarDays },
-      // เจ้าของเท่านั้น — เบิกและรอบจ่ายเป็นเรื่องเงิน หัวหน้าไซต์ไม่เกี่ยว
+      { href: '/attendance', label: 'คนเข้าโครงการ', sub: 'ลงชื่อรายวัน', icon: CalendarDays },
+      // เจ้าของเท่านั้น — เบิกและรอบจ่ายเป็นเรื่องเงิน หัวหน้าโครงการไม่เกี่ยว
       // (คำสั่งเจ้าของ 31 ส.ค. 2569) · CRUD คนงานอยู่ที่ /settings/users
       {
         href: '/payroll',
@@ -66,14 +66,14 @@ export const NAV: NavGroup[] = [
       {
         href: '/approvals',
         label: 'รออนุมัติ',
-        sub: 'รายจ่ายที่หัวหน้าไซต์คีย์',
+        sub: 'รายจ่ายที่หัวหน้าโครงการคีย์',
         icon: Inbox,
         ownerOnly: true,
       },
       {
         href: '/reports',
         label: 'รายงาน',
-        sub: 'สรุปเงิน คน และไซต์ ตามเดือน/ปี',
+        sub: 'สรุปเงิน คน และโครงการ ตามเดือน/ปี',
         icon: BarChart3,
         ownerOnly: true,
       },
@@ -140,8 +140,8 @@ export const QUICK_ADD: QuickAddItem[] = [
   },
   {
     href: '/attendance',
-    label: 'ลงชื่อคนเข้าไซต์',
-    sub: 'ติ๊กแล้วค่าแรงเข้าต้นทุนไซต์ทันที',
+    label: 'ลงชื่อคนเข้าโครงการ',
+    sub: 'ติ๊กแล้วค่าแรงเข้าต้นทุนโครงการทันที',
     icon: CalendarDays,
     tone: 'brand',
   },
@@ -161,7 +161,7 @@ export const quickAddFor = (role: Role): QuickAddItem[] =>
 /**
  * 3 ช่องเมนูของแถบล่าง (ช่องกลางคือปุ่มบันทึก · ช่องที่ 5 คือ "เพิ่มเติม" เสมอ)
  *
- * จัดตาม role เพราะงานประจำวันของสองคนไม่เหมือนกัน — หัวหน้าไซต์ลงชื่อคนเข้าไซต์
+ * จัดตาม role เพราะงานประจำวันของสองคนไม่เหมือนกัน — หัวหน้าโครงการลงชื่อคนเข้าโครงการ
  * ทุกเช้า ส่วนเจ้าของเคลียร์คิวอนุมัติทุกวัน · /ledger อยู่ทั้งคู่เพราะ
  * "คีย์เสร็จแล้วขอดูว่าลงไหม/โดนตีกลับไหม" คืองานถัดไปของการบันทึกเสมอ
  */
@@ -198,6 +198,6 @@ export const bottomNavFor = (role: Role): NavItem[] => [
   { href: '/', label: 'วันนี้', sub: '', icon: Home },
   role === 'owner'
     ? { href: '/approvals', label: 'รออนุมัติ', sub: '', icon: Inbox }
-    : { href: '/attendance', label: 'คนเข้าไซต์', sub: '', icon: CalendarDays },
+    : { href: '/attendance', label: 'คนเข้าโครงการ', sub: '', icon: CalendarDays },
   { href: '/ledger', label: 'รายการ', sub: '', icon: Receipt },
 ]

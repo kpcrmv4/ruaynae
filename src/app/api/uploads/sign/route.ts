@@ -67,14 +67,14 @@ export async function POST(req: NextRequest) {
   const sb = await getSupabaseServer()
 
   if (user.role !== 'owner') {
-    // 🔴 หัวหน้าไซต์แนบสลิปได้เฉพาะไซต์ที่ดูแลอยู่ตอนนี้
-    // เช็คด้วยการอ่านแถวไซต์ผ่าน RLS — ถ้ามองไม่เห็น แปลว่าไม่มีสิทธิ์
+    // 🔴 หัวหน้าโครงการแนบสลิปได้เฉพาะโครงการที่ดูแลอยู่ตอนนี้
+    // เช็คด้วยการอ่านแถวโครงการผ่าน RLS — ถ้ามองไม่เห็น แปลว่าไม่มีสิทธิ์
     // ไม่ต้องเขียนเงื่อนไขซ้ำที่นี่ให้มีโอกาสเพี้ยนจาก policy
     if (siteId === null) return NextResponse.json({ error: 'SITE_REQUIRED' }, { status: 403 })
     const { data: site, error } = await sb
       .from('sites').select('id').eq('id', siteId).maybeSingle()
     if (error) {
-      console.error('[uploads] อ่านไซต์ไม่ได้', error.message)
+      console.error('[uploads] อ่านโครงการไม่ได้', error.message)
       return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
     }
     if (!site) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })

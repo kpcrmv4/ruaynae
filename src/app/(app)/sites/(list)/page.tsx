@@ -2,8 +2,8 @@ import { HardHat } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
-import { fmtBaht, fmtDate } from '@/lib/format'
-import { SITE_STATUSES, SITE_STATUS_LABEL, SITE_STATUS_TONE, isSiteStatus } from '@/lib/sites'
+import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
+import { SITE_STATUSES, SITE_STATUS_LABEL, SITE_STATUS_TONE, isSiteStatus, timeProgress } from '@/lib/sites'
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { ListRow } from '@/components/ui/list-row'
@@ -61,7 +61,7 @@ export default async function SitesPage({
   // ซึ่งแยกไม่ออกจาก "ยังไม่มีใครตั้งค่างาน"
   const isOwner = me.role === 'owner'
 
-  const [listResult, financeRows, ...counts] = await Promise.all([
+  const [listResult, financeRows, workRows, ...counts] = await Promise.all([
     // .order() + .range() ทุกลิสต์ ไม่พึ่งค่าเริ่มต้นของ PostgREST
     listQuery.order('created_at', { ascending: false }).range(0, PAGE_SIZE - 1),
     isOwner
@@ -75,6 +75,16 @@ export default async function SitesPage({
             return data ?? []
           })
       : Promise.resolve([]),
+    // 🔴 จำนวนวันที่มีคนเข้าทำงาน มาจาก RPC ที่นับ distinct ในฐานข้อมูล —
+    // ค่าเดียวกับ "วันที่ลงเวลา" บนการ์ดหน้าโครงการ · ไม่ใช่บวกแถวใน JS
+    sb
+      .rpc('site_money', {})
+      .order('site_id', { ascending: true })
+      .range(0, PAGE_SIZE - 1)
+      .then(({ data, error: wErr }) => {
+        if (wErr) console.error('[sites] อ่านจำนวนวันที่ลงเวลาไม่ได้', wErr.message)
+        return data ?? []
+      }),
     countFor('all'),
     ...SITE_STATUSES.map((s) => countFor(s)),
   ])
@@ -101,6 +111,10 @@ export default async function SitesPage({
   ]
 
   const contractOf = new Map(financeRows.map((f) => [f.site_id, Number(f.contract_amount)]))
+  const attendanceDaysOf = new Map(
+    workRows.map((w) => [w.site_id, Number(w.attendance_days)]),
+  )
+  const today = todayInBangkok()
   const rows = sites ?? []
   // ไม่มีผลการค้นหา กับ ยังไม่มีโครงการเลย เป็นคนละสถานะ — ข้อความเดียวกันทำให้
   // คนคิดว่าข้อมูลหายไปทั้งที่แค่ตัวกรองไม่ตรง
@@ -159,6 +173,21 @@ export default async function SitesPage({
               }
               aside={
                 <>
+                  {/* 🔴 สองตัวเลขที่เจ้าของถามบ่อยที่สุดตอนกวาดตาดูลิสต์:
+                      "เดินไปกี่วันแล้ว" กับ "เหลือเวลาอีกเท่าไหร่" (สั่ง 4 ก.ย. 2569)
+                      · วันที่ลงเวลาเป็นค่าเดียวกับบนการ์ดหน้าโครงการ นับวันไม่ซ้ำ
+                      · โครงการที่ยังไม่ตั้งช่วงเวลาไม่วาดช่องเวลาเลย ดีกว่าวาด
+                        "0 วัน" ที่อ่านเหมือนหมดเวลาแล้ว */}
+                  {(attendanceDaysOf.get(s.id) ?? 0) > 0 && (
+                    <span className="shrink-0 text-xs tnum text-muted-token">
+                      ลงเวลา{' '}
+                      <span className="font-semibold text-ink-2">
+                        {attendanceDaysOf.get(s.id)}
+                      </span>{' '}
+                      วัน
+                    </span>
+                  )}
+                  <TimeLeft startDate={s.start_date} endDate={s.end_date} today={today} />
                   {/* หัวหน้าโครงการไม่เห็นช่องนี้เลย — และไม่ใช่แค่ซ่อนบนหน้าจอ
                       ฐานข้อมูลไม่ยอมให้เขาอ่านตาราง site_finance ตั้งแต่แรก */}
                   {isOwner && (
@@ -178,5 +207,32 @@ export default async function SitesPage({
         </div>
       )}
     </>
+  )
+}
+
+/**
+ * เวลาที่เหลือของโครงการ — เลยกำหนดแล้วเป็นสีเตือน ไม่ใช่เลขติดลบเฉย ๆ
+ *
+ * ยังไม่ตั้งช่วงเวลา = ไม่วาดอะไรเลย · "เหลือ 0 วัน" อ่านเหมือนหมดเวลาแล้ว
+ * ซึ่งเป็นคนละเรื่องกับ "ยังไม่มีใครตั้งกำหนดส่ง"
+ */
+function TimeLeft({
+  startDate,
+  endDate,
+  today,
+}: {
+  startDate: string | null
+  endDate: string | null
+  today: string
+}) {
+  const p = timeProgress(startDate, endDate, today)
+  if (p.kind !== 'ok') return null
+  const late = p.daysLeft < 0
+  return (
+    <span
+      className={`shrink-0 text-xs tnum ${late ? 'font-semibold text-urgent' : 'text-muted-token'}`}
+    >
+      {late ? `เลยมา ${Math.abs(p.daysLeft)} วัน` : `เหลือ ${p.daysLeft} วัน`}
+    </span>
   )
 }

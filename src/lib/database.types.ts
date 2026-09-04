@@ -1201,10 +1201,12 @@ export type Database = {
           amount: number
           days: number
           employee_id: string
+          employee_work_days: number
           full_name: string
           job_title: string
           site_id: string
           site_name: string
+          site_work_days: number
         }[]
       }
       attendance_grid: {

@@ -210,6 +210,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             site_name: r.site_name,
             days: Number(r.days),
             amount: asNullableNumber(r.amount),
+            site_work_days: Number(r.site_work_days),
+            employee_work_days: Number(r.employee_work_days),
           }))}
         />
       ) : tab === 'grid' ? (

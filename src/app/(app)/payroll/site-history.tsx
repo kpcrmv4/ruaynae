@@ -9,9 +9,14 @@ export type WorkRow = {
   job_title: string | null
   site_id: string
   site_name: string
+  /** วันแรงของคนนี้ที่โครงการนี้ (ครึ่งวัน = 0.5) — เอาไปคูณค่าแรง */
   days: number
   /** `null` = ไม่มีสิทธิ์เห็นยอดเงิน — ไม่ใช่ ฿0 */
   amount: number | null
+  /** โครงการนี้มีคนเข้าทำงานกี่วัน (นับวันไม่ซ้ำ) */
+  site_work_days: number
+  /** คนนี้มาทำงานกี่วัน (นับวันไม่ซ้ำ ข้ามทุกโครงการ) */
+  employee_work_days: number
 }
 
 /**
@@ -45,7 +50,10 @@ export function SiteHistory({
 
   // จัดกลุ่มตามมุมมองที่เลือก — แถวเรียงมาจากฐานข้อมูลแล้ว
   const byPerson = view === 'person'
-  const groups = new Map<string, { title: string; sub: string | null; rows: WorkRow[] }>()
+  const groups = new Map<
+    string,
+    { title: string; sub: string | null; workDays: number; rows: WorkRow[] }
+  >()
   for (const r of rows) {
     const key = byPerson ? r.employee_id : r.site_id
     const g = groups.get(key)
@@ -54,6 +62,11 @@ export function SiteHistory({
       groups.set(key, {
         title: byPerson ? r.full_name : r.site_name,
         sub: byPerson ? r.job_title : null,
+        // 🔴 **นับวันจริง ไม่ใช่บวก `days` ของทุกแถว** — 8 คนมาทำงาน 4 วัน
+        // เท่ากับโครงการเดินไป 4 วัน ไม่ใช่ 29 วัน (เจ้าของแจ้ง 4 ก.ย. 2569)
+        // ค่านี้มาจาก count(distinct work_date) ในฐานข้อมูล เพราะแถวที่ส่งมา
+        // เป็นระดับ คน×โครงการ ซึ่งบอกไม่ได้ว่าวันซ้ำกันหรือเปล่า
+        workDays: byPerson ? r.employee_work_days : r.site_work_days,
         rows: [r],
       })
     }
@@ -62,7 +75,7 @@ export function SiteHistory({
   const list = [...groups.values()]
   // มุมมองรายโครงการ: โครงการที่ใช้คนเยอะสุดอยู่บนสุด — ไม่ใช่เรียงตามชื่อคน
   if (!byPerson) {
-    list.sort((a, b) => sumDays(b.rows) - sumDays(a.rows))
+    list.sort((a, b) => b.workDays - a.workDays || sumDays(b.rows) - sumDays(a.rows))
     for (const g of list) g.rows.sort((a, b) => b.days - a.days)
   }
 
@@ -93,7 +106,6 @@ export function SiteHistory({
 
       <div className="space-y-3">
         {list.map((g) => {
-          const days = sumDays(g.rows)
           const money = sumAmount(g.rows)
           return (
             <section key={g.title} className="panel">
@@ -104,8 +116,11 @@ export function SiteHistory({
                     <span className="ml-1.5 text-xs font-normal text-muted-token">{g.sub}</span>
                   )}
                 </span>
+                {/* คำว่า "ทำงาน N วัน" ไม่ใช่ "รวม N วัน" — "รวม" ชวนให้อ่านว่า
+                    เป็นผลบวกของตัวเลขในแถวข้างล่าง ซึ่งมันไม่ใช่ · จำนวนคน/โครงการ
+                    ต่อท้ายไว้ตอบว่าแถวข้างล่างมาจากไหน */}
                 <span className="ml-auto shrink-0 text-xs font-normal tnum text-muted-token">
-                  รวม {days} วัน
+                  ทำงาน {g.workDays} วัน · {g.rows.length} {byPerson ? 'โครงการ' : 'คน'}
                   {money !== null && ` · ${fmtBaht(money)}`}
                 </span>
               </div>
@@ -136,7 +151,9 @@ export function SiteHistory({
       </div>
 
       <p className="mt-3 rounded-lg border border-line-soft bg-surface-2 px-4 py-3 text-xs text-muted-token">
-        นับจากการลงชื่อเข้าโครงการของเดือนที่เลือก · คนที่ทำครึ่งวันนับเป็น 0.5 วัน
+        <b>ทำงาน N วัน</b> บนหัวข้อคือ<span className="font-medium text-ink-2">จำนวนวันที่มีคนเข้าทำงานจริง</span>{' '}
+        (นับวันไม่ซ้ำ) ไม่ใช่ผลบวกของแถวข้างล่าง — 8 คนมาวันเดียวกันคือ 1 วัน
+        · ตัวเลขในแต่ละแถวเป็นวันแรงของคนนั้น ครึ่งวันนับเป็น 0.5
         · ยอดเงินคือ<span className="font-medium text-ink-2">ค่าแรงที่เกิดขึ้น</span>{' '}
         ไม่ใช่เงินที่จ่ายออกไปแล้ว
       </p>

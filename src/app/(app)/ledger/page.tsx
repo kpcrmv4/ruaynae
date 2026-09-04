@@ -9,26 +9,13 @@ import { TXN_STATUSES, TXN_STATUS_LABEL, isTxnKind, isTxnStatus } from '@/lib/tr
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
+import { LedgerFilters } from '@/components/ledger/ledger-filters'
 import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
 
 export const metadata = { title: 'รายรับ-รายจ่าย' }
 
-/**
- * ทางลัดช่วงวันที่ — **แหล่งความจริงคือ `from`/`to` บน URL** ชิปเป็นแค่ตัวเติมให้
- *
- * ทำแบบนี้เพราะ "ช่วงที่เลือกเอง" กับ "เดือนนี้" ต้องอยู่ร่วมกันได้โดยไม่ต้องมี
- * state ฝั่ง client และไม่ต้องมีพารามิเตอร์ตัวที่สองที่วันหนึ่งจะขัดกับ from/to
- * · ค่าเริ่มต้นคือ **ทั้งหมด** (ไม่มี from/to เลย) ตามที่เจ้าของสั่ง
- */
-const rangeShortcuts = (today: string) => [
-  // 🔴 ไม่ใช้คำว่า "ทั้งหมด" ซ้ำกับชิปชนิดรายการที่อยู่บรรทัดบน — สองแถว
-  // ที่ขึ้นต้นด้วยคำเดียวกันทำให้อ่านไม่ออกว่าแถวไหนคุมอะไร
-  { key: 'all', label: 'ทุกช่วงเวลา', from: '', to: '' },
-  { key: 'month', label: 'เดือนนี้', from: `${today.slice(0, 7)}-01`, to: today },
-  { key: 'today', label: 'วันนี้', from: today, to: today },
-]
 
 type Search = {
   status?: string
@@ -210,18 +197,6 @@ export default async function LedgerPage({
   const isFiltered = terms.length > 0 || status !== 'all' || kind !== 'all'
     || Boolean(sp.site) || Boolean(sp.from) || Boolean(sp.to)
 
-  /** ลิงก์ของชิปช่วงเวลา — เก็บตัวกรองอื่นไว้ครบ และรีเซ็ตหน้าเสมอ */
-  const rangeLink = (from: string, to: string) => {
-    const p = new URLSearchParams(keep)
-    p.delete('after')
-    if (from) p.set('from', from); else p.delete('from')
-    if (to) p.set('to', to); else p.delete('to')
-    const s = p.toString()
-    return s ? `/ledger?${s}` : '/ledger'
-  }
-  const activeRange =
-    rangeShortcuts(today).find((r) => r.from === (sp.from ?? '') && r.to === (sp.to ?? ''))?.key
-    ?? 'custom'
 
   // ลิงก์ถอดตัวกรองโครงการออก โดยเก็บตัวกรองอื่นไว้ทั้งหมด
   const clearSite = new URLSearchParams(keep)
@@ -282,73 +257,17 @@ export default async function LedgerPage({
           เดิมกรองได้เฉพาะตอนเข้ามาจากปุ่มลัดของหน้าโครงการ · หน้านี้จึงไม่มี
           ทางเลือกขอบเขตเองเลย (เจ้าของแจ้ง 4 ก.ย. 2569) · เป็นฟอร์ม GET
           เหมือนตัวกรองอื่นทั้งแอป — สถานะอยู่บน URL แชร์ลิงก์ได้ */}
-      {/* ── ช่วงเวลา ─────────────────────────────────────────────────
-          ชิปสามตัวคือทางลัด · ช่องวันที่ข้างล่างคือ "ช่วงที่เลือกเอง"
-          ทั้งสองเขียนลง from/to ตัวเดียวกัน จึงไม่มีทางขัดกันเอง */}
-      <div className="mb-2 flex flex-wrap gap-1.5">
-        {rangeShortcuts(today).map((r) => (
-          <Link
-            key={r.key}
-            href={rangeLink(r.from, r.to)}
-            aria-current={activeRange === r.key ? 'true' : undefined}
-            className={`rounded-sm border px-2.5 py-1.5 text-sm font-medium transition-colors duration-100 ${
-              activeRange === r.key
-                ? 'border-ink bg-ink text-canvas'
-                : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2 hover:text-ink'
-            }`}
-          >
-            {r.label}
-          </Link>
-        ))}
-        {activeRange === 'custom' && (
-          <span className="inline-flex items-center rounded-sm border border-ink bg-ink px-2.5 py-1.5 text-sm font-medium text-canvas">
-            ช่วงที่เลือก
-          </span>
+      <LedgerFilters
+        today={today}
+        sites={sitesResult.data ?? []}
+        isOwner={isOwner}
+        site={sp.site ?? ''}
+        from={sp.from ?? ''}
+        to={sp.to ?? ''}
+        keep={Object.fromEntries(
+          [...keep].filter(([k]) => k !== 'site' && k !== 'from' && k !== 'to'),
         )}
-      </div>
-
-      <form action="/ledger" method="get" className="mb-3 flex flex-wrap items-center gap-2">
-        {/* ตัวกรองอื่นต้องติดไปด้วย ไม่งั้นกดกรองวันแล้วขอบเขตอื่นหายเงียบ ๆ */}
-        {Object.entries(Object.fromEntries(keep)).map(([k, v]) =>
-          k === 'site' || k === 'from' || k === 'to'
-            ? null
-            : <input key={k} type="hidden" name={k} value={v} />,
-        )}
-        <select
-          name="site"
-          defaultValue={sp.site ?? ''}
-          aria-label="กรองตามโครงการ"
-          className="input-base w-auto min-w-48 max-w-full py-2"
-        >
-          <option value="">ทุกโครงการ + ส่วนกลาง</option>
-          {isOwner && <option value="central">เฉพาะส่วนกลาง (ไม่ผูกโครงการ)</option>}
-          {(sitesResult.data ?? []).map((s) => (
-            <option key={s.id} value={s.id}>{s.name}</option>
-          ))}
-        </select>
-        {/* input type=date แสดงปี พ.ศ. บนเครื่องที่ตั้งภาษาไทย แต่ค่าที่อ่านได้
-            เป็น ค.ศ. เสมอ — ส่งลงฐานข้อมูลได้ตรง ๆ (§15) */}
-        <input
-          type="date"
-          name="from"
-          defaultValue={sp.from ?? ''}
-          max={today}
-          aria-label="ตั้งแต่วันที่"
-          className="input-base w-auto py-2 tnum"
-        />
-        <span className="text-sm text-muted-token">ถึง</span>
-        <input
-          type="date"
-          name="to"
-          defaultValue={sp.to ?? ''}
-          max={today}
-          aria-label="ถึงวันที่"
-          className="input-base w-auto py-2 tnum"
-        />
-        <button type="submit" className="btn-secondary shrink-0 px-4 py-2">
-          กรอง
-        </button>
-      </form>
+      />
 
       <ListToolbar
         basePath="/ledger"

@@ -129,20 +129,20 @@ async function seedSites(rows) {
 // 1) ใกล้ครบกำหนด + กำไรดี   2) ต้นทุนแซงเงินที่เก็บได้   3) ยังไม่ได้ตั้งค่างาน
 // 4) ปิดงานแล้ว              5) วางแผนไว้ ยังไม่เริ่ม
 const SITES = [
-  { name: 'บ้านคุณสมศักดิ์ ซ.รามอินทรา 65', client: 'คุณสมศักดิ์ วงศ์อนันต์',
-    phone: '081-234-5678', address: 'ซ.รามอินทรา 65 เขตบางเขน กทม.',
+  { name: 'บ้านคุณสมศักดิ์ ต.บ่อแฮ้ว', client: 'คุณสมศักดิ์ วงศ์อนันต์',
+    phone: '081-234-5678', address: 'ต.บ่อแฮ้ว อ.เมืองลำปาง จ.ลำปาง',
     start: day(-150), end: day(20), status: 'active', contract: 2850000 },
-  { name: 'โกดังโรงงานไทยพลาสติก', client: 'บจก. ไทยพลาสติกอุตสาหกรรม',
-    phone: '02-555-1234', address: 'นิคมอุตสาหกรรมบางปู สมุทรปราการ',
+  { name: 'โกดังโรงงานเซรามิกลำปาง', client: 'บจก. ลำปางเซรามิกอุตสาหกรรม',
+    phone: '054-231-880', address: 'ต.ปงแสนทอง อ.เมืองลำปาง จ.ลำปาง',
     start: day(-76), end: day(107), status: 'active', contract: 4200000 },
-  { name: 'รีโนเวทตึกแถว 2 คูหา ตลาดพลู', client: 'คุณวิไล ศรีสุข',
-    phone: '089-777-2211', address: 'ตลาดพลู เขตธนบุรี กทม.',
+  { name: 'รีโนเวทอาคารพาณิชย์ 2 คูหา กาดกองต้า', client: 'คุณวิไล ศรีสุข',
+    phone: '089-777-2211', address: 'ถ.ตลาดเก่า ต.สวนดอก อ.เมืองลำปาง จ.ลำปาง',
     start: day(-29), end: day(31), status: 'active', contract: 0 },
-  { name: 'ต่อเติมครัวหลังบ้าน ลาดพร้าว 71', client: 'คุณอนงค์ พูนสิน',
-    phone: '086-321-9900', address: 'ลาดพร้าว 71 เขตวังทองหลาง กทม.',
+  { name: 'ต่อเติมครัวหลังบ้าน ต.พระบาท', client: 'คุณอนงค์ พูนสิน',
+    phone: '086-321-9900', address: 'ต.พระบาท อ.เมืองลำปาง จ.ลำปาง',
     start: day(-240), end: day(-60), status: 'done', contract: 480000 },
-  { name: 'บ้านแฝดสองชั้น บางบัวทอง (รอเซ็นสัญญา)', client: 'คุณธนา เจริญพงศ์',
-    phone: '', address: 'บางบัวทอง นนทบุรี',
+  { name: 'บ้านแฝดสองชั้น อ.เกาะคา (รอเซ็นสัญญา)', client: 'คุณธนา เจริญพงศ์',
+    phone: '', address: 'ต.ศาลา อ.เกาะคา จ.ลำปาง',
     start: day(30), end: day(210), status: 'planning', contract: 1950000 },
 ]
 const siteIds = await seedSites(SITES)
@@ -191,9 +191,9 @@ const TXNS = [
   ['income', siteA, 570000, day(-78), 'transfer', 'approved', 'งวดที่ 2 โครงสร้าง ค.ส.ล. ครบ', 'installment', 2, null, null],
   ['income', siteA, 285000, day(-38), 'transfer', 'approved', 'งวดที่ 3 ก่ออิฐและมุงหลังคา', 'installment', 3, null, null],
   ['income', siteA, 570000, day(-8), 'transfer', 'approved', 'งวดที่ 4 งานฉาบและวงกบ', 'installment', 4, null, null],
-  ['income', siteB, 840000, day(-70), 'transfer', 'approved', 'มัดจำโกดังไทยพลาสติก', 'deposit', null, null, null],
+  ['income', siteB, 840000, day(-70), 'transfer', 'approved', 'มัดจำโกดังเซรามิกลำปาง', 'deposit', null, null, null],
   ['income', siteB, 840000, day(-30), 'transfer', 'approved', 'งวดที่ 1 งานฐานรากโกดัง', 'installment', 1, null, null],
-  ['income', siteC, 294000, day(-20), 'cash', 'approved', 'มัดจำรีโนเวทตึกแถว', 'deposit', null, null, null],
+  ['income', siteC, 294000, day(-20), 'cash', 'approved', 'มัดจำรีโนเวทอาคารพาณิชย์', 'deposit', null, null, null],
 
   ['expense', siteA, 980000, day(-120), 'transfer', 'approved', 'ค่าเหล็กและปูนงวดโครงสร้าง', null, null, null, sups[0].id],
   ['expense', siteA, 460000, day(-60), 'transfer', 'approved', 'ค่าอิฐมอญและกระเบื้องหลังคา', null, null, null, sups[0].id],
@@ -321,7 +321,7 @@ const money = await sql(`
       0 as cost_total
     from public.site_finance f where f.site_id = s.id
   ) m
-  where s.name in (${q('บ้านคุณสมศักดิ์ ซ.รามอินทรา 65')}, ${q('โกดังโรงงานไทยพลาสติก')})
+  where s.name in (${q('บ้านคุณสมศักดิ์ ต.บ่อแฮ้ว')}, ${q('โกดังโรงงานเซรามิกลำปาง')})
   order by s.name`)
 
 for (const row of money) {

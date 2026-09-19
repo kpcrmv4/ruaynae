@@ -17,7 +17,7 @@
  *   ที่ไม่ตรงกันแล้วไม่มีใครรู้ว่าอันไหนถูก
  */
 export const SYSTEM_NAME = 'RUAYNAE LIMITED PARTNERSHIP'
-export const APP_TAGLINE = 'บันทึกรายรับ-รายจ่ายรายวันของแต่ละโครงการ พร้อมแนบสลิป'
+export const APP_TAGLINE = 'ระบบบันทึกรายรับ-รายจ่าย'
 
 /**
  * เขตเวลา — ต้องอ้างจากตรงนี้ทุกที่ ห้ามพึ่งเวลาของเครื่อง

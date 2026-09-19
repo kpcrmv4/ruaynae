@@ -218,7 +218,7 @@ export function SiteDetailActions({
       <Modal
         open={assigning} onOpenChange={setAssigning} busy={busy} onSubmit={assign}
         title="มอบหมายหัวหน้าโครงการ"
-        description="ช่วงเวลาสำคัญ — ย้ายคนโดยไม่ระบุวัน จะทำให้รายงานย้อนหลังเปลี่ยนเจ้าของตามไปด้วย"
+        description="ช่วงเวลาสำคัญ — ย้ายคนโดยไม่ระบุวัน จะทำให้รายงานย้อนหลังเปลี่ยนเจ้าของตามไปด้วย · คนหนึ่งคนดูแลหลายโครงการพร้อมกันได้"
       >
         <Field id="c-person" label="ผู้ใช้" span>
           <select id="c-person" value={crewForm.profileId}

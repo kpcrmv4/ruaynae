@@ -195,18 +195,33 @@ try {
       rows[0].n === 0 && total[0].n >= 2, `ไม่มีแถวการเงิน ${rows[0].n} จาก ${total[0].n} โครงการ`)
   }
 
-  // P1-DB-07 · ช่วงเวลาทับกันถูกปฏิเสธ
+  // P1-DB-07 · คนเดิม **โครงการเดิม** ช่วงเวลาทับกันถูกปฏิเสธ
   {
     const r = await sql(
       `insert into public.site_supervisors(site_id, profile_id, effective_from)
-       values ('${othersId}','${sup1.id}', current_date)`,
+       values ('${mineId}','${sup1.id}', current_date)`,
     )
     const { rows } = await sql(
       `select count(*)::int as n from public.site_supervisors where profile_id='${sup1.id}'`,
     )
-    check('P1-DB-07 คนเดียวอยู่สองโครงการวันเดียวกันไม่ได้ (exclusion constraint)',
+    check('P1-DB-07 คนเดียวกัน โครงการเดียวกัน ช่วงซ้อนกันไม่ได้ (exclusion constraint)',
       Boolean(r.error) && /conflicting key|exclusion/i.test(r.error) && rows[0].n === 1,
       `ถูกปฏิเสธ=${Boolean(r.error)} · แถวของ sup1 = ${rows[0].n}`)
+  }
+
+  // P1-DB-07b · คนเดียวดูแล **สองโครงการ** วันเดียวกันต้องเขียนได้ (19 ก.ย. 2569)
+  // 🔴 คู่ตรงข้ามของ 07 — ถ้าไม่มีแถวนี้ constraint ที่กันกว้างเกินไปจะเขียวตลอด
+  {
+    const r = await sql(
+      `insert into public.site_supervisors(site_id, profile_id, effective_from)
+       values ('${othersId}','${sup1.id}', current_date) returning id`,
+    )
+    check('P1-DB-07b คนเดียวดูแลสองโครงการพร้อมกันได้',
+      !r.error && r.rows?.length === 1, r.error ? String(r.error).slice(0, 60) : 'เขียนได้')
+    // ล้างออกก่อน P1-DB-08 ซึ่งต้องการให้ othersId ว่างสำหรับ sup1
+    if (r.rows?.[0]?.id) {
+      await sql(`delete from public.site_supervisors where id='${r.rows[0].id}'`)
+    }
   }
 
   // P1-DB-08 · ช่วงที่ต่อกันพอดีต้องเขียนได้ (พิสูจน์ว่า +1 ถูก)

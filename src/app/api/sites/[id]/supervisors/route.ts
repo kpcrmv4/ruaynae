@@ -5,7 +5,7 @@ import { parseDate } from '@/lib/sites'
 
 export const runtime = 'nodejs'
 
-/** exclusion_violation — ช่วงเวลาของคนคนเดียวทับกันสองโครงการ */
+/** exclusion_violation — คนเดียวกัน **โครงการเดียวกัน** ช่วงเวลาทับกัน (ดูแลหลายโครงการพร้อมกันได้) */
 const EXCLUSION_VIOLATION = '23P01'
 
 /**

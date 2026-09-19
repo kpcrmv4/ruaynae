@@ -344,13 +344,15 @@ try {
       `${r.status} · ${a.status} ${a.amount} ${a.ed}`)
   }
 
-  // ── P1-API-06 · มอบหมายทับช่วงเวลาเดิม → 409 OVERLAP ─────────────
+  // ── P1-API-06 · มอบหมายคนเดิม โครงการเดิม ทับช่วงเวลาเดิม → 409 OVERLAP ──
+  // (คนเดิมแต่**โครงการอื่น**ช่วงเดียวกันต้องผ่าน — ตรวจที่ P1-DB-07b · ไม่ยิงตรงนี้
+  //  เพราะ P1-UI-04 ข้างล่างต้องการให้ sup1 ยังไม่ดูแล othersId)
   {
     const first = await req('POST', `/api/sites/${mineId}/supervisors`,
       { profileId: sup1.id, effectiveFrom: '2026-03-01' }, { cookie: ownerJar })
     const before = (await sql(
       `select count(*)::int as n from public.site_supervisors where profile_id='${sup1.id}'`)).rows[0].n
-    const dup = await req('POST', `/api/sites/${othersId}/supervisors`,
+    const dup = await req('POST', `/api/sites/${mineId}/supervisors`,
       { profileId: sup1.id, effectiveFrom: '2026-06-01' }, { cookie: ownerJar })
     const dupBody = await dup.json().catch(() => ({}))
     const after = (await sql(

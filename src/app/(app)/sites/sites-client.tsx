@@ -17,7 +17,7 @@ export const SITE_ERRORS: Record<string, string> = {
   DATE_RANGE_INVALID: 'วันสิ้นสุดต้องไม่มาก่อนวันเริ่ม',
   STATUS_INVALID: 'สถานะไม่ถูกต้อง',
   NOT_FOUND: 'ไม่พบโครงการนี้',
-  OVERLAP: 'ช่วงเวลาทับกับโครงการอื่นที่คนนี้ดูแลอยู่',
+  OVERLAP: 'คนนี้ดูแลโครงการนี้ในช่วงเวลาที่ทับกันอยู่แล้ว — แก้ช่วงเดิมก่อน',
   CREATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
 }
 export const siteError = (code?: string) => SITE_ERRORS[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'

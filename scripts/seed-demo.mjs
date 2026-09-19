@@ -151,9 +151,9 @@ const siteB = siteIds.get(SITES[1].name)
 const siteC = siteIds.get(SITES[2].name)
 
 // ── หัวหน้าโครงการ ──────────────────────────────────────────────────────
-// 🔴 คนหนึ่งคนดูแลได้ทีละโครงการ — `site_supervisors` มี exclusion constraint
-// กันช่วงเวลาซ้อนกัน (P1) · seed ที่ผูกคนเดียวสองโครงการพร้อมกันจะถูกปฏิเสธ
-// ซึ่งถูกแล้ว · โครงการ C จงใจไม่มีใครดูแล — เป็นสถานะที่หน้าจอต้องวาดได้ด้วย
+// `site_supervisors` มี exclusion constraint กันแถวซ้ำของ คน×โครงการ ในช่วงเวลาซ้อนกัน
+// (P1 · ตั้งแต่ 19 ก.ย. 2569 คนหนึ่งคนดูแลหลายโครงการพร้อมกันได้)
+// · โครงการ C จงใจไม่มีใครดูแล — เป็นสถานะที่หน้าจอต้องวาดได้ด้วย
 await sql(`
   insert into public.site_supervisors(site_id, profile_id, effective_from)
   select v.site_id::uuid, v.profile_id::uuid, v.d::date

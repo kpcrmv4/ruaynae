@@ -1,4 +1,4 @@
-import { CalendarClock, ChevronRight, HardHat, Lock, Tags, Users } from 'lucide-react'
+import { CalendarClock, ChevronRight, HardHat, Lock, SlidersHorizontal, Tags, Users } from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { PushToggle } from '../push-client'
@@ -94,6 +94,24 @@ export default async function SettingsPage() {
           <span className="min-w-0 flex-1">
             <span className="block text-sm font-semibold text-ink">หมวดรายรับ-รายจ่าย</span>
             <span className="block text-xs text-muted-token">เพิ่ม เปลี่ยนลำดับ และปิดหมวดที่ไม่ใช้แล้ว</span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-token" />
+        </Link>
+      )}
+
+      {/* รายการปรับค่าแรง (OT · เบี้ยเลี้ยง · มาสาย) — ของที่กล่อง "ปรับค่าแรง"
+          ในหน้าคนเข้าโครงการดึงไปใช้ · เป็นเงิน จึงเจ้าของเท่านั้น */}
+      {isOwner && (
+        <Link
+          href="/settings/wage-adjustments"
+          className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-brand"
+        >
+          <SlidersHorizontal className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">รายการปรับค่าแรง</span>
+            <span className="block text-xs text-muted-token">
+              OT เบี้ยเลี้ยง มาสาย — ตั้งยอดเริ่มต้นไว้ แล้วเลือกใช้ตอนติ๊กคนเข้าโครงการ
+            </span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-token" />
         </Link>

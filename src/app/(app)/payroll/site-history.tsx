@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { HardHat, UserRound } from 'lucide-react'
 import { fmtBaht } from '@/lib/format'
 import { EmptyState } from '@/components/ui/states'
+import type { AdjustPreset } from '@/lib/wage-adjustments'
+import { SiteWageButton, SiteWageProvider, type WageDay, type WageRowKey } from './site-wage-edit'
 
 export type WorkRow = {
   employee_id: string
@@ -28,16 +30,24 @@ export type WorkRow = {
  * ยุบเหลือมุมมองเดียวแล้วอีกคำถามหนึ่งต้องมานั่งไล่บวกเอง
  *
  * Server Component — สลับมุมมองด้วยลิงก์ ไม่ใช่ state ฝั่ง client
+ * · ปุ่มดินสอท้ายแถว (แก้ค่าแรงที่จ่ายจริง — R10) เป็น client island ใบเล็ก
+ *   ที่คุยกับ provider ตัวเดียวซึ่งถือกล่องแก้ไขไว้ตัวเดียวต่อหน้า
  */
 export function SiteHistory({
   rows,
   view,
   monthKey,
+  details,
+  presets,
 }: {
   rows: WorkRow[]
   view: 'person' | 'site'
   /** ค่า `?p=` ที่กำลังดูอยู่ — ติดไปกับลิงก์สลับมุมมองเสมอ */
   monthKey: string
+  /** รายวันของแต่ละ คน×โครงการ — ป้อนกล่องแก้ค่าแรง */
+  details: Record<WageRowKey, WageDay[]>
+  /** รายการปรับสำเร็จรูปที่เปิดอยู่ — ป้อนกล่องปรับ OT/เบี้ยเลี้ยง/หัก */
+  presets: AdjustPreset[]
 }) {
   if (rows.length === 0) {
     return (
@@ -80,7 +90,7 @@ export function SiteHistory({
   }
 
   return (
-    <>
+    <SiteWageProvider details={details} presets={presets}>
       <div className="mb-3 flex gap-1.5">
         {(
           [
@@ -138,9 +148,18 @@ export function SiteHistory({
                     </span>
                     <span className="shrink-0 text-sm tnum font-semibold text-ink">{r.days} วัน</span>
                     {r.amount !== null && (
-                      <span className="w-24 shrink-0 text-right text-sm tnum text-muted-token">
+                      <span className="w-20 shrink-0 text-right text-sm tnum text-muted-token">
                         {fmtBaht(r.amount)}
                       </span>
+                    )}
+                    {/* แก้ค่าแรงที่จ่ายจริง — เฉพาะแถวที่ยังมีวันค้างจ่าย · จ่ายแล้วเป็นกุญแจ */}
+                    {r.amount !== null && (
+                      <SiteWageButton
+                        employeeId={r.employee_id}
+                        siteId={r.site_id}
+                        personName={r.full_name}
+                        siteName={r.site_name}
+                      />
                     )}
                   </li>
                 ))}
@@ -156,8 +175,9 @@ export function SiteHistory({
         · ตัวเลขในแต่ละแถวเป็นวันแรงของคนนั้น ครึ่งวันนับเป็น 0.5
         · ยอดเงินคือ<span className="font-medium text-ink-2">ค่าแรงที่เกิดขึ้น</span>{' '}
         ไม่ใช่เงินที่จ่ายออกไปแล้ว
+        · ดินสอท้ายแถว = แก้ค่าแรงที่จ่ายจริง / OT / เบี้ยเลี้ยง / รายการหัก ของวันที่ยังไม่จ่าย
       </p>
-    </>
+    </SiteWageProvider>
   )
 }
 

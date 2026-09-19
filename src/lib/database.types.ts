@@ -231,6 +231,51 @@ export type Database = {
           },
         ]
       }
+      attendance_adjustments: {
+        Row: {
+          amount: number
+          attendance_id: string
+          created_at: string
+          id: string
+          kind: Database["public"]["Enums"]["adjust_kind"]
+          name: string
+          preset_id: string | null
+        }
+        Insert: {
+          amount: number
+          attendance_id: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["adjust_kind"]
+          name: string
+          preset_id?: string | null
+        }
+        Update: {
+          amount?: number
+          attendance_id?: string
+          created_at?: string
+          id?: string
+          kind?: Database["public"]["Enums"]["adjust_kind"]
+          name?: string
+          preset_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "attendance_adjustments_attendance_id_fkey"
+            columns: ["attendance_id"]
+            isOneToOne: false
+            referencedRelation: "attendance"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "attendance_adjustments_preset_id_fkey"
+            columns: ["preset_id"]
+            isOneToOne: false
+            referencedRelation: "wage_adjustment_presets"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       attendance_wages: {
         Row: {
           amount: number | null
@@ -1190,6 +1235,39 @@ export type Database = {
           },
         ]
       }
+      wage_adjustment_presets: {
+        Row: {
+          amount: number
+          created_at: string
+          id: string
+          is_active: boolean
+          kind: Database["public"]["Enums"]["adjust_kind"]
+          name: string
+          sort_order: number
+          updated_at: string
+        }
+        Insert: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["adjust_kind"]
+          name: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          created_at?: string
+          id?: string
+          is_active?: boolean
+          kind?: Database["public"]["Enums"]["adjust_kind"]
+          name?: string
+          sort_order?: number
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
@@ -1496,6 +1574,7 @@ export type Database = {
         }
         Returns: string
       }
+      set_attendance_ot: { Args: { p_att: string; p_ot: number }; Returns: undefined }
       site_day_wage: { Args: { p_on: string; p_site: string }; Returns: number }
       site_money: {
         Args: { p_site?: string }
@@ -1532,6 +1611,7 @@ export type Database = {
       }
     }
     Enums: {
+      adjust_kind: "add" | "deduct"
       income_kind: "deposit" | "installment" | "variation_order" | "other"
       notification_kind:
         | "txn_pending"
@@ -1672,6 +1752,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
+      adjust_kind: ["add", "deduct"],
       income_kind: ["deposit", "installment", "variation_order", "other"],
       notification_kind: [
         "txn_pending",

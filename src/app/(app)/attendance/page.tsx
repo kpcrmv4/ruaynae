@@ -6,6 +6,7 @@ import { PAGE_SIZE } from '@/lib/constants'
 import { fmtDateLong, todayInBangkok } from '@/lib/format'
 import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
+import type { AdjustLine } from '@/lib/wage-adjustments'
 import { AttendanceBoard } from './attendance-client'
 
 export const metadata = { title: 'คนเข้าโครงการ' }
@@ -90,11 +91,14 @@ export default async function AttendancePage({
     { data: dayWage },
     { data: prevRows, error: pErr },
     { data: otherSiteRows, error: oErr },
+    { data: wageRows, error: wErr },
+    { data: presetRows, error: prErr },
   ] =
     await Promise.all([
-      // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้เลย — หัวหน้าโครงการมีหน้าที่บันทึกว่าใครมาทำงาน
+      // 🔴 ไม่ดึงค่าแรงมาที่หน้านี้สำหรับหัวหน้าโครงการ — เขามีหน้าที่บันทึกว่าใครมาทำงาน
       // ไม่ใช่ดูเงิน (เจ้าของสั่งไว้ 31 ส.ค. 2569) · เรตอยู่ `employee_wages`
-      // ซึ่ง RLS ไม่ให้เขาอ่านอยู่แล้ว การไม่ขอมาตั้งแต่แรกทำให้หน้าไม่ต้องมี if
+      // ซึ่ง RLS ไม่ให้เขาอ่านอยู่แล้ว · เจ้าของดึงแยกอีก query ข้างล่าง (กล่องปรับค่าแรง
+      // ต้องรู้ฐานของวันเพื่อสรุปว่าค่าแรงออกมาเท่าไหร่)
       sb
         .from('employees')
         .select('id, full_name, job_title')
@@ -107,7 +111,9 @@ export default async function AttendancePage({
       isOwner
         ? sb
             .from('attendance')
-            .select('id, employee_id, work_units, note, attendance_wages(amount, ot_amount)')
+            .select(
+              'id, employee_id, work_units, note, attendance_wages(amount, ot_amount), attendance_adjustments(preset_id, name, kind, amount)',
+            )
             .eq('site_id', siteId)
             .eq('work_date', date)
             .order('created_at', { ascending: true })
@@ -120,6 +126,14 @@ export default async function AttendancePage({
                 work_units: Number(r.work_units),
                 amount: Number(r.attendance_wages?.amount ?? 0),
                 otAmount: Number(r.attendance_wages?.ot_amount ?? 0),
+                lines: (r.attendance_adjustments ?? []).map(
+                  (l): AdjustLine => ({
+                    presetId: l.preset_id,
+                    name: l.name,
+                    kind: l.kind,
+                    amount: Number(l.amount),
+                  }),
+                ),
               })),
             }))
         : sb
@@ -138,6 +152,7 @@ export default async function AttendancePage({
                 // `null` = ไม่มีสิทธิ์เห็น ไม่ใช่ 0 ที่อ่านเหมือน "ทำงานฟรี"
                 amount: null,
                 otAmount: null,
+                lines: [] as AdjustLine[],
               })),
             })),
       // 🔴 ยอดรวมมาจากฐานข้อมูล ไม่ใช่บวกแถวที่หน้านี้โหลดมา —
@@ -163,12 +178,30 @@ export default async function AttendancePage({
         .neq('site_id', siteId)
         .order('employee_id', { ascending: true })
         .range(0, PAGE_SIZE * 2 - 1),
+      // เรตรายคน (เจ้าของเท่านั้น) — ฐานของกล่องปรับค่าแรง · คนรายเดือนเป็น 0
+      // เพราะเงินเดือนไปทางกฎรายเดือน การติ๊กเข้าเฉพาะรายการปรับ (§15)
+      isOwner
+        ? sb
+            .from('employee_wages')
+            .select('employee_id, wage_type, daily_rate')
+            .range(0, PAGE_SIZE - 1)
+        : Promise.resolve({ data: [], error: null }),
+      // รายการปรับสำเร็จรูปที่เปิดอยู่ (เจ้าของเท่านั้น — RLS คืนว่างให้คนอื่นอยู่แล้ว)
+      isOwner
+        ? sb
+            .from('wage_adjustment_presets')
+            .select('id, name, kind, amount, sort_order, is_active')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true })
+            .range(0, PAGE_SIZE - 1)
+        : Promise.resolve({ data: [], error: null }),
     ])
 
-  if (eErr || aErr || pErr || oErr) {
+  if (eErr || aErr || pErr || oErr || wErr || prErr) {
     console.error(
       '[attendance] โหลดข้อมูลไม่ได้',
-      eErr?.message ?? aErr?.message ?? pErr?.message ?? oErr?.message,
+      eErr?.message ?? aErr?.message ?? pErr?.message ?? oErr?.message ?? wErr?.message ?? prErr?.message,
     )
     return (
       <DataError message="โหลดข้อมูลคนเข้าโครงการไม่สำเร็จ" />
@@ -183,6 +216,11 @@ export default async function AttendancePage({
     const name = r.sites?.name
     if (name && !cur.siteNames.includes(name)) cur.siteNames.push(name)
     bookedElsewhere[r.employee_id] = cur
+  }
+
+  const rates: Record<string, number> = {}
+  for (const w of wageRows ?? []) {
+    rates[w.employee_id] = w.wage_type === 'daily' ? Number(w.daily_rate ?? 0) : 0
   }
 
   return (
@@ -202,6 +240,8 @@ export default async function AttendancePage({
           work_units: Number(r.work_units),
         }))}
         bookedElsewhere={bookedElsewhere}
+        presets={(presetRows ?? []).map((p) => ({ ...p, amount: Number(p.amount) }))}
+        rates={rates}
       />
     </>
   )

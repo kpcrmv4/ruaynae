@@ -3,6 +3,7 @@ import { getCurrentUserOrNull } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { todayInBangkok } from '@/lib/format'
 import { isUuid, MAX_NOTE } from '@/lib/transactions'
+import { adjustDbCode, parseAdjustLines, type AdjustLine } from '@/lib/wage-adjustments'
 
 export const runtime = 'nodejs'
 
@@ -14,7 +15,10 @@ const guardCode = (msg: string) => GUARD_CODES.find((c) => msg.includes(c))
  * POST /api/attendance — ลงชื่อคนเข้าโครงการหนึ่งคน
  *
  * 🔴 `wage_snapshot` ไม่รับจาก client เลย — trigger เป็นคนถ่ายจากเรตในฐานข้อมูล
- * (ดู P4-DB-09) · ที่นี่ส่งแค่ ใคร · โครงการไหน · วันไหน · กี่ส่วน · OT เท่าไหร่
+ * (ดู P4-DB-09) · ที่นี่ส่งแค่ ใคร · โครงการไหน · วันไหน · กี่ส่วน · รายการปรับอะไรบ้าง
+ *
+ * รายการปรับ (`adjustments`) = OT · เบี้ยเลี้ยง · มาสาย (R10) · `otAmount` แบบเดิม
+ * ยังรับอยู่เพื่อ client เก่า และถูกแปลงเป็นบรรทัด "OT" หนึ่งบรรทัด
  */
 export async function POST(req: NextRequest) {
   const me = await getCurrentUserOrNull()
@@ -49,11 +53,21 @@ export async function POST(req: NextRequest) {
   if (rawUnits !== 0.5 && rawUnits !== 1) {
     return NextResponse.json({ error: 'WORK_UNITS_INVALID' }, { status: 400 })
   }
-  // 🔴 OT เป็นเงิน — หัวหน้าโครงการไม่เห็นและไม่ตั้ง (เจ้าของสั่งไว้ 31 ส.ค. 2569)
+  // 🔴 รายการปรับเป็นเงิน — หัวหน้าโครงการไม่เห็นและไม่ตั้ง (เจ้าของสั่งไว้ 31 ส.ค. 2569)
   // ค่าที่หัวหน้าโครงการส่งมาถูกเพิกเฉย ไม่ใช่ตอบ error เพราะหน้าจอของเขาไม่มีช่องนี้อยู่แล้ว
-  const ot = me.role === 'owner' ? Number(body.otAmount ?? body.ot_amount ?? 0) : 0
-  if (!Number.isFinite(ot) || ot < 0 || ot > 999_999) {
-    return NextResponse.json({ error: 'OT_INVALID' }, { status: 400 })
+  let lines: AdjustLine[] = []
+  if (me.role === 'owner') {
+    const parsed = parseAdjustLines(body.adjustments)
+    if (!parsed.ok) return NextResponse.json({ error: parsed.code }, { status: 400 })
+    lines = parsed.lines
+    // client เก่าที่ยังส่ง OT ตัวเดียว → บรรทัด "OT"
+    const ot = Number(body.otAmount ?? body.ot_amount ?? 0)
+    if (!Number.isFinite(ot) || ot < 0 || ot > 999_999) {
+      return NextResponse.json({ error: 'OT_INVALID' }, { status: 400 })
+    }
+    if (ot > 0 && lines.length === 0) {
+      lines = [{ presetId: null, name: 'OT', kind: 'add', amount: Math.round(ot * 100) / 100 }]
+    }
   }
   const note = String(body.note ?? '').trim().slice(0, MAX_NOTE)
 
@@ -86,17 +100,25 @@ export async function POST(req: NextRequest) {
   if (!data) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
 
   // ยอดเงินอยู่คนละตาราง (`attendance_wages` เจ้าของอ่านได้คนเดียว) และ trigger
-  // เป็นคนสร้างแถวให้แล้ว · เหลือแค่ OT ที่เจ้าของกรอกเอง
-  if (ot > 0) {
-    const { error: otErr } = await sb
-      .from('attendance_wages')
-      .update({ ot_amount: Math.round(ot * 100) / 100 })
-      .eq('attendance_id', data.id)
-      .select('attendance_id')
-      .maybeSingle()
-    if (otErr) {
-      console.error('[attendance] บันทึก OT ไม่สำเร็จ', otErr.message)
-      return NextResponse.json({ ok: true, attendance: data, otError: 'OT_FAILED' }, { status: 201 })
+  // เป็นคนสร้างแถวให้แล้ว · รายการปรับลง `attendance_adjustments` แล้ว trigger
+  // `sync_attendance_ot` คำนวณยอดสุทธิให้ — ที่นี่ไม่แตะ `ot_amount` ตรง ๆ
+  if (lines.length > 0) {
+    const { error: adjErr } = await sb.from('attendance_adjustments').insert(
+      lines.map((l) => ({
+        attendance_id: data.id,
+        preset_id: l.presetId,
+        name: l.name,
+        kind: l.kind,
+        amount: l.amount,
+      })),
+    )
+    if (adjErr) {
+      // ลงชื่อสำเร็จแล้ว — บอกตรง ๆ ว่าส่วนไหนไม่ถูกบันทึก ไม่ใช่ตอบ 500 ทั้งที่แถวมีแล้ว
+      console.error('[attendance] บันทึกรายการปรับไม่สำเร็จ', adjErr.message)
+      return NextResponse.json(
+        { ok: true, attendance: data, adjustError: adjustDbCode(adjErr.message) ?? 'ADJUST_FAILED' },
+        { status: 201 },
+      )
     }
   }
 

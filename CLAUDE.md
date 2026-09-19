@@ -92,6 +92,8 @@ create type payroll_status as enum ('open','closed');
 | `categories` | `name`, `kind`, `is_active`, `sort_order` | อ่านได้ทุก role · เขียนเฉพาะ owner |
 | `employees` | `full_name`, `job_title`, `wage_type`, `daily_rate`, `monthly_salary`, `default_site_id`, `is_active`, **`profile_id`** (NULL = ไม่มีบัญชีล็อกอิน) | owner ทั้งหมด · supervisor อ่านคนที่เคยเข้าโครงการตัวเอง |
 | `attendance` | `work_date`, `site_id`, `employee_id`, `work_units`, `ot_amount`, **`wage_snapshot`**, `amount` (generated), `mcp_key_id` | supervisor เขียนได้เฉพาะโครงการตัวเองและวันที่ยังไม่ปิดรอบ |
+| `wage_adjustment_presets` | รายการปรับค่าแรงสำเร็จรูป (R10): `name`, `kind` (`add`/`deduct`), `amount` (ยอดเริ่มต้น), `sort_order`, `is_active` · ตั้งที่ `/settings/wage-adjustments` | **owner เท่านั้น** |
+| `attendance_adjustments` | บรรทัดปรับของการลงชื่อแต่ละครั้ง: `attendance_id`, `preset_id` (null = พิมพ์เอง), `name` (สำเนา), `kind`, `amount` (บวกเสมอ ทิศทางอยู่ที่ `kind`) · **trigger `sync_attendance_ot` เขียนยอดสุทธิลง `attendance_wages.ot_amount`** — ห้ามใครเขียน `ot_amount` ตรง ให้เรียก `set_attendance_ot()` | **owner เท่านั้น** |
 | `transactions` | `kind`, `site_id` (NULL = ส่วนกลาง), `category_id`, `amount`, `txn_date`, `pay_method`, `status`, `income_kind`, `installment_no`, **`mcp_key_id`** (NULL = คนคีย์เอง · มีค่า = AI คีย์ผ่านคีย์ใบนั้น) | supervisor เขียน `pending` ของโครงการตัวเอง · **แก้เป็น `approved` ได้เฉพาะ owner** |
 | `attachments` | `transaction_id`, `object_key`, `thumb_key`, `byte_size`, `content_type` | ตาม transaction |
 | `upload_intents` | `object_key`, `thumb_key`, `created_by`, `site_id`, `expires_at`, `consumed_at` | ของตัวเองเท่านั้น |
@@ -360,6 +362,9 @@ src/
     (app)/settings/users     ผู้ใช้ระบบ (มี login) · `?tab=workers` = คนงาน (ไม่มี login)
 #                            เข้าจาก **สองปุ่มแยกกัน** บนหน้าตั้งค่า ไม่มีแถบแท็บแล้ว
     (app)/settings/branding  ชื่อบริษัท + โลโก้
+    (app)/settings/wage-adjustments  รายการปรับค่าแรงสำเร็จรูป (OT · เบี้ยเลี้ยง · มาสาย)
+    (app)/attendance/adjust-dialog.tsx  กล่องปรับค่าแรงของคนหนึ่งคนในหนึ่งวัน — ใช้ทั้ง /attendance และ /payroll
+    (app)/payroll/site-wage-edit.tsx    ดินสอแก้ค่าแรงที่จ่ายจริงในแท็บ "ทำงานที่ไหนบ้าง"
     api/auth/pin/route.ts
     api/branding/route.ts    ← ไม่ต้องล็อกอิน · หน้า login เรียกใช้
     api/transactions/route.ts · api/transactions/[id]/route.ts
@@ -448,6 +453,13 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       · **คนที่เคยอยู่ในรอบจ่ายที่ปิดแล้วลบไม่ได้** (`payroll_lines` คือหลักฐานการจ่ายเงิน) ให้ปิดใช้งานแทน
       · `employees_delete_info()` ส่งยอดค้างจ่ายมาพร้อมหน้า กล่องยืนยันจึงบอกได้ทันทีว่ากำลังจะเสียอะไร
 - [x] **R8 · มุมมองการ์ดของคนเข้าโครงการ** — ปุ่มสลับมุมมอง + การ์ดสองคอลัมน์สำหรับเลือกด้วยนิ้วเดียว
+- [x] **R10 · รายการปรับค่าแรง + แก้ค่าแรงที่จ่ายจริง** (19 ก.ย. 2569) — `wage_adjustment_presets`
+      + `attendance_adjustments` · `ot_amount` กลายเป็น "ยอดสุทธิของรายการปรับ" (บวก − หัก) ที่
+      trigger คำนวณให้ · ถอด check `ot_amount >= 0` แล้วคุมที่ **ค่าแรงสุทธิของวันห้ามติดลบ** แทน
+      · กล่อง "ปรับ" บนการ์ด/รายชื่อ/แถวที่ลงแล้วของ `/attendance` · การ์ดสรุปของวันอยู่บนสุดไม่ลอย
+      · ดินสอในแท็บ "ทำงานที่ไหนบ้าง" แก้ค่าแรงฐานรายวัน (`save_attendance_day` ไม่ส่ง `p_ot` =
+      ไม่แตะรายการปรับ) · ⚠️ **ยังไม่ได้ apply migration** (Supabase MCP ในเครื่องที่ทำชี้ผิดโปรเจ็ค)
+      — ต้อง apply + `generate_typescript_types` แล้ว diff กับที่เขียนมือต้องว่าง (`R10-DB-01`)
 - [x] **R9 · รอบคำสั่งเจ้าของ 4 ก.ย. 2569** — เรียกหน่วยงานว่า "โครงการ" ทั้งระบบ · ปิดการ์ด
       "งานวันนี้" · ต้นทุนสะสมแยกสามก้อน (ค่าแรง/ค่าวัสดุ/อื่น ๆ) + ธง `categories.is_material`
       · ยอดรวมแยกหมวดในหน้าโครงการ · **จ่ายค่าแรงรายคนปุ่มเดียว** (เลิกใช้คำว่า "รอบจ่าย"

@@ -1,10 +1,16 @@
 'use client'
 
-import { Check, History, LayoutGrid, List, Loader2, UserRound, X } from 'lucide-react'
+import {
+  Check, History, LayoutGrid, List, Loader2, SlidersHorizontal, UserRound, Users, X,
+} from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht } from '@/lib/format'
+import {
+  ADJUST_ERRORS, adjustNet, type AdjustLine, type AdjustPreset,
+} from '@/lib/wage-adjustments'
+import { AdjustDialog } from './adjust-dialog'
 import { PickGrid, type PickItem } from './pick-grid'
 
 type Employee = {
@@ -19,6 +25,8 @@ type Row = {
   work_units: number
   amount: number | null
   otAmount: number | null
+  /** รายการปรับค่าแรงของวันนี้ — ว่างเสมอสำหรับคนที่ไม่เห็นเงิน */
+  lines: AdjustLine[]
 }
 
 const MESSAGES: Record<string, string> = {
@@ -35,8 +43,13 @@ const MESSAGES: Record<string, string> = {
   EMPLOYEE_INACTIVE: 'คนงานคนนี้ถูกปิดใช้งานแล้ว',
   OT_INVALID: 'ค่า OT ต้องเป็นตัวเลขที่ไม่ติดลบ',
   NOT_FOUND: 'ไม่พบรายการนี้ — อาจถูกลบไปแล้ว',
+  ...ADJUST_ERRORS,
 }
 const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
+
+/** สรุปบรรทัดปรับเป็นข้อความสั้น ๆ ต่อท้ายยอด — "+OT 100 · −มาสาย 50" */
+const linesText = (lines: AdjustLine[]) =>
+  lines.map((l) => `${l.kind === 'add' ? '+' : '−'}${l.name} ${l.amount.toLocaleString('th-TH')}`).join(' · ')
 
 export function AttendanceBoard({
   date,
@@ -49,6 +62,8 @@ export function AttendanceBoard({
   dayWage,
   yesterdaySignIns,
   bookedElsewhere,
+  presets,
+  rates,
 }: {
   date: string
   today: string
@@ -70,13 +85,24 @@ export function AttendanceBoard({
    * "เท่าที่คนดูมีสิทธิ์เห็น" — ฐานข้อมูลยังเป็นตัวตัดสินสุดท้ายเสมอ
    */
   bookedElsewhere: Record<string, { units: number; siteNames: string[] }>
+  /** รายการปรับค่าแรงสำเร็จรูปที่เปิดใช้อยู่ — ว่างสำหรับคนที่ไม่เห็นเงิน */
+  presets: AdjustPreset[]
+  /** เรตต่อวันรายคน (คนรายเดือน = 0) — ว่างสำหรับคนที่ไม่เห็นเงิน */
+  rates: Record<string, number>
 }) {
   const router = useRouter()
   const params = useSearchParams()
   const [busy, setBusy] = useState<string | null>(null)
   const [bulkBusy, setBulkBusy] = useState(false)
   const [half, setHalf] = useState<Record<string, boolean>>({})
-  const [ot, setOt] = useState<Record<string, string>>({})
+  /** รายการปรับค่าแรงของคนที่ติ๊กไว้ (ยังไม่ลงชื่อ) — ไปกับ POST ตอนกด "ลงชื่อ N คน" */
+  const [adjust, setAdjust] = useState<Record<string, AdjustLine[]>>({})
+  /**
+   * กล่องปรับค่าแรงที่เปิดอยู่ · `attendanceId` มีค่า = คนที่ลงชื่อแล้ว (บันทึกยิง API ทันที)
+   * ไม่มี = คนที่ยังติ๊กค้างไว้ (บันทึกลง state ก่อน)
+   */
+  const [dialog, setDialog] = useState<{ employeeId: string; attendanceId: string | null } | null>(null)
+  const [dialogSaving, setDialogSaving] = useState(false)
   // คนที่ติ๊กไว้รอบันทึก — ลงชื่อทีเดียวทั้งชุด ไม่ใช่กดทีละคน
   const [picked, setPicked] = useState<Record<string, boolean>>({})
   /**
@@ -90,12 +116,17 @@ export function AttendanceBoard({
   const [view, setView] = useState<'card' | 'list'>('card')
 
   const byEmployee = new Map(signedIn.map((r) => [r.employee_id, r]))
+  const byId = new Map(employees.map((e) => [e.id, e]))
   const inSite = employees.filter((e) => byEmployee.has(e.id))
   const notIn = employees.filter((e) => !byEmployee.has(e.id))
 
   /** เหลือลงได้อีกกี่วันสำหรับคนนี้ (เพดาน 1 วันต่อวัน หักที่ลงไว้ที่โครงการอื่นแล้ว) */
   const capacityOf = (employeeId: string) =>
     Math.max(0, 1 - (bookedElsewhere[employeeId]?.units ?? 0))
+
+  /** ส่วนของวันที่จะถูกส่งไปจริงสำหรับคนที่ติ๊กไว้ — ครึ่งวันหรือเท่าที่โควตาเหลือ */
+  const unitsOf = (employeeId: string) =>
+    Math.min(half[employeeId] ? 0.5 : 1, capacityOf(employeeId))
 
   // ชุดของเมื่อวานที่ยังไม่ถูกลงวันนี้ คนยังอยู่ในรายชื่อ และยังมีโควตาเหลือ
   // — คนที่เต็มวันอยู่โครงการอื่นแล้วต้องไม่ถูกนับในปุ่ม ไม่งั้นตัวเลขบนปุ่มโกหก
@@ -115,7 +146,7 @@ export function AttendanceBoard({
   }
 
   /** ยิงลงชื่อหนึ่งคน — คืนรหัสเหตุผลที่ไม่สำเร็จ (null = สำเร็จ) ให้ผู้เรียกสรุปข้อความเอง */
-  async function postSignIn(employeeId: string, workUnits: number, otAmount: number) {
+  async function postSignIn(employeeId: string, workUnits: number, lines: AdjustLine[]) {
     try {
       const r = await fetch('/api/attendance', {
         method: 'POST',
@@ -126,10 +157,15 @@ export function AttendanceBoard({
           workDate: date,
           workUnits,
           // ส่งเฉพาะตอนเป็นเจ้าของ · API ก็เพิกเฉยค่าที่หัวหน้าโครงการส่งมาอีกชั้น
-          ...(canSeeMoney ? { otAmount } : {}),
+          ...(canSeeMoney && lines.length > 0 ? { adjustments: lines } : {}),
         }),
       })
-      if (r.ok) return null
+      if (r.ok) {
+        // ลงชื่อสำเร็จแต่รายการปรับไม่ถูกบันทึก — ต้องบอก ไม่ใช่เงียบ (§17 ข้อ 18)
+        const b = await r.json().catch(() => ({}))
+        if (b?.adjustError) toast.error(fail(b.adjustError))
+        return null
+      }
       const b = await r.json().catch(() => ({}))
       return typeof b.error === 'string' ? b.error : 'UNKNOWN'
     } catch {
@@ -155,7 +191,9 @@ export function AttendanceBoard({
       where: other?.siteNames.join(' · ') ?? null,
       picked: Boolean(picked[e.id]) && !full,
       half: Boolean(half[e.id]),
-      ot: Number(ot[e.id] ?? 0) || 0,
+      money: canSeeMoney
+        ? { base: (rates[e.id] ?? 0) * unitsOf(e.id), lines: adjust[e.id] ?? [] }
+        : null,
     }
   })
 
@@ -185,8 +223,7 @@ export function AttendanceBoard({
     const failures: string[] = []
     for (const id of pickedIds) {
       // ลงครึ่งวันที่โครงการอื่นไปแล้ว = เหลือโควตาแค่ครึ่งวัน ส่งเต็มวันไปก็โดนปฏิเสธ
-      const units = Math.min(half[id] ? 0.5 : 1, capacityOf(id))
-      const code = await postSignIn(id, units, Number(ot[id] ?? 0) || 0)
+      const code = await postSignIn(id, unitsOf(id), adjust[id] ?? [])
       if (code === null) ok += 1
       else failures.push(code)
     }
@@ -195,6 +232,7 @@ export function AttendanceBoard({
     // ล้มทั้งหมด: บอกเหตุผลจริงของรายการแรก ดีกว่าข้อความกลาง ๆ ที่ไม่ช่วยอะไร
     else toast.error(failures[0] === 'NETWORK' ? 'เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่' : fail(failures[0]))
     setPicked({})
+    setAdjust({})
     router.refresh()
     setBulkBusy(false)
   }
@@ -203,7 +241,7 @@ export function AttendanceBoard({
    * ลงชื่อทั้งชุดของเมื่อวานในแตะเดียว — ชุดคนหน้างานมักซ้ำกันทั้งสัปดาห์
    *
    * ยิงผ่าน API เดิมทีละคน (ด่านกันซ้ำ/กันเกินวันของฐานข้อมูลยังตรวจครบทุกคน)
-   * คัดลอกเฉพาะ เต็มวัน/ครึ่งวัน — OT เป็นเรื่องของแต่ละวัน ไม่คัดลอก
+   * คัดลอกเฉพาะ เต็มวัน/ครึ่งวัน — OT และรายการปรับเป็นเรื่องของแต่ละวัน ไม่คัดลอก
    */
   async function signInLikeYesterday() {
     if (busy || bulkBusy || copyFromYesterday.length === 0) return
@@ -214,7 +252,7 @@ export function AttendanceBoard({
       // ตัดยอดให้พอดีโควตาที่เหลือ — เมื่อวานเต็มวันแต่วันนี้ไปครึ่งวันที่อื่นแล้ว
       // ก็ลงได้แค่ครึ่งวัน · ไม่ใช่ยิงเต็มวันไปให้ถูกปฏิเสธแล้วนับเป็น "ข้าม"
       const units = Math.min(r.work_units === 0.5 ? 0.5 : 1, capacityOf(r.employee_id))
-      const code = units > 0 ? await postSignIn(r.employee_id, units, 0) : 'WORK_UNITS_EXCEEDED'
+      const code = units > 0 ? await postSignIn(r.employee_id, units, []) : 'WORK_UNITS_EXCEEDED'
       if (code === null) ok += 1
       else skipped += 1
     }
@@ -243,6 +281,63 @@ export function AttendanceBoard({
       setBusy(null)
     }
   }
+
+  /**
+   * บันทึกจากกล่องปรับค่าแรง — สองปลายทาง:
+   * คนที่ยังติ๊กค้าง → เก็บใน state ไปกับการลงชื่อ · คนที่ลงชื่อแล้ว → PUT ทันที
+   */
+  async function saveAdjust(lines: AdjustLine[]) {
+    if (!dialog) return
+    if (!dialog.attendanceId) {
+      setAdjust((a) => ({ ...a, [dialog.employeeId]: lines }))
+      setDialog(null)
+      return
+    }
+    setDialogSaving(true)
+    try {
+      const r = await fetch(`/api/attendance/${dialog.attendanceId}/adjustments`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adjustments: lines }),
+      })
+      const b = await r.json().catch(() => ({}))
+      if (!r.ok) {
+        toast.error(fail(b.error))
+        return
+      }
+      toast.success(lines.length === 0 ? 'ล้างรายการปรับแล้ว' : 'บันทึกรายการปรับแล้ว')
+      setDialog(null)
+      router.refresh()
+    } catch {
+      toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
+    } finally {
+      setDialogSaving(false)
+    }
+  }
+
+  /** ข้อมูลสำหรับกล่องที่เปิดอยู่ — ฐานมาจากคนละที่ตามว่าลงชื่อแล้วหรือยัง */
+  const dialogData = (() => {
+    if (!dialog) return null
+    const e = byId.get(dialog.employeeId)
+    if (!e) return null
+    if (dialog.attendanceId) {
+      const row = byEmployee.get(dialog.employeeId)
+      if (!row) return null
+      // ฐาน = ยอดของวัน − ยอดสุทธิของรายการปรับ (ทั้งสองมาจากฐานข้อมูล)
+      return {
+        name: e.full_name,
+        units: row.work_units,
+        base: (row.amount ?? 0) - (row.otAmount ?? 0),
+        initial: row.lines,
+      }
+    }
+    return {
+      name: e.full_name,
+      units: unitsOf(e.id),
+      base: (rates[e.id] ?? 0) * unitsOf(e.id),
+      initial: adjust[e.id] ?? [],
+    }
+  })()
 
   return (
     <div className="space-y-4">
@@ -290,6 +385,41 @@ export function AttendanceBoard({
         </button>
       )}
 
+      {/* ── สรุปของวัน — การ์ดตัวเลขสำคัญ อยู่บนสุดไม่ลอยตามจอ (เจ้าของแจ้ง 19 ก.ย. 2569)
+          ตัวเลขมาจากเซิร์ฟเวอร์ (router.refresh() หลังทุกการติ๊ก) ไม่ใช่บวกเอง
+          · โทนแบรนด์อ่อนให้ต่างจากแผงรายชื่อสีขาว · หัวหน้าโครงการเห็นจำนวนคน ไม่เห็นเงิน */}
+      <section
+        aria-label="สรุปวันนี้"
+        className="grid grid-cols-2 gap-px overflow-hidden rounded-lg border border-brand-tint-strong bg-brand-tint-strong sm:grid-cols-3"
+        {...(dayWage !== undefined ? { 'data-day-wage': dayWage } : {})}
+      >
+        <div className="bg-brand-tint px-4 py-3">
+          <div className="flex items-center gap-1.5 text-xs font-medium text-brand-on-tint">
+            <Users className="size-3.5" strokeWidth={2} aria-hidden />
+            เข้าโครงการแล้ว
+          </div>
+          <div className="mt-0.5 text-2xl font-bold leading-8 tnum text-ink">
+            {inSite.length}
+            <span className="ml-1 text-sm font-medium text-ink-2">คน</span>
+          </div>
+        </div>
+        {dayWage !== undefined && (
+          <div className="bg-brand-tint px-4 py-3">
+            <div className="text-xs font-medium text-brand-on-tint">ค่าแรงวันนี้</div>
+            <div className="mt-0.5 truncate text-2xl font-bold leading-8 tnum text-ink">
+              {fmtBaht(dayWage)}
+            </div>
+          </div>
+        )}
+        <div className={`bg-brand-tint px-4 py-3 ${dayWage !== undefined ? 'col-span-2 sm:col-span-1' : ''}`}>
+          <div className="text-xs font-medium text-brand-on-tint">ยังไม่เข้า</div>
+          <div className="mt-0.5 text-2xl font-bold leading-8 tnum text-ink">
+            {notIn.length}
+            <span className="ml-1 text-sm font-medium text-ink-2">คน</span>
+          </div>
+        </div>
+      </section>
+
       <section className="panel">
         <div className="panel-head">
           เข้าโครงการแล้ว
@@ -311,28 +441,42 @@ export function AttendanceBoard({
                   className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b border-line-soft px-3.5 py-2.5 last:border-b-0 md:px-4"
                 >
                   <UserRound className="size-4 shrink-0 text-muted-token" />
-                  <span className="min-w-0 flex-1 truncate font-medium text-ink">
-                    {e.full_name}
-                    {Number(row.work_units) === 0.5 && (
-                      <span className="ml-1.5 text-sm font-normal text-muted-token">ครึ่งวัน</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium text-ink">
+                      {e.full_name}
+                      {Number(row.work_units) === 0.5 && (
+                        <span className="ml-1.5 text-sm font-normal text-muted-token">ครึ่งวัน</span>
+                      )}
+                    </span>
+                    {row.lines.length > 0 && (
+                      <span className="block truncate text-xs text-muted-token">{linesText(row.lines)}</span>
                     )}
                   </span>
                   {row.amount !== null && (
                     <span className="shrink-0 text-sm font-semibold tnum text-ink">
                       {fmtBaht(row.amount)}
-                      {(row.otAmount ?? 0) > 0 && (
-                        <span className="ml-1 text-xs font-normal text-muted-token">
-                          (รวม OT {fmtBaht(row.otAmount)})
-                        </span>
-                      )}
                     </span>
+                  )}
+                  {/* ปรับค่าแรงหลังลงชื่อแล้ว — ลืมใส่ OT ตอนติ๊กเป็นเรื่องปกติ · เจ้าของเท่านั้น */}
+                  {canSeeMoney && (
+                    <button
+                      type="button"
+                      onClick={() => setDialog({ employeeId: e.id, attendanceId: row.id })}
+                      disabled={busy !== null || bulkBusy}
+                      aria-label={`ปรับค่าแรงของ ${e.full_name}`}
+                      className={`btn-secondary shrink-0 px-2.5 disabled:cursor-not-allowed disabled:opacity-60 ${
+                        row.lines.length > 0 ? 'border-brand-solid text-brand' : ''
+                      }`}
+                    >
+                      <SlidersHorizontal className="size-4" />
+                    </button>
                   )}
                   <button
                     type="button"
                     onClick={() => signOut(row)}
                     disabled={busy !== null || bulkBusy}
                     aria-label={`เอา ${e.full_name} ออกจากโครงการ`}
-                    className="btn-secondary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-secondary shrink-0 px-2.5 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     {busy === e.id ? (
                       <Loader2 className="size-4 animate-spin" />
@@ -382,22 +526,15 @@ export function AttendanceBoard({
               : 'ทุกคนถูกลงชื่อครบแล้ว'}
           </p>
         ) : view === 'card' ? (
-          <>
-            <PickGrid
-              items={pickItems}
-              disabled={bulkBusy}
-              onToggle={toggle}
-              onToggleHalf={(id, next) => setHalf((h) => ({ ...h, [id]: next }))}
-            />
-            {/* ช่อง OT ใส่ในการ์ดขนาดนี้ไม่ได้โดยไม่ทำให้ทั้งใบกดยาก —
-                บอกทางไปแทนที่จะซ่อนความสามารถไว้เฉย ๆ · หัวหน้าโครงการไม่เห็นบรรทัดนี้
-                เพราะเขาไม่มีสิทธิ์ตั้ง OT อยู่แล้ว */}
-            {canSeeMoney && (
-              <p className="border-t border-line-soft px-3.5 pb-3 pt-2.5 text-xs text-muted-token md:px-4">
-                ตั้งค่า OT ได้ในมุมมองรายชื่อ
-              </p>
-            )}
-          </>
+          <PickGrid
+            items={pickItems}
+            disabled={bulkBusy}
+            onToggle={toggle}
+            onToggleHalf={(id, next) => setHalf((h) => ({ ...h, [id]: next }))}
+            onAdjust={
+              canSeeMoney ? (id) => setDialog({ employeeId: id, attendanceId: null }) : undefined
+            }
+          />
         ) : (
           <ul>
             {notIn.map((e) => {
@@ -408,6 +545,8 @@ export function AttendanceBoard({
               const halfOnly = Boolean(other) && cap > 0 && cap < 1
               const where = other?.siteNames.join(' · ')
               const on = Boolean(picked[e.id]) && !full
+              const lines = adjust[e.id] ?? []
+              const total = (rates[e.id] ?? 0) * unitsOf(e.id) + adjustNet(lines)
               return (
                 <li
                   key={e.id}
@@ -493,20 +632,27 @@ export function AttendanceBoard({
                           ครึ่งวัน
                         </label>
                       )}
-                      {/* ช่อง OT เป็นเงิน — เจ้าของเท่านั้นที่เห็นและกรอกได้ */}
+                      {/* ปรับค่าแรงเป็นเงิน — เจ้าของเท่านั้นที่เห็นและตั้งได้ · กล่องเดียวกับมุมมองการ์ด */}
                       {canSeeMoney && (
-                        <label className="flex items-center gap-2 text-sm text-ink-2">
-                          OT
-                          <input
-                            type="text"
-                            inputMode="decimal"
-                            value={ot[e.id] ?? ''}
-                            onChange={(ev) => setOt((o) => ({ ...o, [e.id]: ev.target.value }))}
-                            placeholder="฿0"
-                            aria-label={`ค่า OT ของ ${e.full_name}`}
-                            className="input-base w-24 py-1.5 tnum"
-                          />
-                        </label>
+                        <>
+                          <button
+                            type="button"
+                            onClick={() => setDialog({ employeeId: e.id, attendanceId: null })}
+                            disabled={bulkBusy}
+                            className={`btn-secondary py-1.5 text-sm ${
+                              lines.length > 0 ? 'border-brand-solid text-brand' : ''
+                            }`}
+                          >
+                            <SlidersHorizontal className="size-4" />
+                            ปรับค่าแรง
+                          </button>
+                          <span className="ml-auto text-sm tnum text-ink-2">
+                            {lines.length > 0 && (
+                              <span className="mr-2 text-xs text-muted-token">{linesText(lines)}</span>
+                            )}
+                            <span className="font-semibold text-ink">{fmtBaht(total)}</span>
+                          </span>
+                        </>
                       )}
                     </div>
                   )}
@@ -517,58 +663,49 @@ export function AttendanceBoard({
         )}
       </section>
 
-      {/* ── แถบสรุปลอยล่าง — เห็นตลอดเวลาที่ไล่ติ๊กรายชื่อยาว ๆ ─────────────
-          ตัวเลขมาจากเซิร์ฟเวอร์ (router.refresh() หลังทุกการติ๊ก) ไม่ใช่บวกเอง
-          บนจอเล็กลอยเหนือแถบเมนูล่าง · หัวหน้าโครงการเห็นจำนวนคน ไม่เห็นเงิน */}
-      <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 lg:bottom-4">
-        <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-e2">
-          {pickedIds.length > 0 ? (
-            // ติ๊กค้างไว้แล้ว — แถบเปลี่ยนเป็นปุ่มบันทึกทั้งชุด บันทึกครั้งเดียวจบ
-            <>
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-token">เลือกไว้</div>
-                <div className="truncate text-lg font-bold leading-6 tnum text-ink">
-                  {pickedIds.length} คน
-                </div>
+      {/* ── แถบลอยเฉพาะตอนติ๊กค้างอยู่ — ปุ่ม "ลงชื่อ" ต้องอยู่ใกล้นิ้วขณะไล่ติ๊กรายชื่อยาว ๆ
+          สรุปของวันไม่ลอยแล้ว (อยู่การ์ดบนสุด) — แถบนี้จึงมีหน้าที่เดียวคือบันทึกทั้งชุด
+          บนจอเล็กลอยเหนือแถบเมนูล่าง */}
+      {pickedIds.length > 0 && (
+        <div className="sticky bottom-[calc(4.5rem+env(safe-area-inset-bottom))] z-30 lg:bottom-4">
+          <div className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-2.5 shadow-e2">
+            <div className="min-w-0 flex-1">
+              <div className="text-xs text-muted-token">เลือกไว้</div>
+              <div className="truncate text-lg font-bold leading-6 tnum text-ink">
+                {pickedIds.length} คน
               </div>
-              <button
-                type="button"
-                onClick={signInPicked}
-                disabled={bulkBusy || busy !== null}
-                className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {bulkBusy ? (
-                  <Loader2 className="size-4 animate-spin" />
-                ) : (
-                  <Check className="size-4" />
-                )}
-                {bulkBusy ? 'กำลังลงชื่อ…' : `ลงชื่อ ${pickedIds.length} คน`}
-              </button>
-            </>
-          ) : (
-            <>
-              <UserRound className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
-              <div className="min-w-0 flex-1">
-                <div className="text-xs text-muted-token">เข้าโครงการแล้ว</div>
-                <div
-                  className="truncate text-lg font-bold leading-6 tnum text-ink"
-                  {...(dayWage !== undefined ? { 'data-day-wage': dayWage } : {})}
-                >
-                  {inSite.length} คน
-                  {dayWage !== undefined && (
-                    <span className="ml-1.5 font-semibold">· ค่าแรงวันนี้ {fmtBaht(dayWage)}</span>
-                  )}
-                </div>
-              </div>
-              {notIn.length > 0 && (
-                <span className="shrink-0 text-sm tnum text-muted-token">
-                  ยังไม่เข้า {notIn.length} คน
-                </span>
+            </div>
+            <button
+              type="button"
+              onClick={signInPicked}
+              disabled={bulkBusy || busy !== null}
+              className="btn-primary shrink-0 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              {bulkBusy ? (
+                <Loader2 className="size-4 animate-spin" />
+              ) : (
+                <Check className="size-4" />
               )}
-            </>
-          )}
+              {bulkBusy ? 'กำลังลงชื่อ…' : `ลงชื่อ ${pickedIds.length} คน`}
+            </button>
+          </div>
         </div>
-      </div>
+      )}
+
+      {/* กล่องปรับค่าแรง — ตัวเดียวต่อหน้า · key = คน+แถว ให้ state ในกล่องเริ่มใหม่ทุกครั้งที่เปิด */}
+      {dialog && dialogData && (
+        <AdjustDialog
+          key={`${dialog.employeeId}:${dialog.attendanceId ?? 'new'}`}
+          name={dialogData.name}
+          units={dialogData.units}
+          base={dialogData.base}
+          presets={presets}
+          initial={dialogData.initial}
+          saving={dialogSaving}
+          onSave={saveAdjust}
+          onClose={() => setDialog(null)}
+        />
+      )}
     </div>
   )
 }

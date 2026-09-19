@@ -11,6 +11,8 @@ import { EmptyState } from '@/components/ui/states'
 import { asNullableNumber } from '@/lib/money'
 import { PayrollBoard } from './payroll-client'
 import { SiteHistory } from './site-history'
+import { wageRowKey, type WageDay } from './site-wage-edit'
+import type { AdjustLine } from '@/lib/wage-adjustments'
 import { WorkGrid } from './work-grid'
 
 export const metadata = { title: 'ค่าแรงและการจ่าย' }
@@ -55,12 +57,45 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     ])
 
   // ── ข้อมูลของแท็บ "ทำงานที่ไหนบ้าง" — สรุปในฐานข้อมูล ไม่ใช่ group ใน JS ──
-  const { data: workRows, error: wErr } =
+  // + รายวันของเดือน (ตารางเดียวกับแท็บตาราง) · บรรทัดปรับ · รายการสำเร็จรูป
+  //   สำหรับกล่อง "แก้ค่าแรง" ต่อแถว (R10) — ดึงเฉพาะตอนเปิดแท็บนี้จริง
+  const [
+    { data: workRows, error: wErr },
+    { data: siteDays, error: sdErr },
+    { data: siteLines, error: slErr },
+    { data: sitePresets, error: spErr },
+  ] =
     tab === 'sites'
-      ? await sb
-          .rpc('attendance_by_site', { p_from: month.from, p_to: month.to })
-          .range(0, 2000)
-      : { data: null, error: null }
+      ? await Promise.all([
+          sb
+            .rpc('attendance_by_site', { p_from: month.from, p_to: month.to })
+            .range(0, 2000),
+          sb
+            .rpc('attendance_grid', { p_from: month.from, p_to: month.to })
+            .order('work_date', { ascending: true })
+            .range(0, 2000),
+          // บรรทัดปรับของเดือนนี้ — กรองผ่านตารางแม่ด้วย !inner (ไม่มีวันที่ในตารางลูก)
+          sb
+            .from('attendance_adjustments')
+            .select('attendance_id, preset_id, name, kind, amount, attendance!inner(work_date)')
+            .gte('attendance.work_date', month.from)
+            .lte('attendance.work_date', month.to)
+            .order('created_at', { ascending: true })
+            .range(0, 4000),
+          sb
+            .from('wage_adjustment_presets')
+            .select('id, name, kind, amount, sort_order, is_active')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true })
+            .order('name', { ascending: true })
+            .range(0, PAGE_SIZE - 1),
+        ])
+      : [
+          { data: null, error: null },
+          { data: null, error: null },
+          { data: null, error: null },
+          { data: null, error: null },
+        ]
 
   // ── ข้อมูลของแท็บ "ตารางการทำงาน" — ดึงเฉพาะตอนเปิดแท็บนั้นจริง ──────
   // เปิดแท็บยอดค้างอยู่แล้วไม่ต้องจ่ายค่า query ของอีกแท็บหนึ่ง
@@ -83,10 +118,11 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           { data: null, error: null },
         ]
 
-  if (bErr || rErr || gErr || pErr || wErr) {
+  if (bErr || rErr || gErr || pErr || wErr || sdErr || slErr || spErr) {
     console.error(
       '[payroll] โหลดข้อมูลไม่ได้',
-      bErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message ?? wErr?.message,
+      bErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message ?? wErr?.message
+        ?? sdErr?.message ?? slErr?.message ?? spErr?.message,
     )
     return (
       <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
@@ -105,6 +141,28 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     advanced: Number(b.advanced),
     balance: Number(b.balance),
   }))
+
+  // รายวันของ คน×โครงการ สำหรับกล่องแก้ค่าแรง — คีย์เดียวกับแถวสรุป
+  const linesByAtt = new Map<string, AdjustLine[]>()
+  for (const l of siteLines ?? []) {
+    const arr = linesByAtt.get(l.attendance_id) ?? []
+    arr.push({ presetId: l.preset_id, name: l.name, kind: l.kind, amount: Number(l.amount) })
+    linesByAtt.set(l.attendance_id, arr)
+  }
+  const wageDetails: Record<string, WageDay[]> = {}
+  for (const c of siteDays ?? []) {
+    const key = wageRowKey(c.employee_id, c.site_id)
+    ;(wageDetails[key] ??= []).push({
+      attendance_id: c.attendance_id,
+      work_date: c.work_date,
+      work_units: Number(c.work_units),
+      wage_snapshot: Number(c.wage_snapshot),
+      ot_amount: Number(c.ot_amount),
+      amount: Number(c.amount),
+      paid: c.paid,
+      lines: linesByAtt.get(c.attendance_id) ?? [],
+    })
+  }
 
   const totalAccrued = rows.reduce((s, r) => s + r.accrued, 0)
   const totalAdvanced = rows.reduce((s, r) => s + r.advanced, 0)
@@ -202,6 +260,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         <SiteHistory
           view={view}
           monthKey={month.key}
+          details={wageDetails}
+          presets={(sitePresets ?? []).map((p) => ({ ...p, amount: Number(p.amount) }))}
           rows={(workRows ?? []).map((r) => ({
             employee_id: r.employee_id,
             full_name: r.full_name,

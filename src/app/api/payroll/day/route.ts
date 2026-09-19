@@ -66,11 +66,14 @@ export async function POST(req: NextRequest) {
   }
 
   const wage = Number(body.wage ?? body.wage_snapshot ?? 0)
-  const ot = Number(body.otAmount ?? body.ot_amount ?? 0)
   if (!Number.isFinite(wage) || wage < 0 || wage > 9_999_999) {
     return NextResponse.json({ error: 'AMOUNT_INVALID' }, { status: 400 })
   }
-  if (!Number.isFinite(ot) || ot < 0 || ot > 999_999) {
+  // 🔴 ไม่ส่ง OT มา (null/ไม่มี) = **ไม่แตะรายการปรับที่ตั้งไว้** — กล่องแก้ค่าแรงฐาน
+  // ในแท็บ "ทำงานที่ไหนบ้าง" ใช้ทางนี้ · ตารางการทำงานส่งตัวเลขมาเสมอ (0 = ล้าง OT)
+  const rawOt = body.otAmount ?? body.ot_amount
+  const ot = rawOt === undefined || rawOt === null || rawOt === '' ? null : Number(rawOt)
+  if (ot !== null && (!Number.isFinite(ot) || ot < 0 || ot > 999_999)) {
     return NextResponse.json({ error: 'OT_INVALID' }, { status: 400 })
   }
 
@@ -81,7 +84,8 @@ export async function POST(req: NextRequest) {
     p_date: workDate,
     p_work_units: units,
     p_wage: Math.round(wage * 100) / 100,
-    p_ot: Math.round(ot * 100) / 100,
+    // omit = ค่าเริ่มต้น null ของฟังก์ชัน = ไม่แตะรายการปรับ
+    ...(ot === null ? {} : { p_ot: Math.round(ot * 100) / 100 }),
   })
 
   if (error) {

@@ -42,6 +42,8 @@ export const TABLE_LABEL: Record<string, string> = {
   employee_wages: 'ค่าแรงคนงาน',
   attendance: 'คนเข้าโครงการ',
   attendance_wages: 'ยอดค่าแรงรายวัน',
+  attendance_adjustments: 'รายการปรับค่าแรง',
+  wage_adjustment_presets: 'รายการปรับค่าแรงสำเร็จรูป',
   advances: 'เบิกล่วงหน้า',
   payroll_runs: 'การจ่ายค่าแรง',
   payroll_lines: 'บรรทัดจ่ายรายคน',

@@ -12,10 +12,10 @@
 -- ควบรวม หรือแค่แก้คำสะกด) แล้วมีคนรัน migration ซ้ำ ชื่อจะถูกย้อนกลับ
 -- ไปเป็นค่าในไฟล์นี้เงียบ ๆ
 --
--- ⚠️ ชื่อ **ระบบ** (`Cosxi Construction`) อยู่คนละที่ — `src/lib/constants.ts`
+-- ⚠️ ชื่อ **ระบบ** (`RUAYNAE LIMITED PARTNERSHIP`) อยู่คนละที่ — `src/lib/constants.ts`
 -- เพราะมันติดมากับตัวซอฟต์แวร์ ไม่ใช่ของบริษัทที่ใช้มัน
 
 update public.branding
-set    company_name = 'บริษัท คอสซี่ คอนสตรัคชั่น จำกัด',
+set    company_name = 'RUAYNAE LIMITED PARTNERSHIP',
        updated_at   = now()
 where  company_name = '';

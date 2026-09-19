@@ -275,7 +275,10 @@ try {
                where object_key in ('${ob.key}', '${signed.key}')`)
 
     const before = { orphan: await exists(ob.key), used: await exists(signed.key) }
-    const r = await fetch(`${BASE}/api/cron/sweep-orphans?secret=${env.CRON_SECRET}`)
+    // กุญแจไปทาง header เท่านั้น — เหตุผลอยู่ใน route ของ cron
+    const r = await fetch(`${BASE}/api/cron/sweep-orphans`, {
+      headers: { Authorization: `Bearer ${env.CRON_SECRET}` },
+    })
     const b = await r.json().catch(() => ({}))
     const after = { orphan: await exists(ob.key), used: await exists(signed.key) }
     const { rows } = await sql(

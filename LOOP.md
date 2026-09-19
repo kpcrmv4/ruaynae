@@ -14,12 +14,12 @@
 
 | อะไร | ค่า |
 |---|---|
-| Supabase MCP | project_ref **`zvzaepnyxihyzheihwhz`** (ชื่อโปรเจ็ค `Cpie`) · region `ap-southeast-1` |
+| Supabase MCP | project_ref **`kdftrlagqovjsgejahwz`** (โปรเจ็ค RUAYNAE) · region `ap-southeast-1` |
 | ตรวจก่อนแตะ DB ทุกครั้ง | `get_project_url` ต้องตรงกับ `NEXT_PUBLIC_SUPABASE_URL` ใน `.env.local` |
 | หมายเหตุ PAT | เป็น token **ผูกเฉพาะโปรเจ็คนี้** — `/v1/organizations` คืนค่าว่าง สร้าง dev branch ไม่ได้ (ปกติ) |
-| Cloudflare R2 | bucket `kp-construction-slips` · ตรวจแล้วอ่าน/เขียน/ลบได้จริง 30 ส.ค. 2569 |
-| git | **local เท่านั้น ยังไม่มี remote** · branch `main` |
-| dev port | `3000` (ถ้าไม่ว่างและไม่ใช่ของเรา → ใช้พอร์ตอื่น **ห้ามฆ่าของคนอื่น**) |
+| Cloudflare R2 | bucket `ruaynae` · ตั้งค่าโดยเจ้าของ 19 ก.ย. 2569 (ยืนยันด้วย `node scripts/verify-r2.mjs`) |
+| git | remote `origin` = `https://github.com/kpcrmv4/ruaynae.git` · branch `main` |
+| dev port | `3200` — ตรึงไว้ใน `package.json` และ CORS ของ R2 · **ห้ามเปลี่ยน** (เปลี่ยนแล้วอัปรูปตายเงียบ) |
 | ห้ามแตะ | `.env*` · `docs/design/demo.html` · `docs/design/DESIGN.md` (สองไฟล์หลังคือสัญญาที่อนุมัติแล้ว จะแก้ต้องถาม) |
 
 ### อนุญาตล่วงหน้า — ไม่เขียนไว้ = ไม่อนุญาต

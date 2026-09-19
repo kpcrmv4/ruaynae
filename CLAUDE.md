@@ -8,10 +8,10 @@
 
 ## 1. ผลิตภัณฑ์
 
-**ชื่อระบบ:** `Cosxi Construction` — อยู่ใน `src/lib/constants.ts` (`SYSTEM_NAME`)
+**ชื่อระบบ:** `RUAYNAE LIMITED PARTNERSHIP` — อยู่ใน `src/lib/constants.ts` (`SYSTEM_NAME`)
 ใช้บนแท็บเบราว์เซอร์และชื่อแอปตอนติดตั้ง · ติดมากับตัวซอฟต์แวร์
 
-**ชื่อบริษัทที่ใช้ระบบ:** `บริษัท คอสซี่ คอนสตรัคชั่น จำกัด` — อยู่ใน
+**ชื่อบริษัทที่ใช้ระบบ:** `RUAYNAE LIMITED PARTNERSHIP` — อยู่ใน
 `branding.company_name` **ที่เดียว** เจ้าของแก้เองได้จาก `/settings`
 · ห้ามคัดลอกมาไว้ในโค้ด (§5) · ค่าตั้งต้นของเครื่องที่ติดตั้งใหม่อยู่ใน
 migration `20260831040000_branding_company_name.sql` ซึ่งเติม**เฉพาะตอนที่ยังว่าง**
@@ -213,7 +213,7 @@ Dashboard → **Settings → API Keys** → แท็บ **"Publishable and secr
 - งานตามเวลา = **pg_cron + pg_net** ไม่ใช่ Vercel cron (Hobby ได้แค่ 2 งาน วันละครั้ง)
 - pg_cron ทำงานเป็น **UTC** — งานที่ต้องยิงตอน 8 โมงเช้าไทยคือ `0 1 * * *`
 - ✅ **ติดตั้งและทำงานจริงแล้ว 4 ก.ย. 2569** — `pg_cron` + `pg_net` เปิดใช้บนโปรเจ็คแล้ว
-  ยิงเข้า production (`https://cpie.vercel.app`) ได้ 200 จริง ตรวจจาก `net._http_response`
+  ยิงเข้า production (`https://ruaynae.vercel.app`) ได้ 200 จริง ตรวจจาก `net._http_response`
 
 | งาน | ตาราง (UTC) | เวลาไทย | ยิงไปที่ |
 |---|---|---|---|

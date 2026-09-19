@@ -300,9 +300,11 @@ try {
     const pendingBefore = Number((await sql(
       'select count(*)::int n from public.notifications where pushed_at is null')).rows[0].n)
 
-    const r = await fetch(
-      `${BASE}/api/cron/push-dispatch?secret=${encodeURIComponent(env.CRON_SECRET)}`,
-      { redirect: 'manual' })
+    // 🔴 กุญแจไปทาง header เท่านั้น — route ปฏิเสธ `?secret=` มาตั้งแต่ 4 ก.ย. 2569
+    // เพราะความลับใน query string ไปนอนอยู่ใน access log ของทุกชั้นที่คำขอวิ่งผ่าน
+    const CRON = { Authorization: `Bearer ${env.CRON_SECRET}` }
+    const r = await fetch(`${BASE}/api/cron/push-dispatch`,
+      { redirect: 'manual', headers: CRON })
     const b = await r.json().catch(() => ({}))
     const pendingAfter = Number((await sql(
       'select count(*)::int n from public.notifications where pushed_at is null')).rows[0].n)
@@ -311,9 +313,8 @@ try {
       r.status === 200 && pendingBefore > 0 && pendingAfter === 0 && Number(b.marked) === pendingBefore,
       `${r.status} · ค้าง ${pendingBefore}→${pendingAfter} · marked=${b.marked} · removed=${b.removed}`)
 
-    const r2 = await fetch(
-      `${BASE}/api/cron/push-dispatch?secret=${encodeURIComponent(env.CRON_SECRET)}`,
-      { redirect: 'manual' })
+    const r2 = await fetch(`${BASE}/api/cron/push-dispatch`,
+      { redirect: 'manual', headers: CRON })
     const b2 = await r2.json().catch(() => ({}))
     check('P7-API-09 dispatch รอบที่สอง → marked = 0 · ไม่ส่งซ้ำของเดิม',
       r2.status === 200 && Number(b2.marked) === 0, `marked=${b2.marked}`)

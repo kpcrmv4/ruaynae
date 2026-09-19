@@ -12,9 +12,9 @@
 
 **สถานะ:** `☐` ยังไม่ตรวจ · `✅` ผ่านโดยมีหลักฐาน · `❌` ตก · `👤` ต้องคนตรวจ
 
-> 👤 = ต้องมี dev server + ฐานข้อมูลที่รัน migration แล้ว · เครื่องรอบนี้ Supabase MCP
-> ชี้ไปโปรเจ็คอื่น จึง**ยังไม่ได้ apply migration และยังไม่ได้ generate types** —
-> `database.types.ts` เขียนด้วยมือ ต้อง `generate_typescript_types` ทับแล้ว diff ต้องว่าง (R10-DB-01)
+> 👤 = ต้องมี dev server + เบราว์เซอร์จริง · ✅ ฝั่ง DB ตรวจบนโปรเจ็คจริง `kdftrlagqovjsgejahwz`
+> ผ่าน MCP 19 ก.ย. 2569 (apply `wage_adjustments` + `wage_adjustments_drop_ot_check` +
+> `supervisor_many_sites` · generate types · advisors)
 
 ---
 
@@ -39,20 +39,20 @@
 
 | ID | Trigger | ผลที่คาด | สถานะ |
 |----|---------|----------|--------|
-| R10-DB-01 | apply migration แล้ว `generate_typescript_types` | diff กับ `src/lib/database.types.ts` ที่เขียนมือ**ต้องว่าง** — ถ้าไม่ว่างให้ใช้ของ generator | ☐ |
-| R10-DB-02 | migration บนฐานว่าง | มี preset 3 รายการ: OT +100 · เบี้ยเลี้ยง +50 · มาสาย −50 | ☐ |
+| R10-DB-01 | apply migration แล้ว `generate_typescript_types` | diff กับ `src/lib/database.types.ts` ที่เขียนมือ**ต้องว่าง** — ถ้าไม่ว่างให้ใช้ของ generator | ✅ ต่างแค่การตัดบรรทัดของ `set_attendance_ot` · ใช้ของ generator แทนแล้ว |
+| R10-DB-02 | migration บนฐานว่าง | มี preset 3 รายการ: OT +100 · เบี้ยเลี้ยง +50 · มาสาย −50 | ✅ |
 | R10-DB-03 | migration ซ้ำบนฐานที่มี preset แล้ว | ไม่เติมซ้ำ (idempotent) | ☐ |
 | R10-DB-04 | แถว `attendance_wages` ที่ `ot_amount > 0` อยู่ก่อน | ได้บรรทัด `attendance_adjustments` ชื่อ "OT" ยอดเท่ากัน · วันที่จ่ายแล้วถูกข้าม | ☐ |
-| R10-DB-05 | insert บรรทัด add 100 + deduct 30 | `attendance_wages.ot_amount = 70` (trigger sync) · `amount` = ฐาน + 70 | ☐ |
-| R10-DB-06 | ลบบรรทัดจนหมด | `ot_amount = 0` | ☐ |
-| R10-DB-07 | deduct มากกว่าค่าแรงของวัน | ล้มด้วย `attendance_wages_amount_nonneg` — ทั้งคำสั่ง insert ย้อนกลับ | ☐ |
+| R10-DB-05 | insert บรรทัด add 100 + deduct 30 | `attendance_wages.ot_amount = 70` (trigger sync) · `amount` = ฐาน + 70 | ✅ · และ deduct 30 อย่างเดียว → `ot_amount = −30` ผ่าน |
+| R10-DB-06 | ลบบรรทัดจนหมด | `ot_amount = 0` | ✅ |
+| R10-DB-07 | deduct มากกว่าค่าแรงของวัน | ล้มด้วย `attendance_wages_amount_nonneg` — ทั้งคำสั่ง insert ย้อนกลับ | ✅ · รอบแรกตกเพราะ check เดิม `ot_amount >= 0` ยังอยู่ (pattern ไม่ตรง — CLAUDE.md §17 ข้อ 21) แก้แล้ว |
 | R10-DB-08 | insert/update/delete บรรทัดของวันที่อยู่ในรอบจ่ายที่ปิดแล้ว | `PAYROLL_CLOSED` | ☐ |
 | R10-DB-09 | `save_attendance_day(..., p_ot => null)` บนวันที่มีบรรทัดปรับ | บรรทัดปรับ**ยังอยู่ครบ** ยอดสุทธิไม่เปลี่ยน · ฐานเปลี่ยนตาม p_wage | ☐ |
 | R10-DB-10 | `save_attendance_day(..., p_ot => 150)` บนวันที่มีบรรทัด OT 100 + มาสาย 50 | บรรทัดเดิมหายทั้งคู่ เหลือ "OT" 150 บรรทัดเดียว (แทนที่ทั้งชุด) | ☐ |
 | R10-DB-11 | `save_attendance_day(..., p_ot => 50)` บนวันที่ยอดสุทธิเป็น 50 อยู่แล้ว | ไม่แตะบรรทัด (ยอดเท่าเดิม = ไม่แทนที่) | ☐ |
 | R10-DB-12 | `mcp_record_attendance` ส่ง `ot_amount: 200` | ได้บรรทัด "OT" 200 · `ot_amount = 200` | ☐ |
 | R10-DB-13 | หัวหน้าโครงการ select ทั้งสองตารางใหม่ | 0 แถว (RLS owner-only) · insert ถูกปฏิเสธ | ☐ |
-| R10-DB-14 | `get_advisors` security + performance | เขียว — โดยเฉพาะ RLS เปิดครบ · index บน `attendance_id` | ☐ |
+| R10-DB-14 | `get_advisors` security + performance | เขียว — โดยเฉพาะ RLS เปิดครบ · index บน `attendance_id` | ✅ ไม่มีรายการใหม่ (definer ที่ authenticated เรียกได้เป็นของเดิมโดยตั้งใจ) · เพิ่ม index `preset_id` ตาม advisor |
 | R10-DB-15 | audit_log หลังแก้บรรทัด | มีแถวของ `attendance_adjustments` **และ** `attendance_wages` (sync) พร้อม before/after | ☐ |
 
 ## 2 · R10-SET — หน้าตั้งค่า `/settings/wage-adjustments`

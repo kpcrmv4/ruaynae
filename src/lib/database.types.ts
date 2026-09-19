@@ -1574,7 +1574,10 @@ export type Database = {
         }
         Returns: string
       }
-      set_attendance_ot: { Args: { p_att: string; p_ot: number }; Returns: undefined }
+      set_attendance_ot: {
+        Args: { p_att: string; p_ot: number }
+        Returns: undefined
+      }
       site_day_wage: { Args: { p_on: string; p_site: string }; Returns: number }
       site_money: {
         Args: { p_site?: string }

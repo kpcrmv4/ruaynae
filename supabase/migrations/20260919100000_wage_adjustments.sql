@@ -84,6 +84,9 @@ create table if not exists public.attendance_adjustments (
 
 create index if not exists attendance_adjustments_att_idx
   on public.attendance_adjustments(attendance_id);
+-- FK ทุกตัวต้องมี index (advisor unindexed_foreign_keys) — ลบ preset แล้ว set null ต้องไล่หาแถวได้เร็ว
+create index if not exists attendance_adjustments_preset_idx
+  on public.attendance_adjustments(preset_id) where preset_id is not null;
 
 alter table public.attendance_adjustments enable row level security;
 
@@ -102,6 +105,9 @@ do $$
 declare c record;
 begin
   -- check เดิมถูกตั้งชื่อให้อัตโนมัติ — หาจากนิยาม ไม่เดาชื่อ
+  -- 🔴 pg_get_constraintdef พิมพ์เป็น "(ot_amount >= (0)::numeric)" ไม่ใช่ "ot_amount >= 0"
+  --    pattern แรกที่ใช้ ilike '%ot_amount >= 0%' จึงไม่เจอและ check เดิมรอดมาได้เงียบ ๆ
+  --    (เจอตอนตรวจ R10-DB-07 บนฐานจริง 19 ก.ย. 2569) · ใช้ regex ที่ยอมรับวงเล็บแทน
   for c in
     select con.conname
     from pg_constraint con
@@ -109,7 +115,8 @@ begin
     join pg_namespace n on n.oid = rel.relnamespace
     where n.nspname = 'public' and rel.relname = 'attendance_wages'
       and con.contype = 'c'
-      and pg_get_constraintdef(con.oid) ilike '%ot_amount >= 0%'
+      and con.conname <> 'attendance_wages_amount_nonneg'
+      and pg_get_constraintdef(con.oid) ~ 'ot_amount >= \(?0'
   loop
     execute format('alter table public.attendance_wages drop constraint %I', c.conname);
   end loop;

@@ -32,11 +32,14 @@ export function EmployeeDelete({
   fullName,
   info,
   disabled,
+  className,
 }: {
   id: string
   fullName: string
   info: DeleteInfo | undefined
   disabled: boolean
+  /** คลาสขนาดปุ่มจากแถวที่เรียก — ให้ปุ่มลบสูงเท่าปุ่มข้าง ๆ ในแถวเดียวกัน */
+  className?: string
 }) {
   const router = useRouter()
   const [open, setOpen] = useState(false)
@@ -80,9 +83,10 @@ export function EmployeeDelete({
           type="button"
           disabled={disabled}
           aria-label={`ลบ ${fullName}`}
-          className="btn-danger disabled:cursor-not-allowed disabled:opacity-60"
+          className={`btn-danger disabled:cursor-not-allowed disabled:opacity-60 ${className ?? ''}`}
         >
-          <Trash2 className="size-4" />
+          <Trash2 className="size-4 shrink-0" />
+          ลบ
         </button>
       </Dialog.Trigger>
       <Dialog.Portal>

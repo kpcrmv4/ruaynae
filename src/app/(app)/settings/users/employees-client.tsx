@@ -46,6 +46,15 @@ const JOB_TITLES = [
   'กรรมกร',
 ] as const
 
+/**
+ * ขนาดปุ่มในแถวคนงาน — ต่ำกว่า lg ย่อลง (padding + ตัวหนังสือ 13px) ให้ปุ่ม
+ * สี่ปุ่มพร้อมป้ายข้อความเรียงพอดีแม้จอ 360 (วัดจริง 289/298px) · `whitespace-nowrap`
+ * กันคำในปุ่มหักกลาง "ปิดใช้ / งาน" — ถ้าแคบกว่านั้นอีก ปุ่มสุดท้ายตกบรรทัดใหม่
+ * ทั้งปุ่มแทน (flex-wrap) · lg ขึ้นไปกลับเป็นขนาดปกติของ `btn-*`
+ */
+const ACTION_BTN =
+  'gap-1 whitespace-nowrap px-1.5 py-2 text-[13px] lg:gap-2 lg:px-4 lg:py-2.5 lg:text-base'
+
 const EMPTY = {
   fullName: '',
   jobTitle: '',
@@ -348,7 +357,10 @@ export function EmployeesClient({
                 บรรทัดคนละแบบกับแถวอื่น (เจ้าของแจ้ง 19 ก.ย. 2569)
                 · ต่ำกว่า lg วางเป็นสองชั้นเสมอ: ชื่อเต็ม+ตำแหน่ง ↔ ค่าแรง แล้วปุ่ม
                 เรียงชิดขวาเป็นแถวของตัวเอง ทุกแถวหน้าตาเดียวกันไม่ว่ามีกี่ปุ่ม
-                · lg ขึ้นไป (มี sidebar แล้ว) ยังเป็นบรรทัดเดียวเหมือนเดิม */
+                · lg ขึ้นไป (มี sidebar แล้ว) ยังเป็นบรรทัดเดียวเหมือนเดิม
+                · ปุ่มมีป้ายข้อความ**ทุกขนาดจอ** — ไอคอนเปล่า ๆ สามสี่อันเรียงกัน
+                ผู้ใช้ที่ไม่ชำนาญคอมแยกไม่ออกว่าอันไหนทำอะไร (เจ้าของแจ้ง 19 ก.ย. 2569)
+                · ให้พอดีจอ 390 จึงย่อปุ่มและตัวหนังสือลงหนึ่งขั้นต่ำกว่า lg (ACTION_BTN) */
             <div
               key={e.id}
               className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
@@ -373,7 +385,7 @@ export function EmployeesClient({
                 </span>
               </div>
 
-              <div className="col-span-2 flex items-center justify-end gap-2 lg:col-span-1">
+              <div className="col-span-2 flex flex-wrap items-center justify-end gap-1 lg:col-span-1 lg:flex-nowrap lg:gap-2">
                 {/* 🔴 เฉพาะคนรายเดือน — คนรายวันมีค่าแรงเกิดตอนติ๊กเข้าโครงการ
                     อยู่แล้ว ตั้งเงินเดือนซ้ำจะทำให้ต้นทุนเป็นสองเท่า (§17 ข้อ 1)
                     · ปุ่มจึงไม่วาดเลยสำหรับคนรายวัน ไม่ใช่วาดแล้วกดไม่ผ่าน */}
@@ -381,19 +393,19 @@ export function EmployeesClient({
                   <Link
                     href={`/settings/recurring?employee=${e.id}`}
                     aria-label={`ตั้งเงินเดือนรายเดือนของ ${e.full_name}`}
-                    className="btn-secondary"
+                    className={`btn-secondary ${ACTION_BTN}`}
                   >
-                    <CalendarClock className="size-4" />
-                    <span className="hidden sm:inline">เงินเดือน</span>
+                    <CalendarClock className="size-4 shrink-0" />
+                    เงินเดือน
                   </Link>
                 )}
                 <button
                   onClick={() => openEdit(e)}
                   aria-label={`แก้ไข ${e.full_name}`}
-                  className="btn-secondary"
+                  className={`btn-secondary ${ACTION_BTN}`}
                 >
-                  <Pencil className="size-4" />
-                  <span className="hidden sm:inline">แก้ไข</span>
+                  <Pencil className="size-4 shrink-0" />
+                  แก้ไข
                 </button>
                 <button
                   onClick={() =>
@@ -402,16 +414,16 @@ export function EmployeesClient({
                   }
                   disabled={busy !== null}
                   aria-label={e.is_active ? `ปิดใช้งาน ${e.full_name}` : `เปิดใช้งาน ${e.full_name}`}
-                  className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                  className={`btn-secondary ${ACTION_BTN} disabled:cursor-not-allowed disabled:opacity-60`}
                 >
                   {busy === e.id ? (
-                    <Loader2 className="size-4 animate-spin" />
+                    <Loader2 className="size-4 shrink-0 animate-spin" />
                   ) : e.is_active ? (
-                    <UserX className="size-4" />
+                    <UserX className="size-4 shrink-0" />
                   ) : (
-                    <UserCheck className="size-4" />
+                    <UserCheck className="size-4 shrink-0" />
                   )}
-                  <span className="hidden sm:inline">{e.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</span>
+                  {e.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}
                 </button>
                 {/* ปิดใช้งาน ≠ ลบ — ปิดคือ "ไม่ทำงานกับเราแล้ว แต่ประวัติยังอยู่"
                     ส่วนลบคือเอาออกจากระบบจริง ๆ พร้อมประวัติที่ยังไม่ได้จ่ายเงิน */}
@@ -420,6 +432,7 @@ export function EmployeesClient({
                   fullName={e.full_name}
                   info={infoOf.get(e.id)}
                   disabled={busy !== null}
+                  className={ACTION_BTN}
                 />
               </div>
             </div>

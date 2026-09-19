@@ -60,9 +60,11 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
 
   // ค่างานอยู่คนละตาราง — เขียนเสมอ (ไม่ใช่เฉพาะตอน > 0) เพราะการแก้ค่างาน
   // กลับเป็น 0 คือการลบค่าที่เคยตั้งไว้ ซึ่งต้องบันทึกได้เหมือนกัน
+  // หลักประกันสัญญา (R11) เขียนพร้อมกันในแถวเดียว · วันได้คืน/รายรับที่ผูกไว้
+  // ไม่อยู่ในชุดนี้ — แก้ผ่านปุ่ม "ได้รับคืนแล้ว" เท่านั้น
   const { data: fin, error: fErr } = await sb
     .from('site_finance')
-    .update({ contract_amount: parsed.contractAmount })
+    .update({ contract_amount: parsed.contractAmount, ...parsed.bond })
     .eq('site_id', id)
     .select('site_id')
     .maybeSingle()

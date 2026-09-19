@@ -19,6 +19,8 @@ import { Metric, MetricBar } from '@/components/ui/metric'
 import { EmptyState } from '@/components/ui/states'
 import { MoneyBars, OverrunBadge, ProfitChip, SiteSummary } from '@/components/sites/money-bars'
 import { TodayBoard } from '@/components/overview/today-board'
+import { BondAlert } from '@/components/overview/bond-alert'
+import { BOND_SOON_DAYS } from '@/lib/bonds'
 
 export const metadata = { title: 'วันนี้' }
 
@@ -44,7 +46,7 @@ export default async function OverviewPage() {
   // และไม่มีการดึงแถวมานับใน JS ซึ่งจะเพี้ยนเงียบ ๆ ที่ 1,000 แถว
   const isOwner = me.role === 'owner'
 
-  const [{ data: summary, error: sErr }, { data: sites, error: lErr }] = await Promise.all([
+  const [{ data: summary, error: sErr }, { data: sites, error: lErr }, { data: bondSum }] = await Promise.all([
     sb.rpc('site_overview', { p_on: today }),
     sb
       .from('sites')
@@ -53,6 +55,13 @@ export default async function OverviewPage() {
       // โครงการที่ใกล้ครบกำหนดที่สุดอยู่บนสุด · โครงการที่ยังไม่ตั้งวันจบไปท้ายสุด
       .order('end_date', { ascending: true, nullsFirst: false })
       .range(0, TOP_SITES - 1),
+    // หลักประกันสัญญา (R11) — เจ้าของเท่านั้น · RPC นับในฐานข้อมูล · อ่านไม่ได้ก็แค่ไม่มีแถบ
+    isOwner
+      ? sb.rpc('bond_summary', { p_on: today, p_soon_days: BOND_SOON_DAYS }).then(({ data, error }) => {
+          if (error) console.error('[overview] อ่านสรุปหลักประกันไม่ได้', error.message)
+          return { data: data ?? null }
+        })
+      : Promise.resolve({ data: null }),
   ])
 
   const rows = sites ?? []
@@ -121,6 +130,17 @@ export default async function OverviewPage() {
           บันทึกรายจ่าย
         </Link>
       </div>
+
+      {/* ── หลักประกันสัญญาที่ครบ/ใกล้ครบ — เด่นสุดบนหน้าแรก (เจ้าของสั่ง 19 ก.ย. 2569) ──
+          วาดเฉพาะตอนมีของจริง · ไม่มี = ไม่มีแถบ */}
+      {isOwner && bondSum?.[0] && (
+        <BondAlert
+          overdueCount={Number(bondSum[0].overdue_count ?? 0)}
+          overdueAmount={Number(bondSum[0].overdue_amount ?? 0)}
+          dueSoonCount={Number(bondSum[0].due_soon_count ?? 0)}
+          dueSoonAmount={Number(bondSum[0].due_soon_amount ?? 0)}
+        />
+      )}
 
       {/* ── งานวันนี้ — ปิดไว้ตามคำขอของเจ้าของ (4 ก.ย. 2569) ─────────────
           การ์ดยังอยู่ครบใน components/overview/today-board.tsx · เอากลับมา

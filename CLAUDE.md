@@ -87,6 +87,7 @@ create type payroll_status as enum ('open','closed');
 | `app_settings` | แถวเดียว: ที่อยู่, เลขผู้เสียภาษี, ผู้ลงนาม, นโยบายเก็บรูป ฯลฯ | **owner เท่านั้น ทั้งอ่านและเขียน** |
 | `profiles` | `id → auth.users`, `full_name`, `role`, `pin_hash` (HMAC + pepper, unique), `is_active` | อ่านตัวเอง · owner อ่าน/เขียนทั้งหมด · **`role` แก้ได้เฉพาะ owner (guard trigger)** |
 | `sites` | `name`, `client_name`, `contract_amount`, `start_date`, `end_date`, `status` | owner ทั้งหมด · supervisor อ่านเฉพาะโครงการที่ดูแล |
+| `site_finance` | ค่างานและ**หลักประกันสัญญา** (R11): `contract_amount`, `contract_no`, `contract_date`, `bond_kind` (`cash`/`bank_guarantee`), `bond_amount`, `bond_ref`, `handover_date` (ส่งมอบงวดสุดท้าย — คนละช่องกับ `sites.end_date`), `warranty_months` (24), **`warranty_end` generated**, `bond_returned_at/_amount`, `bond_return_txn_id` · สถานะคิดตอนอ่านใน RPC `bond_status()` / `bond_summary()` ไม่มีคอลัมน์สถานะ | **owner เท่านั้น** |
 | `site_supervisors` | `site_id`, `profile_id`, **`effective_from`, `effective_to`** | owner เขียน · supervisor อ่านแถวตัวเอง |
 | `site_milestones` | แผนงวดล่วงหน้า (ไม่บังคับ): `seq`, `name`, `planned_amount`, `planned_date` — ยังไม่มีคอลัมน์บอกว่างวดไหนเก็บเงินแล้ว (วางแผนไว้เป็น `collected_txn_id` แต่ยังไม่ได้สร้าง รอเฟสหลัง) | ตามโครงการ |
 | `categories` | `name`, `kind`, `is_active`, `sort_order` | อ่านได้ทุก role · เขียนเฉพาะ owner |
@@ -367,6 +368,9 @@ src/
     (app)/settings/wage-adjustments  รายการปรับค่าแรงสำเร็จรูป (OT · เบี้ยเลี้ยง · มาสาย)
     (app)/attendance/adjust-dialog.tsx  กล่องปรับค่าแรงของคนหนึ่งคนในหนึ่งวัน — ใช้ทั้ง /attendance และ /payroll
     (app)/payroll/site-wage-edit.tsx    ดินสอแก้ค่าแรงที่จ่ายจริงในแท็บ "ทำงานที่ไหนบ้าง"
+    (app)/sites/[id]/bond-return.tsx    ปุ่ม "ได้รับหลักประกันคืนแล้ว" (R11) · api/sites/[id]/bond-return
+    components/reports/bond-report.tsx  แท็บหลักประกันสัญญา · components/overview/bond-alert.tsx แถบเตือนหน้าแรก
+    lib/bonds.ts                        ค่าคงที่/ตัวตรวจ/สูตรสถานะ (สูตรเดียวกับ RPC bond_status)
     api/auth/pin/route.ts
     api/branding/route.ts    ← ไม่ต้องล็อกอิน · หน้า login เรียกใช้
     api/transactions/route.ts · api/transactions/[id]/route.ts
@@ -462,6 +466,13 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       · ดินสอในแท็บ "ทำงานที่ไหนบ้าง" แก้ค่าแรงฐานรายวัน (`save_attendance_day` ไม่ส่ง `p_ot` =
       ไม่แตะรายการปรับ) · ⚠️ **ยังไม่ได้ apply migration** (Supabase MCP ในเครื่องที่ทำชี้ผิดโปรเจ็ค)
       — ต้อง apply + `generate_typescript_types` แล้ว diff กับที่เขียนมือต้องว่าง (`R10-DB-01`)
+- [x] **R11 · หลักประกันสัญญา + ประกันผลงาน** (19 ก.ย. 2569) — คอลัมน์บน `site_finance` ·
+      `warranty_end` = ส่งมอบงวดสุดท้าย + ระยะประกัน (generated) · RPC `bond_status`/`bond_summary`
+      (security invoker — RLS ของ `site_finance` กรอง · service role เห็นครบ) · แท็บ "หลักประกันสัญญา"
+      ใน `/reports` · แถบเตือนแดง/ส้มบนหน้าแรก (เจ้าของ) · สรุปเช้าส่งเมื่อเกินกำหนดหรือวันสำคัญ
+      (เหลือ 30 วัน / ครบวันนี้) · ปุ่ม "ได้รับหลักประกันคืนแล้ว" — **เงินสดลงเป็นรายรับ** หมวด
+      "หลักประกันสัญญาคืน" ทันที · หนังสือค้ำแค่บันทึกวัน · ยอด 5% เติมให้แล้วแก้ได้
+      · `scripts/import-bonds.mjs` นำเข้าสเปรดชีตเก่า (พ.ศ. → ค.ศ. ในสคริปต์)
 - [x] **R9 · รอบคำสั่งเจ้าของ 4 ก.ย. 2569** — เรียกหน่วยงานว่า "โครงการ" ทั้งระบบ · ปิดการ์ด
       "งานวันนี้" · ต้นทุนสะสมแยกสามก้อน (ค่าแรง/ค่าวัสดุ/อื่น ๆ) + ธง `categories.is_material`
       · ยอดรวมแยกหมวดในหน้าโครงการ · **จ่ายค่าแรงรายคนปุ่มเดียว** (เลิกใช้คำว่า "รอบจ่าย"

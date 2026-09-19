@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { SITE_STATUSES, SITE_STATUS_LABEL, type SiteStatus } from '@/lib/sites'
+import { BOND_ERRORS } from '@/lib/bonds'
 
 export const SITE_ERRORS: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
@@ -19,6 +20,9 @@ export const SITE_ERRORS: Record<string, string> = {
   NOT_FOUND: 'ไม่พบโครงการนี้',
   OVERLAP: 'คนนี้ดูแลโครงการนี้ในช่วงเวลาที่ทับกันอยู่แล้ว — แก้ช่วงเดิมก่อน',
   CREATE_FAILED: 'บันทึกไม่สำเร็จ กรุณาลองใหม่',
+  DATE_FUTURE: 'วันที่ต้องไม่เป็นวันในอนาคต',
+  PAY_METHOD_INVALID: 'วิธีรับเงินไม่ถูกต้อง',
+  ...BOND_ERRORS,
 }
 export const siteError = (code?: string) => SITE_ERRORS[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
 

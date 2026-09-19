@@ -1,5 +1,6 @@
 import type { Database } from '@/lib/database.types'
 import type { BadgeTone } from '@/components/ui/badge'
+import { parseBondFields, type BondFields } from '@/lib/bonds'
 
 export type SiteStatus = Database['public']['Enums']['site_status']
 
@@ -153,7 +154,7 @@ export type SiteFields = {
 }
 
 export type SiteParse =
-  | { ok: true; fields: SiteFields; contractAmount: number }
+  | { ok: true; fields: SiteFields; contractAmount: number; bond: BondFields }
   | { ok: false; error: string }
 
 const text = (v: unknown, max = MAX_NAME): string | null => {
@@ -192,6 +193,10 @@ export function parseSiteFields(b: unknown): SiteParse {
     return { ok: false, error: 'STATUS_INVALID' }
   }
 
+  // หลักประกันสัญญา (R11) — อยู่ site_finance เช่นเดียวกับค่างาน · ตัวตรวจอยู่ lib/bonds
+  const bond = parseBondFields(o)
+  if (!bond.ok) return { ok: false, error: bond.error }
+
   return {
     ok: true,
     fields: {
@@ -206,5 +211,6 @@ export function parseSiteFields(b: unknown): SiteParse {
     // เขียนลงคนละตาราง จึงคืนแยกออกมา — ปนกลับเข้า fields เมื่อไหร่
     // `.insert()` จะพังทันทีเพราะ type ของตาราง `sites` ไม่มีคอลัมน์นี้แล้ว
     contractAmount: amount.value,
+    bond: bond.fields,
   }
 }

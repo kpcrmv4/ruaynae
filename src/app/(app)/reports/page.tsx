@@ -18,18 +18,53 @@ import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import { FlowChart } from '@/components/reports/flow-chart'
 import { BarList, type BarItem } from '@/components/reports/bar-list'
+import { BondReport, ReportTabs, toBondRow } from '@/components/reports/bond-report'
+import { todayInBangkok } from '@/lib/format'
+import { BOND_SOON_DAYS } from '@/lib/bonds'
 
 export const metadata = { title: 'รายงาน' }
 
 /** กี่แถวต่อรายการย่อย — ที่เหลือดูต่อได้ที่หน้าของมันเอง */
 const TOP_N = 8
 
-type Search = { p?: string; site?: string }
+type Search = { p?: string; site?: string; tab?: string }
 
 export default async function ReportsPage({ searchParams }: { searchParams: Promise<Search> }) {
   const sp = await searchParams
   const period = parsePeriod(sp.p)
   const sb = await getSupabaseServer()
+
+  // ── แท็บหลักประกันสัญญา (R11) — ไม่ผูกกับช่วงเวลา จึงแยกทางตั้งแต่ต้น ──
+  if (sp.tab === 'bonds') {
+    const today = todayInBangkok()
+    const [{ data: bondRows, error: bErr }, { data: bondSum, error: bsErr }] = await Promise.all([
+      sb.rpc('bond_status', { p_on: today, p_soon_days: BOND_SOON_DAYS }).range(0, PAGE_SIZE * 4 - 1),
+      sb.rpc('bond_summary', { p_on: today, p_soon_days: BOND_SOON_DAYS }),
+    ])
+    if (bErr || bsErr) {
+      console.error('[reports] โหลดหลักประกันไม่ได้', bErr?.message ?? bsErr?.message)
+      return <DataError message="โหลดรายงานหลักประกันไม่สำเร็จ" />
+    }
+    const sum = bondSum?.[0]
+    return (
+      <>
+        <div className="mb-4">
+          <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
+          <p className="mt-0.5 text-sm text-muted-token">หลักประกันสัญญา · ประกันผลงาน · ณ {today.slice(8, 10)}/{today.slice(5, 7)}/{Number(today.slice(0, 4)) + 543}</p>
+        </div>
+        <ReportTabs active="bonds" periodKey={period.key} />
+        <BondReport
+          rows={(bondRows ?? []).map(toBondRow)}
+          summary={{
+            overdueCount: Number(sum?.overdue_count ?? 0),
+            overdueAmount: Number(sum?.overdue_amount ?? 0),
+            dueSoonCount: Number(sum?.due_soon_count ?? 0),
+            dueSoonAmount: Number(sum?.due_soon_amount ?? 0),
+          }}
+        />
+      </>
+    )
+  }
 
   const { data: sites, error: sErr } = await sb
     .from('sites')
@@ -160,6 +195,7 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
         </p>
       </div>
 
+      <ReportTabs active="money" periodKey={period.key} />
       <PeriodPicker period={period} siteId={siteId} sites={sites ?? []} link={link} />
 
       {!hasAnything ? (

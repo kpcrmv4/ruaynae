@@ -915,24 +915,64 @@ export type Database = {
       }
       site_finance: {
         Row: {
+          bond_amount: number
+          bond_kind: Database["public"]["Enums"]["bond_kind"] | null
+          bond_ref: string | null
+          bond_return_txn_id: string | null
+          bond_returned_amount: number | null
+          bond_returned_at: string | null
           contract_amount: number
+          contract_date: string | null
+          contract_no: string | null
           created_at: string
+          handover_date: string | null
           site_id: string
           updated_at: string
+          warranty_end: string | null
+          warranty_months: number
         }
         Insert: {
+          bond_amount?: number
+          bond_kind?: Database["public"]["Enums"]["bond_kind"] | null
+          bond_ref?: string | null
+          bond_return_txn_id?: string | null
+          bond_returned_amount?: number | null
+          bond_returned_at?: string | null
           contract_amount?: number
+          contract_date?: string | null
+          contract_no?: string | null
           created_at?: string
+          handover_date?: string | null
           site_id: string
           updated_at?: string
+          warranty_end?: string | null
+          warranty_months?: number
         }
         Update: {
+          bond_amount?: number
+          bond_kind?: Database["public"]["Enums"]["bond_kind"] | null
+          bond_ref?: string | null
+          bond_return_txn_id?: string | null
+          bond_returned_amount?: number | null
+          bond_returned_at?: string | null
           contract_amount?: number
+          contract_date?: string | null
+          contract_no?: string | null
           created_at?: string
+          handover_date?: string | null
           site_id?: string
           updated_at?: string
+          warranty_end?: string | null
+          warranty_months?: number
         }
         Relationships: [
+          {
+            foreignKeyName: "site_finance_bond_return_txn_id_fkey"
+            columns: ["bond_return_txn_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "site_finance_site_id_fkey"
             columns: ["site_id"]
@@ -1306,6 +1346,38 @@ export type Database = {
         Args: { p_employee: string; p_site: string; p_work_date: string }
         Returns: boolean
       }
+      bond_status: {
+        Args: { p_on: string; p_soon_days?: number }
+        Returns: {
+          bond_amount: number
+          bond_kind: Database["public"]["Enums"]["bond_kind"]
+          bond_ref: string
+          bond_return_txn_id: string
+          bond_returned_amount: number
+          bond_returned_at: string
+          contract_amount: number
+          contract_date: string
+          contract_no: string
+          days_left: number
+          handover_date: string
+          site_id: string
+          site_name: string
+          site_status: Database["public"]["Enums"]["site_status"]
+          status: string
+          warranty_end: string
+          warranty_months: number
+        }[]
+      }
+      bond_summary: {
+        Args: { p_on: string; p_soon_days?: number }
+        Returns: {
+          due_soon_amount: number
+          due_soon_count: number
+          event_count: number
+          overdue_amount: number
+          overdue_count: number
+        }[]
+      }
       close_payroll_run: {
         Args: { p_run: string }
         Returns: {
@@ -1615,6 +1687,7 @@ export type Database = {
     }
     Enums: {
       adjust_kind: "add" | "deduct"
+      bond_kind: "cash" | "bank_guarantee"
       income_kind: "deposit" | "installment" | "variation_order" | "other"
       notification_kind:
         | "txn_pending"
@@ -1756,6 +1829,7 @@ export const Constants = {
   public: {
     Enums: {
       adjust_kind: ["add", "deduct"],
+      bond_kind: ["cash", "bank_guarantee"],
       income_kind: ["deposit", "installment", "variation_order", "other"],
       notification_kind: [
         "txn_pending",

@@ -47,10 +47,10 @@ export async function POST(req: NextRequest) {
 
   // ค่างานอยู่คนละตาราง (`site_finance`) ที่เจ้าของเท่านั้นอ่าน/เขียนได้
   // trigger `sites_ensure_finance` สร้างแถวให้แล้วด้วยค่า 0 ตรงนี้จึงเป็น update
-  if (parsed.contractAmount > 0) {
+  if (parsed.contractAmount > 0 || parsed.bond.bond_kind !== null || parsed.bond.contract_no) {
     const { data: fin, error: fErr } = await sb
       .from('site_finance')
-      .update({ contract_amount: parsed.contractAmount })
+      .update({ contract_amount: parsed.contractAmount, ...parsed.bond })
       .eq('site_id', data.id)
       .select('site_id')
       .maybeSingle()

@@ -6,6 +6,9 @@ import { useRouter } from 'next/navigation'
 import { useState, type ReactNode } from 'react'
 import { toast } from 'sonner'
 import { SITE_STATUSES, SITE_STATUS_LABEL, type SiteStatus } from '@/lib/sites'
+import {
+  BOND_KINDS, BOND_KIND_LABEL, WARRANTY_DEFAULT_MONTHS, suggestBond, type BondFields, type BondKind,
+} from '@/lib/bonds'
 import { siteError } from '../sites-client'
 
 type Site = {
@@ -73,12 +76,14 @@ function Field({ id, label, span, children }: { id: string; label: string; span?
 }
 
 export function SiteDetailActions({
-  site, contractAmount, crew, milestones, people,
+  site, contractAmount, bond, crew, milestones, people,
 }: {
   site: Site
   /** มาจากตาราง `site_finance` คนละตารางกับ `sites` — เจ้าของเท่านั้นที่อ่านได้
    *  คอมโพเนนต์นี้เรนเดอร์ให้เจ้าของเท่านั้นอยู่แล้ว จึงรับเป็น number ตรง ๆ */
   contractAmount: number
+  /** หลักประกันสัญญา (R11) — จาก `site_finance` เช่นกัน */
+  bond: BondFields
   crew: Crew[]
   milestones: Milestone[]
   people: Person[]
@@ -98,7 +103,28 @@ export function SiteDetailActions({
     startDate: site.start_date ?? '',
     endDate: site.end_date ?? '',
     status: site.status,
+    // หลักประกันสัญญา — งานเอกชนปล่อยว่างได้ทั้งชุด
+    contractNo: bond.contract_no ?? '',
+    contractDate: bond.contract_date ?? '',
+    bondKind: (bond.bond_kind ?? '') as BondKind | '',
+    bondAmount: bond.bond_amount ? String(bond.bond_amount) : '',
+    bondRef: bond.bond_ref ?? '',
+    handoverDate: bond.handover_date ?? '',
+    warrantyMonths: String(bond.warranty_months ?? WARRANTY_DEFAULT_MONTHS),
   })
+
+  /**
+   * เลือกชนิดหลักประกันครั้งแรก = เติม 5% ของค่างานให้ (เจ้าของตัดสิน 19 ก.ย. 2569: แก้ได้)
+   * เติมเฉพาะตอนช่องยอดยังว่าง — ยอดที่เจ้าของพิมพ์ไว้แล้วต้องไม่ถูกทับ
+   */
+  const pickBondKind = (k: BondKind | '') => {
+    const contract = Number(form.contractAmount.replace(/,/g, '')) || 0
+    setForm((f) => ({
+      ...f,
+      bondKind: k,
+      bondAmount: k && f.bondAmount === '' && contract > 0 ? String(suggestBond(contract)) : f.bondAmount,
+    }))
+  }
   const [crewForm, setCrewForm] = useState({
     profileId: people[0]?.id ?? '',
     effectiveFrom: '',
@@ -211,6 +237,51 @@ export function SiteDetailActions({
         <Field id="e-end" label="กำหนดส่งมอบ">
           <input id="e-end" type="date" value={form.endDate}
             onChange={(e) => setForm({ ...form, endDate: e.target.value })} className="input-base" />
+        </Field>
+
+        {/* ── หลักประกันสัญญา (R11) — งานราชการ · งานเอกชนปล่อยว่างได้ ── */}
+        <div className="sm:col-span-2 border-t border-line-soft pt-3">
+          <p className="text-sm font-semibold text-ink">หลักประกันสัญญา · ประกันผลงาน</p>
+          <p className="mt-0.5 text-xs text-muted-token">
+            งานราชการถูกหักไว้ราว 5% ได้คืนเมื่อครบประกันผลงานนับจากวันส่งมอบงวดสุดท้าย · งานเอกชนปล่อยว่างได้
+          </p>
+        </div>
+        <Field id="e-contract-no" label="เลขที่สัญญา">
+          <input id="e-contract-no" value={form.contractNo}
+            onChange={(e) => setForm({ ...form, contractNo: e.target.value })}
+            placeholder="เช่น 183/2566" className="input-base" />
+        </Field>
+        <Field id="e-contract-date" label="วันลงนามสัญญา">
+          <input id="e-contract-date" type="date" value={form.contractDate}
+            onChange={(e) => setForm({ ...form, contractDate: e.target.value })} className="input-base" />
+        </Field>
+        <Field id="e-bond-kind" label="ชนิดหลักประกัน">
+          <select id="e-bond-kind" value={form.bondKind}
+            onChange={(e) => pickBondKind(e.target.value as BondKind | '')} className="input-base">
+            <option value="">ไม่มีหลักประกัน</option>
+            {BOND_KINDS.map((k) => <option key={k} value={k}>{BOND_KIND_LABEL[k]}</option>)}
+          </select>
+        </Field>
+        <Field id="e-bond-amount" label="ยอดหลักประกัน (บาท)">
+          <input id="e-bond-amount" type="text" inputMode="decimal" value={form.bondAmount}
+            onChange={(e) => setForm({ ...form, bondAmount: e.target.value })}
+            placeholder={form.contractAmount ? String(suggestBond(Number(form.contractAmount.replace(/,/g, '')) || 0)) : '0'}
+            disabled={!form.bondKind}
+            className="input-base tnum" />
+        </Field>
+        <Field id="e-bond-ref" label="เลขที่หนังสือค้ำ / ธนาคาร" span>
+          <input id="e-bond-ref" value={form.bondRef}
+            onChange={(e) => setForm({ ...form, bondRef: e.target.value })}
+            placeholder="เว้นว่างได้" disabled={!form.bondKind} className="input-base" />
+        </Field>
+        <Field id="e-handover" label="วันส่งมอบงวดสุดท้าย">
+          <input id="e-handover" type="date" value={form.handoverDate}
+            onChange={(e) => setForm({ ...form, handoverDate: e.target.value })} className="input-base" />
+        </Field>
+        <Field id="e-warranty" label="ระยะประกันผลงาน (เดือน)">
+          <input id="e-warranty" type="text" inputMode="numeric" value={form.warrantyMonths}
+            onChange={(e) => setForm({ ...form, warrantyMonths: e.target.value })}
+            className="input-base tnum" />
         </Field>
       </Modal>
 

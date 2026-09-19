@@ -4,9 +4,11 @@ import {
   ArrowLeft,
   Banknote,
   CalendarDays,
+  FileCheck,
   Phone,
   MapPin,
   Receipt,
+  ShieldCheck,
   UserRound,
   Wallet,
   type LucideIcon,
@@ -24,7 +26,11 @@ import { CategoryTotals } from '@/components/sites/category-totals'
 import { TxnDetailProvider } from '@/components/ledger/txn-detail'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
+import {
+  BOND_KIND_LABEL, BOND_STATUS_LABEL, BOND_STATUS_TONE, WARRANTY_DEFAULT_MONTHS, bondStatusOf,
+} from '@/lib/bonds'
 import { SiteDetailActions } from './site-detail-client'
+import { BondReturnButton } from './bond-return'
 
 /** กี่แถวล่าสุดที่โชว์ในหน้าโครงการ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
 const RECENT_TXN = 10
@@ -65,6 +71,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
     pickerSites,
     pickerCategories,
     catTotals,
+    bondRow,
   ] = await Promise.all([
     sb
       .from('site_supervisors')
@@ -159,9 +166,36 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         if (e) console.error('[sites] อ่านยอดรวมแยกหมวดไม่ได้', e.message)
         return data ?? []
       }),
+    // หลักประกันสัญญา (R11) — `site_finance` owner-only · หัวหน้าโครงการได้ null เอง
+    sb
+      .from('site_finance')
+      .select(
+        'contract_no, contract_date, bond_kind, bond_amount, bond_ref, handover_date, warranty_months, warranty_end, bond_returned_at, bond_returned_amount',
+      )
+      .eq('site_id', id)
+      .maybeSingle()
+      .then(({ data, error: e }) => {
+        if (e) console.error('[sites] อ่านหลักประกันไม่ได้', e.message)
+        return data ?? null
+      }),
   ])
 
   const today = todayInBangkok()
+  const bond = bondRow
+    ? {
+        contract_no: bondRow.contract_no,
+        contract_date: bondRow.contract_date,
+        bond_kind: bondRow.bond_kind,
+        bond_amount: Number(bondRow.bond_amount),
+        bond_ref: bondRow.bond_ref,
+        handover_date: bondRow.handover_date,
+        warranty_months: bondRow.warranty_months ?? WARRANTY_DEFAULT_MONTHS,
+        warranty_end: bondRow.warranty_end,
+        bond_returned_at: bondRow.bond_returned_at,
+        bond_returned_amount: bondRow.bond_returned_amount === null ? null : Number(bondRow.bond_returned_amount),
+      }
+    : null
+  const bondState = bond ? bondStatusOf(bond, today) : null
   // สถานะที่ปลายทางของปุ่มลัดยอมรับโครงการนี้ — ต้องตรงกับกล่องเลือกโครงการของสองหน้านั้น
   const canRecord = ['planning', 'active', 'paused'].includes(site.status)
   const canAttend = ['planning', 'active'].includes(site.status)
@@ -201,6 +235,15 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           <SiteDetailActions
             site={site}
             contractAmount={money.contract ?? 0}
+            bond={{
+              contract_no: bond?.contract_no ?? null,
+              contract_date: bond?.contract_date ?? null,
+              bond_kind: bond?.bond_kind ?? null,
+              bond_amount: bond?.bond_amount ?? 0,
+              bond_ref: bond?.bond_ref ?? null,
+              handover_date: bond?.handover_date ?? null,
+              warranty_months: bond?.warranty_months ?? WARRANTY_DEFAULT_MONTHS,
+            }}
             crew={crew ?? []}
             milestones={milestones ?? []}
             people={people}
@@ -360,6 +403,125 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           </div>
         </dl>
       </section>
+
+      {/* ── หลักประกันสัญญา · ประกันผลงาน (R11) — เจ้าของเท่านั้น ──────────
+          สถานะคิดจากวันที่ตอนอ่าน (สูตรเดียวกับ RPC bond_status) · ไม่มีคอลัมน์สถานะ
+          ให้ใครต้องคอยอัปเดต · แถวที่ยังไม่ตั้งอะไรเลยไม่วาด — งานเอกชนไม่มีเรื่องนี้ */}
+      {isOwner && bond && bondState && (bond.contract_no || bondState.status !== 'none') && (
+        <section
+          className={`panel mb-4 ${
+            bondState.status === 'overdue'
+              ? 'border-urgent-ring'
+              : bondState.status === 'due_soon'
+                ? 'border-status-progress-ring'
+                : ''
+          }`}
+        >
+          <div className="panel-head">
+            <ShieldCheck className="size-4 shrink-0 text-muted-token" strokeWidth={1.8} />
+            หลักประกันสัญญา · ประกันผลงาน
+            {bondState.status !== 'none' && (
+              <span className="ml-auto">
+                <Badge tone={BOND_STATUS_TONE[bondState.status]} dot>
+                  {BOND_STATUS_LABEL[bondState.status]}
+                </Badge>
+              </span>
+            )}
+          </div>
+
+          {/* แถบสรุปตัวเลขที่ต้องเห็นก่อน — เลยมาแล้ว/เหลืออีกกี่วัน */}
+          {(bondState.status === 'overdue' || bondState.status === 'due_soon') && bondState.daysLeft !== null && (
+            <div
+              className={`flex flex-wrap items-center gap-x-3 gap-y-1 border-b px-4 py-2.5 text-sm ${
+                bondState.status === 'overdue'
+                  ? 'border-urgent-ring bg-urgent-bg text-urgent'
+                  : 'border-status-progress-ring bg-status-progress-bg text-status-progress'
+              }`}
+            >
+              <span className="font-semibold">
+                {bondState.status === 'overdue'
+                  ? `ครบประกันผลงานมาแล้ว ${Math.abs(bondState.daysLeft)} วัน — ไปขอหลักประกันคืนได้`
+                  : `อีก ${bondState.daysLeft} วันจะครบประกันผลงาน`}
+              </span>
+              <span className="tnum">· {fmtBaht(bond.bond_amount)}</span>
+            </div>
+          )}
+
+          <dl className="grid gap-x-6 gap-y-3 p-4 sm:grid-cols-2">
+            <div>
+              <dt className="text-xs font-medium text-muted-token">เลขที่สัญญา · วันลงนาม</dt>
+              <dd className="mt-0.5 flex items-center gap-1.5 text-base text-ink">
+                <FileCheck className="size-4 shrink-0 text-muted-token" />
+                {bond.contract_no ?? <span className="text-muted-token">ยังไม่ได้ระบุ</span>}
+                {bond.contract_date && (
+                  <span className="text-sm text-muted-token">· {fmtDate(bond.contract_date)}</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-token">หลักประกัน</dt>
+              <dd className="mt-0.5 text-base text-ink">
+                {bond.bond_kind ? (
+                  <>
+                    <span className="font-semibold tnum">{fmtBaht(bond.bond_amount)}</span>
+                    <span className="text-sm text-muted-token"> · {BOND_KIND_LABEL[bond.bond_kind]}</span>
+                    {bond.bond_ref && <span className="block text-sm text-muted-token">{bond.bond_ref}</span>}
+                  </>
+                ) : (
+                  <span className="text-muted-token">ไม่มี</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-token">ส่งมอบงวดสุดท้าย → ครบประกัน</dt>
+              <dd className="mt-0.5 text-base tnum text-ink">
+                {bond.handover_date ? (
+                  <>
+                    {fmtDate(bond.handover_date)} → {fmtDate(bond.warranty_end)}
+                    <span className="text-sm text-muted-token"> ({bond.warranty_months} เดือน)</span>
+                  </>
+                ) : (
+                  <span className="text-muted-token">ยังไม่ได้ระบุวันส่งมอบ — ใส่ในกล่องแก้ไข</span>
+                )}
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs font-medium text-muted-token">ได้รับคืน</dt>
+              <dd className="mt-0.5 text-base text-ink">
+                {bond.bond_returned_at ? (
+                  <>
+                    <span className="tnum">{fmtDate(bond.bond_returned_at)}</span>
+                    {bond.bond_returned_amount !== null && (
+                      <span className="font-semibold tnum text-income"> · {fmtBaht(bond.bond_returned_amount)}</span>
+                    )}
+                  </>
+                ) : (
+                  <span className="text-muted-token">ยังไม่ได้รับคืน</span>
+                )}
+              </dd>
+            </div>
+          </dl>
+
+          {bond.bond_kind && bond.bond_amount > 0 && (bond.handover_date || bond.bond_returned_at) && (
+            <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3">
+              <BondReturnButton
+                siteId={site.id}
+                bondKind={bond.bond_kind}
+                bondAmount={bond.bond_amount}
+                today={today}
+                returned={
+                  bond.bond_returned_at
+                    ? { at: bond.bond_returned_at, amount: bond.bond_returned_amount ?? bond.bond_amount }
+                    : null
+                }
+              />
+              {!bond.bond_returned_at && bond.bond_kind === 'cash' && (
+                <span className="text-xs text-muted-token">กดแล้วระบบลงรายรับของโครงการนี้ให้ทันที</span>
+              )}
+            </div>
+          )}
+        </section>
+      )}
 
       {/* ── หัวหน้าโครงการ ────────────────────────────────────────────── */}
       <section className="panel mb-4">

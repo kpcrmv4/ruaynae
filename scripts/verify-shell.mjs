@@ -99,20 +99,24 @@ const ownerJar = await login('/api/auth/login', {
 })
 const supJar = await login('/api/auth/pin', { pin: env.SEED_SUPERVISOR1_PIN })
 
-// ── P0-UI-01 · sidebar ของเจ้าของมีลิงก์ 9 รายการ และมีรายการ active ────
+// ── P0-UI-01 · sidebar ของเจ้าของมีลิงก์ 10 รายการ และมีรายการ active ───
 // จำนวนเป็น **ตัวเลขที่พิมพ์ไว้** โดยตั้งใจ ไม่ใช่นับจาก `nav.ts`
 // นับจากไฟล์เดียวกับที่แอปอ่าน = เอาโค้ดไปเทียบกับตัวเอง แล้วแถวนี้จะไม่มีวันแดงอีกเลย
 // ต่อให้เมนูหายไปทั้งกลุ่ม · ตัวเลขที่ต้องมาแก้ตอนเพิ่มเมนูคือราคาที่ถูกกว่ามาก
-// (9 = ภาพรวม · โครงการ · รายรับ-รายจ่าย · คนเข้าโครงการ · ค่าแรงและรอบจ่าย · รออนุมัติ
-//  · ประวัติการแก้ไข · ตั้งค่า · เชื่อมต่อ AI — ตัวสุดท้ายเพิ่มมาในเฟส P9)
+// (10 = วันนี้ · โครงการ · รายรับ-รายจ่าย · คนเข้าโครงการ · ค่าแรงและการจ่าย
+//  · รออนุมัติ · รายงาน · ประวัติการแก้ไข · ตั้งค่า · เชื่อมต่อ AI)
+//
+// ⚠️ เคยเป็น 9 และรายการที่หายไปจากคำอธิบายคือ **รายงาน** — เมนูถูกเพิ่มเข้า
+// `nav.ts` แล้วไม่มีใครมาแก้ตัวเลขตรงนี้ · แถวนี้จึงแดงมาตลอดจนถึง 19 ก.ย. 2569
+// ซึ่งคือสิ่งที่มันถูกออกแบบมาให้ทำพอดี
 {
   const html = await page('/', ownerJar)
   const nav = navBlock(html, 'sidebar')
   const links = nav ? (nav.match(/<a\s/g) ?? []).length : -1
   // รายการที่ตรงกับ URL ปัจจุบันต้องมีคลาส active — ถ้าไม่มี คนจะไม่รู้ว่าอยู่หน้าไหน
   const hasActive = Boolean(nav && nav.includes('bg-sidebar-active-bg'))
-  check('P0-UI-01 sidebar ของเจ้าของมีลิงก์ 9 รายการ และมีรายการที่ active',
-    links === 9 && hasActive, `ลิงก์ ${links} · active ${hasActive}`)
+  check('P0-UI-01 sidebar ของเจ้าของมีลิงก์ 10 รายการ และมีรายการที่ active',
+    links === 10 && hasActive, `ลิงก์ ${links} · active ${hasActive}`)
 }
 
 // ── P0-UI-02a · แถบล่างมี 5 ช่อง · ช่องกลางไม่มีข้อความแต่มี aria-label ──
@@ -164,10 +168,16 @@ try {
     "insert into public.sites(name) values ('ทดสอบ R5 ป้ายเมนู') returning id")).rows
   await sql(`insert into public.site_supervisors(site_id, profile_id, effective_from)
              values ('${navSite}','${sup1.id}', current_date - 1)`)
+  // 🔴 แถวที่ status='rejected' ต้องมี `rejected_reason` ไม่ว่าง — บังคับด้วย
+  // CHECK `txn_rejected_needs_reason` ใน `20260830180000_p2_transactions.sql`
+  // ใส่ไม่ครบแล้ว insert จะตก 23514 เงียบ ๆ ตรงนี้ แถวตีกลับไม่เคยถูกสร้าง
+  // แล้วสองแถวข้างล่างจะฟ้องว่า "ป้ายเป็น 0" เหมือนแอปพัง ทั้งที่แอปถูก
   const mk = (status, amount) => sql(
     `insert into public.transactions
-       (kind, site_id, category_id, amount, txn_date, pay_method, status, created_by)
-     values ('expense','${navSite}','${expCat.id}',${amount},'${today}','cash','${status}','${sup1.id}')`)
+       (kind, site_id, category_id, amount, txn_date, pay_method, status, created_by,
+        rejected_reason)
+     values ('expense','${navSite}','${expCat.id}',${amount},'${today}','cash','${status}','${sup1.id}',
+        ${status === 'rejected' ? "'ทดสอบ: ตีกลับให้แก้'" : 'null'})`)
   await mk('pending', 101)
   await mk('pending', 102)
   await mk('rejected', 103)

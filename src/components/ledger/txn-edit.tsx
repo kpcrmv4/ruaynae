@@ -14,29 +14,13 @@ import { slipUploadError, uploadSlip } from '@/lib/slip-upload'
 import {
   INCOME_KINDS, INCOME_KIND_LABEL, MAX_NOTE, PAY_METHODS, PAY_METHOD_LABEL,
   TXN_KIND_LABEL, canModifyTxn, txnError,
-  type IncomeKind, type PayMethod, type TxnKind, type TxnStatus,
+  type IncomeKind, type TxnKind,
 } from '@/lib/transactions'
-
-/** ค่าของแถวเท่าที่กล่องแก้ไขต้องใช้ — ส่งมาจาก Server Component ของแต่ละหน้า */
-export type EditableTxn = {
-  id: string
-  kind: TxnKind
-  status: TxnStatus
-  createdBy: string | null
-  siteId: string | null
-  /** ชื่อโครงการของแถวนี้ — เผื่อโครงการปิดงานไปแล้วจนไม่อยู่ในลิสต์ให้เลือก */
-  siteName: string | null
-  categoryId: string
-  /** ชื่อหมวดของแถวนี้ — เผื่อหมวดถูกปิดใช้งานไปแล้ว */
-  categoryName: string | null
-  amount: number
-  txnDate: string
-  payMethod: PayMethod
-  incomeKind: IncomeKind | null
-  installmentNo: number | null
-  note: string | null
-  attachments: { id: string }[]
-}
+// 🔴 `toEditableTxn` อยู่ในไฟล์ธรรมดา ไม่ใช่ไฟล์นี้ — ฟังก์ชันที่ export จาก
+// โมดูล 'use client' เรียกจาก Server Component ไม่ได้ (พังตอนรัน ไม่ใช่ตอน
+// typecheck) และ `TxnRow` ซึ่งเป็น Server Component เป็นคนเรียกมัน
+export type { EditableTxn } from '@/lib/txn-editable'
+import type { EditableTxn } from '@/lib/txn-editable'
 
 type Site = { id: string; name: string }
 type Category = { id: string; name: string; kind: TxnKind }
@@ -83,6 +67,14 @@ export function TxnEditProvider({
       )}
     </EditCtx.Provider>
   )
+}
+
+/**
+ * กล่องแก้ไขของหน้านี้ (ถ้ามี) — กล่องรายละเอียดใช้เปิดต่อจากตัวเอง
+ * คืน `null` เมื่อหน้านั้นไม่ได้ครอบด้วย provider ซึ่งแปลว่า "หน้านี้ไม่มีการแก้ไข"
+ */
+export function useTxnEdit() {
+  return useContext(EditCtx)
 }
 
 /**

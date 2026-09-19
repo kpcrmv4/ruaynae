@@ -5,7 +5,9 @@ import {
   type IncomeKind, type PayMethod, type TxnKind, type TxnStatus,
 } from '@/lib/transactions'
 import { Badge } from '@/components/ui/badge'
+import { TxnDetailTrigger } from '@/components/ledger/txn-detail'
 import { TxnEditButton } from '@/components/ledger/txn-edit'
+import { toEditableTxn } from '@/lib/txn-editable'
 
 /**
  * หนึ่งแถวของรายรับ-รายจ่าย — รูปเดียวกันทั้ง `/ledger` และหน้าโครงการ
@@ -30,8 +32,12 @@ export type TxnRowData = {
   /** มีค่า = คีย์ MCP ใบนั้นเป็นคนบันทึกผ่าน AI · null = คนคีย์เองในแอป */
   mcp_key_id: string | null
   category_id: string
+  /** เวลาที่บันทึกเข้าระบบ — คนละเรื่องกับ `txn_date` ซึ่งคือวันที่ของรายการ */
+  created_at: string
   sites: { name: string } | null
   categories: { name: string } | null
+  /** ชื่อคนคีย์ · null เมื่อ RLS ไม่ให้คนดูอ่านโปรไฟล์คนอื่น */
+  profiles: { full_name: string } | null
   attachments: { id: string }[]
 }
 
@@ -59,7 +65,11 @@ export function TxnRow({
      ปัญหาจะกลายเป็นสีเขียวซึ่งอ่านว่า "เรียบร้อย" · วงขอบเป็นคนบอกว่า "ใบนี้แหละ"
      ส่วนสีพื้นยังบอกสถานะจริงเหมือนเดิม */
   const tone = [
-    t.status === 'rejected' ? 'bg-urgent-bg' : focused ? 'bg-brand-tint' : '',
+    t.status === 'rejected'
+      ? 'bg-urgent-bg'
+      : focused
+        ? 'bg-brand-tint'
+        : 'hover:bg-surface-2',
     focused ? 'ring-2 ring-inset ring-brand' : '',
   ].join(' ')
 
@@ -71,8 +81,15 @@ export function TxnRow({
     <div
       id={`txn-${t.id}`}
       /* scroll-mt กันหัวเรื่องเหนียวบังแถวตอนถูกเลื่อนมาหา */
-      className={`grid scroll-mt-24 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4 ${tone}`}
+      className={`relative grid scroll-mt-24 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 transition-colors duration-100 last:border-b-0 md:px-4 ${tone}`}
     >
+      {/* กดตรงไหนของการ์ดก็เปิดรายละเอียด — บนมือถือเป้ากดคือทั้งแถว
+          ไม่ใช่ปุ่มเล็ก ๆ ปุ่มเดียว · ไม่วาดเลยถ้าหน้านั้นไม่มี provider */}
+      <TxnDetailTrigger
+        txn={t}
+        label={`${t.categories?.name ?? 'ไม่มีหมวด'} ${fmtBaht(t.amount)}`}
+      />
+
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="truncate font-semibold text-ink">
@@ -148,26 +165,9 @@ export function TxnRow({
         </div>
       </div>
 
-      <div className="self-center">
-        <TxnEditButton
-          txn={{
-            id: t.id,
-            kind: t.kind,
-            status: t.status,
-            createdBy: t.created_by,
-            siteId: t.site_id,
-            siteName: t.sites?.name ?? null,
-            categoryId: t.category_id,
-            categoryName: t.categories?.name ?? null,
-            amount: Number(t.amount),
-            txnDate: t.txn_date,
-            payMethod: t.pay_method,
-            incomeKind: t.income_kind,
-            installmentNo: t.installment_no,
-            note: t.note,
-            attachments: t.attachments,
-          }}
-        />
+      {/* z สูงกว่าปุ่มใสที่ทับทั้งแถว ไม่งั้นดินสอจะกดไม่โดน */}
+      <div className="relative z-10 self-center">
+        <TxnEditButton txn={toEditableTxn(t)} />
       </div>
     </div>
   )

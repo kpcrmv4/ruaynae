@@ -21,6 +21,7 @@ import { Badge } from '@/components/ui/badge'
 import { Metric, MetricBar } from '@/components/ui/metric'
 import { MoneyBars, OverrunBadge, SiteSummary } from '@/components/sites/money-bars'
 import { CategoryTotals } from '@/components/sites/category-totals'
+import { TxnDetailProvider } from '@/components/ledger/txn-detail'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
 import { SiteDetailActions } from './site-detail-client'
@@ -117,8 +118,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
       .from('transactions')
       .select(`
         id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no,
-        rejected_reason, site_id, created_by, category_id, mcp_key_id, sites(name), categories(name),
-        attachments(id)
+        rejected_reason, site_id, created_by, created_at, category_id, mcp_key_id, sites(name),
+        categories(name), profiles!transactions_created_by_fkey(full_name), attachments(id)
       `)
       .eq('site_id', id)
       .order('txn_date', { ascending: false })
@@ -453,6 +454,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         sites={pickerSites}
         categories={pickerCategories}
       >
+       <TxnDetailProvider>
         <section className="panel mt-4">
           <div className="panel-head">
             รายรับ-รายจ่ายล่าสุด
@@ -490,6 +492,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             </>
           )}
         </section>
+       </TxnDetailProvider>
       </TxnEditProvider>
     </>
   )

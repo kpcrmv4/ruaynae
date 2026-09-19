@@ -10,6 +10,7 @@ import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 import { FocusScroll } from '@/components/ledger/focus-scroll'
+import { TxnDetailProvider } from '@/components/ledger/txn-detail'
 import { LedgerFilters } from '@/components/ledger/ledger-filters'
 import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
@@ -54,8 +55,8 @@ export default async function LedgerPage({
     .from('transactions')
     .select(`
       id, kind, amount, txn_date, pay_method, status, note, income_kind, installment_no, rejected_reason,
-      site_id, created_by, category_id, mcp_key_id, sites(name), categories(name),
-      attachments(id)
+      site_id, created_by, created_at, category_id, mcp_key_id, sites(name), categories(name),
+      profiles!transactions_created_by_fkey(full_name), attachments(id)
     `)
   if (status !== 'all') listQuery = listQuery.eq('status', status)
   if (kind !== 'all') listQuery = listQuery.eq('kind', kind)
@@ -242,6 +243,7 @@ export default async function LedgerPage({
       sites={sitesResult.data ?? []}
       categories={categoriesResult.data ?? []}
     >
+     <TxnDetailProvider>
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <h1 className="text-2xl font-bold text-ink">รายรับ-รายจ่าย</h1>
@@ -436,6 +438,7 @@ export default async function LedgerPage({
           )}
         </>
       )}
+     </TxnDetailProvider>
     </TxnEditProvider>
   )
 }

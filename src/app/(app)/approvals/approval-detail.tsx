@@ -1,10 +1,11 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { Check, ExternalLink, FileSearch, ImageOff, Loader2, Undo2, X } from 'lucide-react'
+import { Check, FileSearch, Loader2, Undo2, X } from 'lucide-react'
 import { useState } from 'react'
 import { fmtBaht } from '@/lib/format'
 import { MAX_NOTE } from '@/lib/transactions'
+import { SlipGallery } from '@/components/ui/slip-gallery'
 import { useApproval } from './use-approval'
 
 /**
@@ -61,8 +62,6 @@ export function ApprovalDetailButton({ txn }: { txn: ApprovalDetailData }) {
 
 function DetailBody({ txn, onDone }: { txn: ApprovalDetailData; onDone: () => void }) {
   const { busy, send } = useApproval(txn.id)
-  const [active, setActive] = useState(txn.attachments[0]?.id ?? null)
-  const [broken, setBroken] = useState(false)
   const [rejecting, setRejecting] = useState(false)
   const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
@@ -105,81 +104,12 @@ function DetailBody({ txn, onDone }: { txn: ApprovalDetailData; onDone: () => vo
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3.5">
         {/* ── สลิป — ใหญ่พอให้อ่านยอดในรูปออก ─────────────────────────
             รูปย่อในแถวมีไว้ให้รู้ว่า "มีสลิป" · ตรงนี้คือที่ที่ใช้ตรวจจริง */}
-        {active ? (
-          <div className="mb-4">
-            <a
-              href={`/api/uploads/${active}`}
-              target="_blank"
-              rel="noreferrer"
-              className="block overflow-hidden rounded-md border border-line bg-surface-2"
-            >
-              {broken ? (
-                <span className="flex h-40 flex-col items-center justify-center gap-1.5 text-sm text-muted-token">
-                  <ImageOff className="size-6" strokeWidth={1.6} />
-                  เปิดรูปนี้ไม่ได้ ลองกดเปิดในแท็บใหม่
-                </span>
-              ) : (
-                /* eslint-disable-next-line @next/next/no-img-element */
-                <img
-                  key={active}
-                  src={`/api/uploads/${active}`}
-                  alt="สลิป / บิลที่แนบมา"
-                  onError={() => setBroken(true)}
-                  className="mx-auto max-h-[45svh] w-full object-contain"
-                />
-              )}
-            </a>
-            <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-2">
-              <a
-                href={`/api/uploads/${active}`}
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1.5 text-sm font-medium text-brand hover:underline"
-              >
-                <ExternalLink className="size-3.5" />
-                เปิดรูปเต็มในแท็บใหม่
-              </a>
-              {txn.attachments.length > 1 && (
-                <span className="text-sm text-muted-token">
-                  แนบมา <span className="tnum">{txn.attachments.length}</span> รูป
-                </span>
-              )}
-            </div>
-
-            {/* แถวรูปย่อ — โผล่เมื่อมีมากกว่าหนึ่งรูปเท่านั้น */}
-            {txn.attachments.length > 1 && (
-              <div className="mt-2 flex flex-wrap gap-2">
-                {txn.attachments.map((a, i) => (
-                  <button
-                    key={a.id}
-                    type="button"
-                    onClick={() => {
-                      setActive(a.id)
-                      setBroken(false)
-                    }}
-                    aria-label={`ดูรูปที่ ${i + 1}`}
-                    aria-pressed={a.id === active}
-                    className={`overflow-hidden rounded-sm border transition-colors ${
-                      a.id === active ? 'border-brand ring-2 ring-brand/40' : 'border-line hover:border-ink-2'
-                    }`}
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={`/api/uploads/${a.id}?thumb=1`}
-                      alt=""
-                      loading="lazy"
-                      className="size-14 object-cover"
-                    />
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-        ) : (
-          <p className="mb-4 rounded-md border border-dashed border-line-strong px-3 py-3 text-sm text-muted-token">
-            รายการนี้ไม่ได้แนบสลิป — ถ้าต้องมีหลักฐาน ให้ตีกลับพร้อมบอกว่าขอสลิปเพิ่ม
-          </p>
-        )}
+        <div className="mb-4">
+          <SlipGallery
+            attachments={txn.attachments}
+            emptyMessage="รายการนี้ไม่ได้แนบสลิป — ถ้าต้องมีหลักฐาน ให้ตีกลับพร้อมบอกว่าขอสลิปเพิ่ม"
+          />
+        </div>
 
         <dl className="grid grid-cols-[auto_minmax(0,1fr)] gap-x-4 gap-y-2 text-sm">
           <Row label="วันที่" value={txn.dateLabel} />

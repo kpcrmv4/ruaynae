@@ -1,6 +1,8 @@
 'use client'
 
-import { Filter } from 'lucide-react'
+import { CalendarDays, Search, Warehouse } from 'lucide-react'
+import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 
 export type RangeKey = 'all' | 'today' | 'month' | 'last' | 'year' | 'custom'
@@ -14,7 +16,7 @@ export const RANGE_LABEL: Record<RangeKey, string> = {
   custom: 'กำหนดช่วงเอง…',
 }
 
-/** ช่วงวันของแต่ละตัวเลือก — `null` = ไม่จำกัด (ไม่ส่ง from/to เลย) */
+/** ช่วงวันของแต่ละตัวเลือก — `''` ทั้งคู่ = ไม่จำกัด (ไม่ส่ง from/to เลย) */
 export function rangeDates(key: RangeKey, today: string): { from: string; to: string } {
   const y = Number(today.slice(0, 4))
   const m = Number(today.slice(5, 7))
@@ -47,114 +49,246 @@ export function detectRange(from: string, to: string, today: string): RangeKey {
   return 'custom'
 }
 
+export type StatusChip = { key: string; label: string; count?: number }
+
+type Current = {
+  kind: string
+  status: string
+  q: string
+  site: string
+  from: string
+  to: string
+}
+
+const KINDS = [
+  ['all', 'ทั้งหมด'],
+  ['income', 'รายรับ'],
+  ['expense', 'รายจ่าย'],
+] as const
+
 /**
- * แถบตัวกรองของหน้ารายรับ-รายจ่าย
+ * ส่วนหัวของหน้ารายรับ-รายจ่าย — ตัวกรองทุกตัวรวมอยู่ที่นี่ที่เดียว
  *
- * 🔴 เดิมเป็นชิปช่วงเวลาหนึ่งแถว + ช่องวันที่สองช่อง + กล่องเลือกโครงการ =
- * **หกแถวควบคุมก่อนถึงข้อมูลแถวแรก** บนจอ 390px และช่อง `type="date"` ถูกบีบ
- * จนเหลือกล่องเปล่า ๆ ที่กดแล้วไม่รู้ว่าคืออะไร (เจ้าของแจ้ง 4 ก.ย. 2569)
- * · ยุบเหลือกล่องเลือกสองอันเรียงคู่กัน · ช่องวันที่โผล่เฉพาะตอนเลือก
- * "กำหนดช่วงเอง" ซึ่งเป็นกรณีส่วนน้อย
+ * 🔴 เดิมมีชิปชนิด · กล่องเลือกสองอัน · ปุ่ม "กรอง" · ชิปสถานะ · ช่องค้นหา
+ * เรียงกันลงมา **หน้าตาเหมือนกันหมด** (ชิปดำสองแถวคนละความหมาย) และต้องกด
+ * "กรอง" อีกทีหลังเลือก (เจ้าของแจ้ง 19 ก.ย. 2569) · ตอนนี้แต่ละชั้นมี
+ * รูปร่างของตัวเอง เพื่อให้กวาดตาแล้วรู้ว่าอันไหนคืออะไรโดยไม่ต้องอ่าน:
  *
- * 🔴 แหล่งความจริงยังเป็น `from`/`to` บน URL เหมือนเดิม — กล่องเลือกเป็นแค่
- * ตัวเติมค่าให้ ไม่มีพารามิเตอร์ตัวที่สองที่วันหนึ่งจะขัดกันเอง
+ *   1. ชนิด (รายรับ/รายจ่าย) = **แถบสลับ** ช่องเดียวสามส่วน
+ *   2. ช่วงเวลา + โครงการ = **กล่องเลือกมีไอคอน** เปลี่ยนแล้วไปทันที ไม่มีปุ่มกรอง
+ *   3. ค้นหา = ช่องพิมพ์ (อันเดียวที่ยังต้องกดส่ง เพราะพิมพ์อยู่กลางคำจะยิงไม่ได้)
+ *   4. สถานะ = **แท็บขีดล่าง** ติดกับลิสต์ เพราะมันคือการแบ่งหน้าลิสต์ ไม่ใช่ตัวกรอง
+ *
+ * 🔴 แหล่งความจริงยังเป็น URL เหมือนเดิม (`kind` `status` `q` `site` `from` `to`)
+ * — ทุกปุ่มคือลิงก์หรือ `router.push` ไปยัง URL ใหม่ · แชร์ลิงก์ได้ · Back ทำงานเอง
+ * · ทุกการเปลี่ยนตัวกรองตัด `after` (cursor) ทิ้งเสมอ ไม่งั้นได้หน้าสองของลิสต์ใหม่
  */
 export function LedgerFilters({
   today,
   sites,
+  siteName,
   isOwner,
-  site,
-  from,
-  to,
-  /** ตัวกรองอื่นที่ต้องติดไปกับฟอร์มด้วย ไม่งั้นกดกรองแล้วขอบเขตอื่นหายเงียบ ๆ */
-  keep,
+  current,
+  statuses,
 }: {
   today: string
   sites: { id: string; name: string }[]
+  /** ชื่อโครงการที่กรองอยู่ เผื่อมันไม่อยู่ในกล่องเลือก (ปิดงานแล้ว) จะได้ยังแสดงชื่อได้ */
+  siteName: string | null
   isOwner: boolean
-  site: string
-  from: string
-  to: string
-  keep: Record<string, string>
+  current: Current
+  statuses: readonly StatusChip[]
 }) {
-  const [range, setRange] = useState<RangeKey>(() => detectRange(from, to, today))
-  const [dates, setDates] = useState({ from, to })
+  const router = useRouter()
+  const [range, setRange] = useState<RangeKey>(() => detectRange(current.from, current.to, today))
+  const [dates, setDates] = useState({ from: current.from, to: current.to })
+
+  /** URL ของหน้านี้หลังแก้ค่าบางตัว — ค่าว่างคือถอดตัวกรองนั้นออก */
+  const hrefWith = (patch: Partial<Current>) => {
+    const next = { ...current, ...patch }
+    const p = new URLSearchParams()
+    if (next.kind && next.kind !== 'all') p.set('kind', next.kind)
+    if (next.status && next.status !== 'all') p.set('status', next.status)
+    if (next.q) p.set('q', next.q)
+    if (next.site) p.set('site', next.site)
+    if (next.from) p.set('from', next.from)
+    if (next.to) p.set('to', next.to)
+    const s = p.toString()
+    return s ? `/ledger?${s}` : '/ledger'
+  }
+
+  const go = (patch: Partial<Current>) => router.push(hrefWith(patch))
 
   const pickRange = (k: RangeKey) => {
     setRange(k)
-    // เลือกช่วงสำเร็จรูป = เขียนวันให้เลย · "กำหนดเอง" คงค่าที่กรอกไว้
-    if (k !== 'custom') setDates(rangeDates(k, today))
+    if (k === 'custom') return // รอให้กรอกวันก่อน ค่อยไป
+    const d = rangeDates(k, today)
+    setDates(d)
+    go(d)
   }
 
+  const pickDate = (field: 'from' | 'to', value: string) => {
+    const d = { ...dates, [field]: value }
+    setDates(d)
+    go(d)
+  }
+
+  const siteKnown =
+    !current.site || current.site === 'central' || sites.some((s) => s.id === current.site)
+
+  const control = 'input-base py-2 pl-9 text-[15px]'
+  const icon = 'pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-token'
+
   return (
-    <form
-      action="/ledger"
-      method="get"
-      className="mb-3 grid grid-cols-2 gap-2 sm:flex sm:flex-wrap sm:items-center"
-    >
-      {Object.entries(keep).map(([k, v]) => (
-        <input key={k} type="hidden" name={k} value={v} />
-      ))}
-
-      <select
-        value={range}
-        onChange={(e) => pickRange(e.target.value as RangeKey)}
-        aria-label="ช่วงเวลา"
-        className="input-base col-span-1 py-2 sm:w-auto"
-      >
-        {(Object.keys(RANGE_LABEL) as RangeKey[]).map((k) => (
-          <option key={k} value={k}>{RANGE_LABEL[k]}</option>
-        ))}
-      </select>
-
-      <select
-        name="site"
-        defaultValue={site}
-        aria-label="กรองตามโครงการ"
-        className="input-base col-span-1 py-2 sm:w-auto"
-      >
-        <option value="">ทุกโครงการ</option>
-        {isOwner && <option value="central">เฉพาะส่วนกลาง</option>}
-        {sites.map((s) => (
-          <option key={s.id} value={s.id}>{s.name}</option>
-        ))}
-      </select>
-
-      {/* 🔴 ช่วงสำเร็จรูปส่งวันไปด้วย hidden — ปลายทางอ่าน from/to อย่างเดียว
-          จึงไม่ต้องรู้จักคำว่า "เดือนนี้" และลิงก์ที่แชร์กันไปยังคงหมายถึง
-          ช่วงวันเดิมเสมอ แม้เปิดคนละวัน */}
-      {range === 'custom' ? (
-        <>
-          <input
-            type="date"
-            name="from"
-            value={dates.from}
-            max={today}
-            onChange={(e) => setDates((d) => ({ ...d, from: e.target.value }))}
-            aria-label="ตั้งแต่วันที่"
-            className="input-base col-span-1 py-2 tnum sm:w-auto"
-          />
-          <input
-            type="date"
-            name="to"
-            value={dates.to}
-            max={today}
-            onChange={(e) => setDates((d) => ({ ...d, to: e.target.value }))}
-            aria-label="ถึงวันที่"
-            className="input-base col-span-1 py-2 tnum sm:w-auto"
-          />
-        </>
-      ) : (
-        <>
-          {dates.from && <input type="hidden" name="from" value={dates.from} />}
-          {dates.to && <input type="hidden" name="to" value={dates.to} />}
-        </>
+    <div className="mb-4 space-y-2.5">
+      {/* 1 · ชนิด — เจ้าของเท่านั้นที่มีทั้งสองชนิดให้สลับ
+          หัวหน้าโครงการเห็นแต่รายจ่าย แถบสลับที่มีช่องเดียวคือแถบที่ไม่ทำอะไร */}
+      {isOwner && (
+        <div
+          role="group"
+          aria-label="ชนิดรายการ"
+          className="grid grid-cols-3 gap-1 rounded-md bg-surface-3 p-1 sm:inline-grid"
+        >
+          {KINDS.map(([k, label]) => {
+            const active = current.kind === k
+            return (
+              <Link
+                key={k}
+                href={hrefWith({ kind: k })}
+                aria-current={active ? 'true' : undefined}
+                className={`rounded-sm px-3 py-1.5 text-center text-sm transition-colors duration-100 sm:px-5 ${
+                  active
+                    ? 'bg-surface font-semibold text-ink shadow-sm'
+                    : 'font-medium text-ink-2 hover:text-ink'
+                }`}
+              >
+                {label}
+              </Link>
+            )
+          })}
+        </div>
       )}
 
-      <button type="submit" className="btn-secondary col-span-2 py-2 sm:w-auto sm:px-4">
-        <Filter className="size-4" />
-        กรอง
-      </button>
-    </form>
+      {/* 2 · ช่วงเวลา + โครงการ — เปลี่ยนแล้วไปเลย ไม่มีปุ่มกรอง */}
+      <div className="grid grid-cols-2 gap-2 sm:flex sm:flex-wrap">
+        <label className="relative block sm:w-auto">
+          <span className="sr-only">ช่วงเวลา</span>
+          <CalendarDays className={icon} strokeWidth={1.8} aria-hidden />
+          <select
+            value={range}
+            onChange={(e) => pickRange(e.target.value as RangeKey)}
+            className={`${control} sm:w-auto sm:pr-9`}
+          >
+            {(Object.keys(RANGE_LABEL) as RangeKey[]).map((k) => (
+              <option key={k} value={k}>{RANGE_LABEL[k]}</option>
+            ))}
+          </select>
+        </label>
+
+        <label className="relative block sm:w-auto">
+          <span className="sr-only">โครงการ</span>
+          <Warehouse className={icon} strokeWidth={1.8} aria-hidden />
+          <select
+            value={current.site}
+            onChange={(e) => go({ site: e.target.value })}
+            className={`${control} sm:w-auto sm:pr-9`}
+          >
+            <option value="">ทุกโครงการ</option>
+            {isOwner && <option value="central">เฉพาะส่วนกลาง</option>}
+            {/* โครงการที่กรองอยู่แต่ไม่อยู่ในกล่อง (ปิดงานแล้ว) — ต้องยังเห็นชื่อ
+                ตัวกรองที่มองไม่เห็นคือตัวกรองที่ทำให้อ่านตัวเลขผิดขอบเขต */}
+            {!siteKnown && (
+              <option value={current.site}>{siteName ?? 'โครงการที่เลือก'}</option>
+            )}
+            {sites.map((s) => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+        </label>
+
+        {/* ช่องวันที่โผล่เฉพาะตอน "กำหนดช่วงเอง" ซึ่งเป็นกรณีส่วนน้อย
+            🔴 <input type="date"> ส่ง ค.ศ. เสมอ ห้ามแปลงก่อนส่ง (CLAUDE.md §15) */}
+        {range === 'custom' && (
+          <>
+            <input
+              type="date"
+              value={dates.from}
+              max={today}
+              onChange={(e) => pickDate('from', e.target.value)}
+              aria-label="ตั้งแต่วันที่"
+              className="input-base py-2 tnum sm:w-auto"
+            />
+            <input
+              type="date"
+              value={dates.to}
+              max={today}
+              onChange={(e) => pickDate('to', e.target.value)}
+              aria-label="ถึงวันที่"
+              className="input-base py-2 tnum sm:w-auto"
+            />
+          </>
+        )}
+      </div>
+
+      {/* 3 · ค้นหา — ฟอร์ม GET ธรรมดา · ตัวกรองอื่นติดไปด้วยเป็น hidden
+          ไม่งั้นพิมพ์ค้นหาแล้วขอบเขตโครงการ/ช่วงวันหายเงียบ ๆ */}
+      <form action="/ledger" method="get" className="flex gap-2 sm:max-w-md">
+        {current.kind !== 'all' && <input type="hidden" name="kind" value={current.kind} />}
+        {current.status !== 'all' && <input type="hidden" name="status" value={current.status} />}
+        {current.site && <input type="hidden" name="site" value={current.site} />}
+        {current.from && <input type="hidden" name="from" value={current.from} />}
+        {current.to && <input type="hidden" name="to" value={current.to} />}
+        <div className="relative flex-1">
+          <Search className={icon} aria-hidden />
+          <input
+            type="search"
+            name="q"
+            defaultValue={current.q}
+            placeholder="ค้นหาจากรายละเอียด…"
+            aria-label="ค้นหาจากรายละเอียด"
+            className={control}
+          />
+        </div>
+        <button type="submit" className="btn-secondary shrink-0 px-3 py-2 text-[15px]">
+          ค้นหา
+        </button>
+      </form>
+
+      {/* 4 · สถานะ — แท็บขีดล่าง ติดกับลิสต์ · เลื่อนแนวนอนได้บนจอแคบ
+          สีที่เลือกเป็นหมึก ไม่ใช่สีแบรนด์ (ตัวกรองไม่ใช่ปุ่มหลักของหน้า) */}
+      <div
+        role="tablist"
+        aria-label="สถานะ"
+        className="-mx-1 flex overflow-x-auto border-b border-line px-1 no-scrollbar"
+      >
+        {statuses.map((s) => {
+          const active = current.status === s.key
+          return (
+            <Link
+              key={s.key}
+              href={hrefWith({ status: s.key })}
+              role="tab"
+              aria-selected={active}
+              className={`-mb-px inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-2 py-2 text-[13px] transition-colors duration-100 sm:px-3 sm:text-sm ${
+                active
+                  ? 'border-ink font-semibold text-ink'
+                  : 'border-transparent font-medium text-muted-token hover:text-ink'
+              }`}
+            >
+              {s.label}
+              {s.count !== undefined && (
+                <span
+                  className={`rounded-xs px-1 text-xs font-semibold tnum ${
+                    active ? 'bg-ink text-canvas' : 'bg-surface-3 text-muted-token'
+                  }`}
+                >
+                  {s.count}
+                </span>
+              )}
+            </Link>
+          )
+        })}
+      </div>
+    </div>
   )
 }

@@ -91,16 +91,20 @@ export function TxnRow({
       />
 
       <div className="min-w-0">
-        <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
-          <span className="truncate font-semibold text-ink">
-            {t.categories?.name ?? 'ไม่มีหมวด'}
-          </span>
+        {/* 🔴 ชื่อหมวดอยู่บรรทัดของตัวเอง ชิปอยู่บรรทัดถัดไปเสมอ — เดิมอยู่แถวเดียวกัน
+            แบบ flex-wrap แล้วชิปชื่อโครงการยาว ๆ (`whitespace-nowrap` ใน .chip) ไม่ยอมหด
+            จึงทะลุคอลัมน์ไปซ้อนใต้ป้ายสถานะและปุ่มแก้ไข (เจ้าของแจ้ง 19 ก.ย. 2569)
+            · ชิปจึงต้อง `max-w-full` และตัดข้อความข้างในด้วย ellipsis ไม่ใช่ล้นออก */}
+        <div className="truncate font-semibold leading-6 text-ink">
+          {t.categories?.name ?? 'ไม่มีหมวด'}
+        </div>
+        <div className="mt-1 flex flex-wrap items-center gap-x-1.5 gap-y-1">
           {/* ผูกโครงการ = ชิปขอบทึบ · ส่วนกลาง = ชิปขอบประ (DESIGN §5.2)
               ต้องแยกออกในแวบเดียวเพราะสองอย่างนี้เข้าคนละยอดรวม */}
           {showSite &&
             (t.site_id ? (
-              <span className="chip border border-brand-tint-strong bg-brand-tint text-brand-on-tint ring-0">
-                {t.sites?.name ?? 'โครงการ'}
+              <span className="chip max-w-full border border-brand-tint-strong bg-brand-tint text-brand-on-tint ring-0">
+                <span className="truncate">{t.sites?.name ?? 'โครงการ'}</span>
               </span>
             ) : (
               <span className="chip border border-dashed border-line-strong text-muted-token ring-0">
@@ -124,7 +128,7 @@ export function TxnRow({
             </span>
           )}
         </div>
-        <div className="mt-0.5 truncate text-sm text-muted-token">
+        <div className="mt-1 truncate text-sm text-muted-token">
           {showDate && `${fmtDate(t.txn_date)} · `}
           {PAY_METHOD_LABEL[t.pay_method]}
           {t.income_kind && ` · ${INCOME_KIND_LABEL[t.income_kind]}`}

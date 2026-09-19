@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Receipt, Undo2, Warehouse } from 'lucide-react'
+import { Receipt, Undo2 } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -8,10 +8,9 @@ import { searchTerms } from '@/lib/search-core'
 import { TXN_STATUSES, TXN_STATUS_LABEL, isTxnKind, isTxnStatus, isUuid } from '@/lib/transactions'
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
-import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 import { FocusScroll } from '@/components/ledger/focus-scroll'
 import { TxnDetailProvider } from '@/components/ledger/txn-detail'
-import { LedgerFilters } from '@/components/ledger/ledger-filters'
+import { LedgerFilters, type StatusChip } from '@/components/ledger/ledger-filters'
 import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
@@ -188,7 +187,7 @@ export default async function LedgerPage({
   const netTrustworthy = (i: number) =>
     !(i === 0 && Boolean(sp.after)) && !(i === groups.length - 1 && hasMore)
 
-  const filters: FilterChip[] = [
+  const statuses: StatusChip[] = [
     { key: 'all', label: 'ทั้งหมด', count: counts[0] },
     ...TXN_STATUSES.map((s, i) => ({
       key: s,
@@ -205,23 +204,8 @@ export default async function LedgerPage({
   if (sp.from) keep.set('from', sp.from)
   if (sp.to) keep.set('to', sp.to)
 
-  const kindLink = (k: 'all' | 'income' | 'expense') => {
-    const p = new URLSearchParams(keep)
-    if (k === 'all') p.delete('kind')
-    else p.set('kind', k)
-    p.delete('after')
-    const s = p.toString()
-    return s ? `/ledger?${s}` : '/ledger'
-  }
-
   const isFiltered = terms.length > 0 || status !== 'all' || kind !== 'all'
     || Boolean(sp.site) || Boolean(sp.from) || Boolean(sp.to)
-
-
-  // ลิงก์ถอดตัวกรองโครงการออก โดยเก็บตัวกรองอื่นไว้ทั้งหมด
-  const clearSite = new URLSearchParams(keep)
-  clearSite.delete('site')
-  const clearSiteHref = clearSite.toString() ? `/ledger?${clearSite}` : '/ledger'
 
   // ── ลิงก์ไปดูเฉพาะใบที่ถูกตีกลับ — เก็บตัวกรองอื่นไว้ ตัด cursor ทิ้ง ──
   const rejectedParams = new URLSearchParams(keep)
@@ -303,79 +287,25 @@ export default async function LedgerPage({
         </div>
       )}
 
-      {/* เจ้าของเท่านั้นที่มีทั้งสองชนิดให้สลับ — หัวหน้าโครงการเห็นแต่รายจ่าย
-          ปุ่มกรองที่มีตัวเลือกเดียวคือปุ่มที่ไม่ทำอะไร */}
-      {isOwner && (
-        <div className="mb-3 flex flex-wrap gap-1.5">
-          {([
-            ['all', 'ทั้งหมด'],
-            ['income', 'รายรับ'],
-            ['expense', 'รายจ่าย'],
-          ] as const).map(([k, label]) => (
-            <Link
-              key={k}
-              href={kindLink(k)}
-              aria-current={kind === k ? 'true' : undefined}
-              className={`rounded-sm border px-2.5 py-1.5 text-sm font-medium transition-colors duration-100 ${
-                kind === k
-                  ? 'border-ink bg-ink text-canvas'
-                  : 'border-line-strong bg-surface text-ink-2 hover:border-ink-2 hover:text-ink'
-              }`}
-            >
-              {label}
-            </Link>
-          ))}
-        </div>
-      )}
-
-      {/* ── ตัวกรองโครงการ / ส่วนกลาง ─────────────────────────────────
-          เดิมกรองได้เฉพาะตอนเข้ามาจากปุ่มลัดของหน้าโครงการ · หน้านี้จึงไม่มี
-          ทางเลือกขอบเขตเองเลย (เจ้าของแจ้ง 4 ก.ย. 2569) · เป็นฟอร์ม GET
-          เหมือนตัวกรองอื่นทั้งแอป — สถานะอยู่บน URL แชร์ลิงก์ได้ */}
+      {/* ── ตัวกรองทั้งหมดอยู่ในส่วนหัวชิ้นเดียว ─────────────────────
+          ชนิด · ช่วงเวลา · โครงการ · ค้นหา · แท็บสถานะ — แต่ละชั้นมีรูปร่างของตัวเอง
+          และเปลี่ยนแล้วไปทันที (ไม่มีปุ่ม "กรอง") · สถานะอยู่บน URL แชร์ลิงก์ได้
+          · โครงการที่กรองอยู่แสดงเป็นค่าในกล่องเลือกเอง ไม่ต้องมีแถบบอกซ้ำอีกชั้น */}
       <LedgerFilters
         today={today}
         sites={sitesResult.data ?? []}
+        siteName={siteFilterName}
         isOwner={isOwner}
-        site={sp.site ?? ''}
-        from={sp.from ?? ''}
-        to={sp.to ?? ''}
-        keep={Object.fromEntries(
-          [...keep].filter(([k]) => k !== 'site' && k !== 'from' && k !== 'to'),
-        )}
-      />
-
-      <ListToolbar
-        basePath="/ledger"
-        q={q}
-        filters={filters}
-        activeFilter={status}
-        placeholder="ค้นหาจากรายละเอียด…"
-        // ตัวกรองที่ไม่มีปุ่มของตัวเองบนแถบนี้ ต้องติดไปกับชิปและการค้นหาด้วย
-        // ไม่งั้นกดชิปสถานะแล้วขอบเขต "เฉพาะโครงการนี้" หายไปเงียบ ๆ
-        extra={{
-          ...(kind !== 'all' ? { kind } : {}),
-          ...(sp.site ? { site: sp.site } : {}),
-          ...(sp.from ? { from: sp.from } : {}),
-          ...(sp.to ? { to: sp.to } : {}),
+        current={{
+          kind,
+          status,
+          q,
+          site: sp.site ?? '',
+          from: sp.from ?? '',
+          to: sp.to ?? '',
         }}
+        statuses={statuses}
       />
-
-      {/* ── ขอบเขตที่กำลังดูอยู่ — มาจากปุ่มลัดบนหน้าโครงการหรือการ์ดงานวันนี้ ──
-          ต้องเห็นว่ากรองอยู่ และต้องออกจากมันได้ในแตะเดียว */}
-      {sp.site && (
-        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-brand-tint-strong bg-brand-tint px-3 py-2">
-          <Warehouse className="size-4 shrink-0 text-brand-on-tint" strokeWidth={1.8} />
-          <span className="min-w-0 flex-1 truncate text-sm font-semibold text-brand-on-tint">
-            เฉพาะ{sp.site === 'central' ? 'รายการส่วนกลาง (ไม่ผูกโครงการ)' : `โครงการ ${siteFilterName ?? 'ที่เลือก'}`}
-          </span>
-          <Link
-            href={clearSiteHref}
-            className="shrink-0 rounded-sm px-2 py-0.5 text-sm font-semibold text-brand-on-tint underline underline-offset-2"
-          >
-            ดูทุกโครงการ
-          </Link>
-        </div>
-      )}
 
       {page.length === 0 ? (
         <EmptyState

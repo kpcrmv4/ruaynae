@@ -2,11 +2,10 @@
 
 import * as Dialog from '@radix-ui/react-dialog'
 import { Check, Loader2, Undo2 } from 'lucide-react'
-import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-import { toast } from 'sonner'
 import { fmtBaht } from '@/lib/format'
-import { MAX_NOTE, txnError } from '@/lib/transactions'
+import { MAX_NOTE } from '@/lib/transactions'
+import { useApproval } from './use-approval'
 
 /**
  * ปุ่มอนุมัติ / ตีกลับ ของหนึ่งรายการ
@@ -14,50 +13,28 @@ import { MAX_NOTE, txnError } from '@/lib/transactions'
  * 🔴 การตีกลับ **ต้องมีเหตุผล** — ทั้งฐานข้อมูล (check constraint) และ API
  * บังคับอยู่แล้ว · ตรงนี้บังคับอีกชั้นเพื่อไม่ให้ผู้ใช้เสียเวลายิงไปแล้วโดนปฏิเสธ
  * ส่งงานกลับโดยไม่บอกว่าต้องแก้อะไรคือการโยนงานทิ้ง ไม่ใช่การตรวจงาน
+ *
+ * การยิงจริงอยู่ใน `useApproval` — กล่องรายละเอียดใช้ตัวเดียวกัน
  */
 export function ApprovalActions({ id, amount }: { id: string; amount: number }) {
-  const router = useRouter()
-  const [busy, setBusy] = useState<null | 'approve' | 'reject'>(null)
+  const { busy, send } = useApproval(id)
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
 
-  async function send(action: 'approve' | 'reject') {
-    // 🔴 กันกดซ้ำสองชั้น: ปุ่ม disabled *และ* ธงตรงนี้ — การกดรัว ๆ ยิง onClick
-    // ได้ก่อนที่ React จะ re-render ปุ่มเป็น disabled
-    if (busy) return
-    if (action === 'reject' && !reason.trim()) {
+  async function reject() {
+    if (!reason.trim()) {
       setFieldError('กรุณาบอกเหตุผลที่ตีกลับ')
       return
     }
-    setBusy(action)
-    try {
-      const r = await fetch(`/api/transactions/${id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(
-          action === 'approve' ? { action } : { action, reason: reason.trim() },
-        ),
-      })
-      const b = await r.json().catch(() => ({}))
-      if (!r.ok) {
-        const msg = txnError(b.error)
-        setFieldError(msg)
-        toast.error(msg)
-        return
-      }
-      toast.success(action === 'approve' ? 'อนุมัติแล้ว' : 'ตีกลับแล้ว')
-      setOpen(false)
-      setReason('')
-      setFieldError('')
-      // แถวหายจากคิวเพราะ query กรอง `pending` — refresh ให้เซิร์ฟเวอร์คำนวณใหม่
-      // ไม่ใช่ลบออกจาก state เอง ซึ่งจะเพี้ยนทันทีที่มีคนอื่นกดพร้อมกัน
-      router.refresh()
-    } catch {
-      toast.error('เชื่อมต่อไม่ได้ ตรวจสอบสัญญาณแล้วลองใหม่')
-    } finally {
-      setBusy(null)
+    const r = await send('reject', reason)
+    if (!r.ok) {
+      if (r.error) setFieldError(r.error)
+      return
     }
+    setOpen(false)
+    setReason('')
+    setFieldError('')
   }
 
   return (
@@ -116,7 +93,7 @@ export function ApprovalActions({ id, amount }: { id: string; amount: number }) 
               </Dialog.Close>
               <button
                 type="button"
-                onClick={() => send('reject')}
+                onClick={reject}
                 disabled={busy !== null || reason.trim() === ''}
                 className="btn-danger disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -134,7 +111,7 @@ export function ApprovalActions({ id, amount }: { id: string; amount: number }) 
 
       <button
         type="button"
-        onClick={() => send('approve')}
+        onClick={() => void send('approve')}
         disabled={busy !== null}
         className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
       >

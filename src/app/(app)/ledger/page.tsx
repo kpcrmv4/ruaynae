@@ -1,14 +1,15 @@
 import Link from 'next/link'
-import { Receipt, Warehouse } from 'lucide-react'
+import { Receipt, Undo2, Warehouse } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
 import { searchTerms } from '@/lib/search-core'
-import { TXN_STATUSES, TXN_STATUS_LABEL, isTxnKind, isTxnStatus } from '@/lib/transactions'
+import { TXN_STATUSES, TXN_STATUS_LABEL, isTxnKind, isTxnStatus, isUuid } from '@/lib/transactions'
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
+import { FocusScroll } from '@/components/ledger/focus-scroll'
 import { LedgerFilters } from '@/components/ledger/ledger-filters'
 import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
@@ -26,6 +27,8 @@ type Search = {
   to?: string
   /** keyset cursor — `<txn_date>|<id>` ของแถวสุดท้ายที่แสดงไปแล้ว */
   after?: string
+  /** รายการที่แจ้งเตือนพามา — ไฮไลท์และเลื่อนไปหาแถวนั้น */
+  focus?: string
 }
 
 export default async function LedgerPage({
@@ -38,6 +41,8 @@ export default async function LedgerPage({
   const kind = isTxnKind(sp.kind) ? sp.kind : 'all'
   const q = (sp.q ?? '').slice(0, 60)
   const terms = searchTerms(q)
+  // id ที่ไม่ใช่ uuid = ไม่ไฮไลท์อะไรเลย ไม่ใช่เอาไปเทียบกับทุกแถวทิ้ง ๆ ขว้าง ๆ
+  const focus = isUuid(sp.focus) ? sp.focus : undefined
   const isOwner = me.role === 'owner'
 
   const sb = await getSupabaseServer()
@@ -84,7 +89,7 @@ export default async function LedgerPage({
     return count ?? 0
   }
 
-  const [listResult, siteFilterName, sitesResult, categoriesResult, ...counts] = await Promise.all([
+  const [listResult, siteFilterName, sitesResult, categoriesResult, rejectedTotal, ...counts] = await Promise.all([
     listQuery
       .order('txn_date', { ascending: false })
       .order('id', { ascending: false })
@@ -114,6 +119,20 @@ export default async function LedgerPage({
       .eq('is_active', true)
       .order('sort_order', { ascending: true })
       .range(0, PAGE_SIZE * 4 - 1),
+    // 🔴 ตัวเลขบนเมนู "รายการ" = จำนวนใบที่ถูกตีกลับ **ทั้งหมด** ไม่ผูกกับตัวกรอง
+    // ของหน้านี้ (layout เป็นคนนับ) · ถ้าเอาตัวเลขที่ถูกกรองแล้วมาอธิบายป้ายนั้น
+    // คนจะเห็นสองเลขไม่ตรงกันบนจอเดียว แล้วเลิกเชื่อทั้งคู่
+    sb
+      .from('transactions')
+      .select('id', { count: 'exact', head: true })
+      .eq('status', 'rejected')
+      .then(({ count, error }) => {
+        if (error) {
+          console.error('[ledger] นับรายการที่ถูกตีกลับไม่ได้', error.message)
+          return 0
+        }
+        return count ?? 0
+      }),
     countFor('all'),
     ...TXN_STATUSES.map((s) => countFor(s)),
   ])
@@ -203,6 +222,19 @@ export default async function LedgerPage({
   clearSite.delete('site')
   const clearSiteHref = clearSite.toString() ? `/ledger?${clearSite}` : '/ledger'
 
+  // ── ลิงก์ไปดูเฉพาะใบที่ถูกตีกลับ — เก็บตัวกรองอื่นไว้ ตัด cursor ทิ้ง ──
+  const rejectedParams = new URLSearchParams(keep)
+  rejectedParams.set('status', 'rejected')
+  rejectedParams.delete('after')
+  const rejectedHref = `/ledger?${rejectedParams}`
+
+  // แถวที่แจ้งเตือนพามาอยู่ในหน้านี้ไหม — ถ้าไม่อยู่ต้องบอกตรง ๆ ว่าทำไมไม่เห็น
+  // แทนที่จะปล่อยให้คนไล่หาแถวที่ถูกตัวกรองซ่อนไว้จนเลิกเชื่อว่ามันมีอยู่จริง
+  const focusOnPage = Boolean(focus && page.some((t) => t.id === focus))
+
+  // ลิงก์ล้างตัวกรองทั้งหมดแต่ยังชี้ที่ใบเดิม
+  const focusOnlyHref = focus ? `/ledger?focus=${focus}` : '/ledger'
+
   return (
     <TxnEditProvider
       me={{ id: me.id, role: me.role }}
@@ -227,6 +259,47 @@ export default async function LedgerPage({
           initialSiteId={sp.site && sp.site !== 'central' ? sp.site : undefined}
         />
       </div>
+
+      {/* ── ตัวเลขบนเมนูมาจากไหน ────────────────────────────────────
+          ป้ายแดงบนเมนู "รายการ" นับใบที่ถูกตีกลับ · เข้ามาแล้วไม่มีอะไรบอกว่า
+          ใบไหน คือการส่งคนมายืนหน้าลิสต์เปล่า ๆ (เจ้าของแจ้ง 19 ก.ย. 2569)
+          กดแล้วกรองเหลือเฉพาะใบเหล่านั้น ซึ่งถูกทำเครื่องหมายไว้ทุกใบด้วย */}
+      {rejectedTotal > 0 && status !== 'rejected' && (
+        <Link
+          href={rejectedHref}
+          className="mb-3 flex items-center gap-2.5 rounded-lg border border-urgent-ring bg-urgent-bg px-3 py-2.5 transition-colors duration-100 hover:border-urgent"
+        >
+          <Undo2 className="size-4.5 shrink-0 text-urgent" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-urgent">
+              ถูกตีกลับ <span className="tnum">{rejectedTotal}</span> รายการ ต้องแก้แล้วส่งใหม่
+            </span>
+            <span className="block text-xs text-ink-2">
+              นี่คือตัวเลขที่ขึ้นบนเมนู “รายการ”
+            </span>
+          </span>
+          <span className="shrink-0 text-sm font-semibold text-urgent underline underline-offset-2">
+            ดูเลย
+          </span>
+        </Link>
+      )}
+
+      {/* ใบที่แจ้งเตือนพามา แต่ตัวกรองปัจจุบันซ่อนมันไว้ */}
+      {focus && !focusOnPage && (
+        <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-lg border border-line-strong bg-surface-2 px-3 py-2.5">
+          <span className="min-w-0 flex-1 text-sm text-ink-2">
+            ไม่พบรายการที่แจ้งเตือนถึงในหน้านี้ — อาจถูกตัวกรองซ่อนไว้ หรืออยู่ในหน้าถัดไป
+          </span>
+          {isFiltered && (
+            <Link
+              href={focusOnlyHref}
+              className="shrink-0 text-sm font-semibold text-brand underline underline-offset-2"
+            >
+              ล้างตัวกรองแล้วหาใหม่
+            </Link>
+          )}
+        </div>
+      )}
 
       {/* เจ้าของเท่านั้นที่มีทั้งสองชนิดให้สลับ — หัวหน้าโครงการเห็นแต่รายจ่าย
           ปุ่มกรองที่มีตัวเลือกเดียวคือปุ่มที่ไม่ทำอะไร */}
@@ -338,10 +411,15 @@ export default async function LedgerPage({
                     </span>
                   )}
                 </div>,
-                ...g.rows.map((t) => <TxnRow key={t.id} txn={t} />),
+                ...g.rows.map((t) => (
+                  <TxnRow key={t.id} txn={t} focused={t.id === focus} />
+                )),
               ]
             })}
           </div>
+
+          {/* พามาถึงแถวจริง ไม่ใช่แค่ทาสีไว้แล้วให้เลื่อนหาเอง */}
+          {focus && focusOnPage && <FocusScroll id={focus} />}
 
           {hasMore && last && (
             <div className="mt-3 text-center">

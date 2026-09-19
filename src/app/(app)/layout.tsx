@@ -33,7 +33,10 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
   ] = await Promise.all([
       sb
         .from('notifications')
-        .select('id, kind, title, body, link, read_at, created_at')
+        // 🔴 `txn_id` มาด้วยเสมอ — กระดิ่งเอาไปต่อท้ายลิงก์เป็น `?focus=<id>`
+        // เพื่อให้หน้าปลายทางชี้ได้ว่า "ใบนี้แหละที่แจ้งเตือนถึง" ไม่ใช่โยน
+        // คนอ่านไปที่ลิสต์ยาว ๆ แล้วให้ไล่หาเอง
+        .select('id, kind, title, body, link, read_at, created_at, txn_id')
         .order('created_at', { ascending: false })
         .range(0, BELL_SIZE - 1),
       sb

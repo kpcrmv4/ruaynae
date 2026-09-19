@@ -4,11 +4,12 @@ import { ClipboardCheck, Inbox } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
-import { fmtBaht, fmtDate, todayInBangkok } from '@/lib/format'
+import { fmtBaht, fmtDate, fmtDateTime, todayInBangkok } from '@/lib/format'
 import { INCOME_KIND_LABEL, PAY_METHOD_LABEL } from '@/lib/transactions'
 import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import { ApprovalActions } from './approvals-client'
+import { ApprovalDetailButton } from './approval-detail'
 
 export const metadata = { title: 'รออนุมัติ' }
 
@@ -167,7 +168,29 @@ export default async function ApprovalsPage({
                   {t.note && <div className="mt-0.5 text-sm text-ink-2">{t.note}</div>}
                 </div>
 
-                <ApprovalActions id={t.id} amount={Number(t.amount)} />
+                {/* ดูให้ครบก่อนตัดสินใจ แล้วกดอนุมัติ/ตีกลับได้จากในกล่องเลย
+                    · ปุ่มคู่เดิมยังอยู่ท้ายแถวสำหรับใบที่ดูแวบเดียวก็ตัดสินใจได้ */}
+                <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                  <ApprovalDetailButton
+                    txn={{
+                      id: t.id,
+                      amount: Number(t.amount),
+                      categoryName: t.categories?.name ?? null,
+                      siteName: t.site_id ? (t.sites?.name ?? 'โครงการ') : null,
+                      dateLabel: fmtDate(t.txn_date),
+                      payMethodLabel: PAY_METHOD_LABEL[t.pay_method],
+                      incomeKindLabel: t.income_kind
+                        ? `${INCOME_KIND_LABEL[t.income_kind]}${t.installment_no ? ` ${t.installment_no}` : ''}`
+                        : null,
+                      note: t.note,
+                      createdByName: t.profiles?.full_name ?? 'ผู้ใช้ที่ถูกลบแล้ว',
+                      createdAtLabel: fmtDateTime(t.created_at),
+                      ageDays: ageDays(t.created_at),
+                      attachments: t.attachments,
+                    }}
+                  />
+                  <ApprovalActions id={t.id} amount={Number(t.amount)} />
+                </div>
               </div>
             ))}
           </div>

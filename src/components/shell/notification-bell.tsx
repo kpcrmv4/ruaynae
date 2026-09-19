@@ -14,6 +14,21 @@ export type NotificationItem = {
   link: string | null
   read_at: string | null
   created_at: string
+  /** รายการที่แจ้งเตือนใบนี้พูดถึง — null ได้ (เช่นสรุปประจำวัน) */
+  txn_id: string | null
+}
+
+/**
+ * ลิงก์ของแจ้งเตือนหนึ่งใบ
+ *
+ * 🔴 ลิงก์ในฐานข้อมูลชี้ได้แค่ระดับ "หน้า" (`/ledger?status=rejected`) ซึ่งกดแล้ว
+ * เจอลิสต์ยาว ๆ ที่ไม่มีอะไรบอกว่าใบไหนคือใบที่เพิ่งถูกตีกลับ · ต่อ `focus`
+ * ให้หน้าปลายทางไฮไลท์และเลื่อนไปหาแถวนั้นเอง
+ */
+function hrefOf(n: NotificationItem): string {
+  if (!n.link) return '#'
+  if (!n.txn_id || !n.link.startsWith('/ledger')) return n.link
+  return `${n.link}${n.link.includes('?') ? '&' : '?'}focus=${n.txn_id}`
 }
 
 /** เมื่อไหร่ — สั้น ๆ พอให้รู้ว่าเมื่อกี้หรือเมื่อวาน */
@@ -158,7 +173,7 @@ export function NotificationBell({
                 return (
                   <li key={n.id} className="border-b border-line-soft last:border-b-0">
                     <a
-                      href={n.link ?? '#'}
+                      href={hrefOf(n)}
                       onClick={() => {
                         setOpen(false)
                         if (isUnread) void markRead({ id: n.id })

@@ -34,6 +34,15 @@ const dateWeekdayFmt = new Intl.DateTimeFormat(LOCALE, {
   year: 'numeric',
 })
 
+const dateTimeFmt = new Intl.DateTimeFormat(LOCALE, {
+  timeZone: TZ,
+  day: 'numeric',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+})
+
 const moneyFmt = new Intl.NumberFormat(LOCALE, { maximumFractionDigits: 0 })
 
 /** `2026-03-01` → `1 มี.ค. 2569` */
@@ -47,6 +56,15 @@ export const fmtDateLong = (iso: string | null | undefined): string =>
  *  เพราะงานก่อสร้างคิดเป็น จันทร์–เสาร์ ไม่ใช่เลขวันที่ */
 export const fmtDateWithWeekday = (iso: string | null | undefined): string =>
   iso ? dateWeekdayFmt.format(new Date(`${iso}T00:00:00Z`)) : '—'
+
+/**
+ * timestamp จากฐานข้อมูล → `18 ก.ย. 2569 14:32` (เวลาไทยเสมอ)
+ *
+ * 🔴 คำนวณฝั่งเซิร์ฟเวอร์แล้วส่งเป็นข้อความไปให้ client component — ปล่อยให้
+ * เบราว์เซอร์จัดรูปแบบเองจะได้เวลาตามเครื่องของคนดู ไม่ใช่เวลาที่งานเกิดจริง
+ */
+export const fmtDateTime = (iso: string | null | undefined): string =>
+  iso ? dateTimeFmt.format(new Date(iso)) : '—'
 
 /** `1250000` → `1,250,000` — ไม่ใส่ ฿ เพราะบางที่วางไว้เป็นหน่วยแยก */
 export const fmtMoney = (n: number | null | undefined): string => moneyFmt.format(n ?? 0)

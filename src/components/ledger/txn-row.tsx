@@ -1,4 +1,4 @@
-import { Sparkles } from 'lucide-react'
+import { BellRing, Sparkles } from 'lucide-react'
 import { fmtBaht, fmtDate } from '@/lib/format'
 import {
   INCOME_KIND_LABEL, PAY_METHOD_LABEL, TXN_STATUS_LABEL, TXN_STATUS_TONE,
@@ -39,19 +39,41 @@ export function TxnRow({
   txn: t,
   showSite = true,
   showDate = false,
+  focused = false,
 }: {
   txn: TxnRowData
   /** ปิดเมื่ออยู่ในหน้าโครงการ — ชิปชื่อโครงการเดิมซ้ำทุกแถวคือหมึกที่ไม่บอกอะไร */
   showSite?: boolean
   /** เปิดเมื่อลิสต์ไม่ได้จัดกลุ่มตามวัน (หน้าโครงการ) */
   showDate?: boolean
+  /** แถวที่แจ้งเตือน/ตัวเลขบนเมนูพามา — ไฮไลท์และมีป้ายบอกว่าทำไมถึงเด่น */
+  focused?: boolean
 }) {
+  /* 🔴 "ตีกลับ" คือของค้างที่ต้องแก้ ไม่ใช่สถานะเฉย ๆ — ป้ายมุมขวาตัวเดียว
+     หายไปในลิสต์ยาว ๆ · แถบสีซ้าย + พื้นอ่อนทำให้กวาดตาเจอก่อนอ่านอะไรเลย
+     และเป็นคำตอบของคำถาม "ตัวเลขบนเมนูรายการมาจากใบไหน" */
+  /* 🔴 แถวที่ถูกตีกลับ **คงโทนแดงไว้แม้ตอนถูกโฟกัส** — ถ้าให้สีแบรนด์ทับ
+     แถวที่มีปัญหาจะกลายเป็นสีเขียวซึ่งอ่านว่า "เรียบร้อย" · วงขอบเป็นคน
+     บอกว่า "ใบนี้แหละ" ส่วนสีพื้นยังบอกสถานะจริงเหมือนเดิม */
+  const tone = [
+    t.status === 'rejected'
+      ? 'bg-urgent-bg/60 border-l-4 border-l-urgent-solid'
+      : focused
+        ? 'bg-brand-tint border-l-4 border-l-brand'
+        : '',
+    focused ? 'ring-2 ring-inset ring-brand' : '',
+  ].join(' ')
+
   return (
     /* 🔴 ปุ่มแก้ไขเป็น **คอลัมน์ที่สาม** ไม่ใช่ของต่อท้ายกลุ่มป้ายสถานะ —
        ยัดปุ่ม 44px ต่อท้ายป้ายทำให้คอลัมน์ขวากว้างขึ้นอีกราว 50px แล้วบนจอ 390
        ช่องข้อความจะถูกบีบจนภาษาไทยขึ้นบรรทัดใหม่กลางคำ (CLAUDE.md §17 ข้อ 7)
        · คอลัมน์ที่สามที่ไม่มีปุ่ม (คนที่แก้ไม่ได้) ยุบเหลือ 0 เองตามธรรมชาติของ auto */
-    <div className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4">
+    <div
+      id={`txn-${t.id}`}
+      /* scroll-mt กันหัวเรื่องเหนียวบังแถวตอนถูกเลื่อนมาหา */
+      className={`grid scroll-mt-24 grid-cols-[minmax(0,1fr)_auto_auto] items-start gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4 ${tone}`}
+    >
       <div className="min-w-0">
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
           <span className="truncate font-semibold text-ink">
@@ -76,6 +98,13 @@ export function TxnRow({
             <span className="chip border border-dashed border-line-strong text-muted-token ring-0">
               <Sparkles className="size-3" strokeWidth={2} aria-hidden />
               บันทึกผ่าน AI
+            </span>
+          )}
+          {/* ไฮไลท์เฉย ๆ ตอบไม่ได้ว่า "ทำไมแถวนี้ถึงเด่น" — ป้ายเป็นคนตอบ */}
+          {focused && (
+            <span className="chip bg-brand-solid text-white ring-0">
+              <BellRing className="size-3" strokeWidth={2} aria-hidden />
+              รายการที่แจ้งเตือนถึง
             </span>
           )}
         </div>

@@ -2,7 +2,7 @@
 /**
  * verify-auth.mjs — ปิดแถว P0-AUTH-* และ P0-API-* ใน docs/test-plan/P0.md
  *
- * ต้องมี dev server รันอยู่ · ส่ง base URL เป็น argv[2] (ดีฟอลต์ 3100)
+ * ต้องมี dev server รันอยู่ · ส่ง base URL เป็น argv[2] (ดีฟอลต์ 3200)
  *
  * กติกา: แถวปฏิเสธยืนยัน "รหัสเหตุผล" ไม่ใช่แค่ว่าไม่ 200
  * · แถวที่บอกว่า "ต้องไม่มีคุกกี้" ต้องคู่กับแถวที่พิสูจน์ว่ากรณีถูกต้อง**มี**คุกกี้
@@ -10,7 +10,7 @@
  */
 import { readFileSync } from 'node:fs'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)
@@ -275,7 +275,7 @@ for (const [id, path] of [['P0-API-04', '/sw.js'], ['P0-API-05', '/manifest.webm
 
 // P0-AUTH-10/11 · สวิตช์ปุ่มเดโม่เป็น opt-in
 // ตรวจได้ทีละขั้วต่อการรันหนึ่งครั้ง เพราะ Next อ่าน env ตอนสตาร์ตเซิร์ฟเวอร์
-// อีกขั้วรันด้วย:  ENABLE_DEMO_LOGIN=0 npx next dev -p 3100
+// อีกขั้วรันด้วย:  ENABLE_DEMO_LOGIN=0 npx next dev -p 3200
 // (Next 16 ไม่ยอมให้มี dev server ตัวที่สองของโฟลเดอร์เดียวกัน จึงต้องสลับ ไม่ใช่เปิดคู่)
 {
   const on = env.ENABLE_DEMO_LOGIN === '1'

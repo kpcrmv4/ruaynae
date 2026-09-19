@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs'
 import { execSync } from 'node:child_process'
 import { createHmac } from 'node:crypto'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const results = []
 const check = (label, ok, detail = '') => {
   results.push({ ok })

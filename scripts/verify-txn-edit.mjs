@@ -232,7 +232,7 @@ try {
 // ══════════════════════════════════════════════════════════════════════
 console.log('\n── R4-API / R4-UI · แก้ไขจากหน้าจอ ─────────────────────────')
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const req = (method, path, body, headers = {}) =>
   fetch(`${BASE}${path}`, {
     method, redirect: 'manual',

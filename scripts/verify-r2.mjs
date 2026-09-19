@@ -12,7 +12,7 @@ import {
 } from '@aws-sdk/client-s3'
 import { APP_ORIGINS } from './app-origins.mjs'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)

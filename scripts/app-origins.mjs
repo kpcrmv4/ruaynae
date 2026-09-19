@@ -15,20 +15,25 @@
  * ⚠️ อย่าใส่ `'*'` — presigned URL ที่หลุดออกไปจะกลายเป็นช่องให้เว็บไหนก็ได้
  * เขียนไฟล์เข้า bucket เรา
  *
- * ⚠️ URL ของ preview deployment สุ่มใหม่ทุกครั้ง (`cpie-<hash>-*.vercel.app`)
+ * ⚠️ URL ของ preview deployment สุ่มใหม่ทุกครั้ง (`ruaynae-<hash>-*.vercel.app`)
  * จึงใส่ล่วงหน้าไม่ได้ · preview มี Deployment Protection กั้นอยู่แล้ว
  * ถ้าต้องทดสอบอัปโหลดบน preview ให้ส่ง origin นั้นทาง argv เป็นครั้ง ๆ ไป
  */
 
 /** โดเมนจริงที่ผู้ใช้เปิดใช้งาน */
-export const PRODUCTION_ORIGIN = 'https://cpie.vercel.app'
+export const PRODUCTION_ORIGIN = 'https://ruaynae.vercel.app'
 
-/** เครื่องนักพัฒนา — พอร์ต 3000 และ 3100 ตามที่ `npm run dev` ใช้จริง */
+/**
+ * เครื่องนักพัฒนา — พอร์ต **3200** ตามที่ `npm run dev` ใช้จริง
+ * (`package.json` → `next dev -p 3200`) และตามที่ตั้งไว้ใน CORS policy ของ R2
+ *
+ * ⚠️ พอร์ตในไฟล์นี้ต้องตรงกับ `-p` ใน `package.json` เสมอ · ไม่ตรง =
+ * เบราว์เซอร์บล็อก PUT เข้า R2 ตั้งแต่ preflight แล้วหน้าจอบอกแค่
+ * "อัปโหลดไม่สำเร็จ" โดยไม่มี error ฝั่งเซิร์ฟเวอร์ให้เห็นเลย
+ */
 export const DEV_ORIGINS = [
-  'http://localhost:3000',
-  'http://localhost:3100',
-  'http://127.0.0.1:3000',
-  'http://127.0.0.1:3100',
+  'http://localhost:3200',
+  'http://127.0.0.1:3200',
 ]
 
 export const APP_ORIGINS = [PRODUCTION_ORIGIN, ...DEV_ORIGINS]

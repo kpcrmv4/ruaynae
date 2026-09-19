@@ -356,7 +356,7 @@ try {
 // ══════════════════════════════════════════════════════════════════════
 console.log('\n── P2-API / P2-UI · ฟอร์มบันทึก ────────────────────────────')
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const req = (method, path, body, headers = {}) =>
   fetch(`${BASE}${path}`, {
     method, redirect: 'manual',

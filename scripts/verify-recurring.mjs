@@ -13,11 +13,11 @@
  * 🔴 สคริปต์นี้เขียนลงฐานข้อมูลจริง — แตะเฉพาะแถวที่ตัวเองสร้าง (ขึ้นต้นด้วย
  * MARK) และคืนสภาพในบล็อก finally เสมอ · ห้ามลบแบบเหมารวมเด็ดขาด (§17 ข้อ 9)
  *
- * ใช้: node scripts/verify-recurring.mjs [http://localhost:3100]
+ * ใช้: node scripts/verify-recurring.mjs [http://localhost:3200]
  */
 import { readFileSync } from 'node:fs'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8')
     .split(/\r?\n/)

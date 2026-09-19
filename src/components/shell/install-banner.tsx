@@ -20,8 +20,8 @@ import { enablePush, readPushState, type PushState } from '@/lib/push'
  */
 export function InstallBanner({ vapidPublicKey }: { vapidPublicKey: string }) {
   const { canPrompt, installed, isIos, install } = usePwaInstall()
-  const installBox = useDismissed('cpie:install-dismissed')
-  const notifyBox = useDismissed('cpie:notify-dismissed')
+  const installBox = useDismissed('ruaynae:install-dismissed')
+  const notifyBox = useDismissed('ruaynae:notify-dismissed')
   // ฝั่งเซิร์ฟเวอร์ยังไม่รู้ว่าเครื่องนี้ติดตั้งแล้วหรือยัง — รอให้ถึงเบราว์เซอร์ก่อน
   const ready = useIsClient()
 

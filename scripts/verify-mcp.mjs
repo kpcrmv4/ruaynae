@@ -25,7 +25,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { generateKey, hashKey, keyPrefix } from '../src/lib/mcp/keys-core.ts'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)
@@ -153,7 +153,7 @@ const bail = (why) => {
 }
 if (!env.MCP_KEY_PEPPER) bail('ไม่มี MCP_KEY_PEPPER ใน .env.local — ออกคีย์ทดสอบไม่ได้')
 if (!(await fetch(BASE, { redirect: 'manual' }).then(() => true).catch(() => false))) {
-  bail(`ไม่มี dev server ที่ ${BASE} — สั่ง \`npm run dev -- -p 3100\` ก่อน`)
+  bail(`ไม่มี dev server ที่ ${BASE} — สั่ง \`npm run dev\` ก่อน`)
 }
 
 const profileOf = (role) => sql(

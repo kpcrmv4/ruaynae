@@ -10,14 +10,14 @@
  * ทุกแถวที่มันสร้างมีชื่อบอกตัวเองว่าเป็นของซ้อม และถูกลบใน `finally`
  * · ล้างเฉพาะ id ที่สคริปต์นี้สร้างเอง ห้ามล้างแบบไม่มีเงื่อนไข (CLAUDE.md §17 ข้อ 9)
  *
- * ใช้: node scripts/verify-mcp-write.mjs [http://localhost:3100]
+ * ใช้: node scripts/verify-mcp-write.mjs [http://localhost:3200]
  */
 import { readFileSync } from 'node:fs'
 import { randomUUID } from 'node:crypto'
 import { generateKey, hashKey, keyPrefix } from '../src/lib/mcp/keys-core.ts'
 import { WRITE_TOOL_NAMES } from '../src/lib/mcp/tool-names.ts'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)

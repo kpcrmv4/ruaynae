@@ -15,7 +15,7 @@
 import { readFileSync } from 'node:fs'
 import { spawnSync } from 'node:child_process'
 
-const BASE = process.argv[2] ?? 'http://localhost:3100'
+const BASE = process.argv[2] ?? 'http://localhost:3200'
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)
@@ -40,7 +40,7 @@ console.log('── E2E บนเบราว์เซอร์จริง ─�
 
 const up = await fetch(BASE, { redirect: 'manual' }).then(() => true).catch(() => false)
 if (!up) {
-  console.log(`  ❌ ไม่มี dev server ที่ ${BASE} — สั่ง \`npm run dev -- -p 3100\` ก่อน`)
+  console.log(`  ❌ ไม่มี dev server ที่ ${BASE} — สั่ง \`npm run dev\` ก่อน`)
   console.log('\n  1 แถว: ผ่าน 0 · ตก 1')
   process.exit(1)
 }

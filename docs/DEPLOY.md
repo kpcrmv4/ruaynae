@@ -13,7 +13,7 @@ npm run gate         # tsc + verify-contrast + next build   → ต้องเ�
 npm run verify:all   # 395 แถว                              → ต้อง 0 ตก
 ```
 
-`verify:all` ต้องมี dev server อยู่ที่ `http://localhost:3100` (`npm run dev -- -p 3100`)
+`verify:all` ต้องมี dev server อยู่ที่ `http://localhost:3200` (`npm run dev` (พอร์ต 3200))
 เพราะแถว E2E ยิงใส่เบราว์เซอร์จริง
 
 ---

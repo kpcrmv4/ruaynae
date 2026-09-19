@@ -25,47 +25,47 @@
      The -solid family is IDENTICAL in both themes. Dark mode lightens
      --brand so it reads as text on a dark panel; reusing that lightened
      value as a fill under white text is how you land at 2.8:1. */
-  --brand: #1d4ed8;
-  --brand-tint: #e8effd;          /* pale wash — active rows, brand badges   */
-  --brand-tint-strong: #c2d5f8;   /* the ring around those badges           */
-  --brand-on-tint: #123a9e;       /* text ON --brand-tint                   */
-  --brand-solid: #1d4ed8;         /* fill under WHITE text                  */
-  --brand-solid-hover: #1a45be;
-  --brand-solid-active: #16389b;
+  --brand: #047857;
+  --brand-tint: #e6f5ec;          /* pale wash — active rows, brand badges   */
+  --brand-tint-strong: #bfe3cf;   /* the ring around those badges           */
+  --brand-on-tint: #0b6340;       /* text ON --brand-tint                   */
+  --brand-solid: #047857;         /* fill under WHITE text                  */
+  --brand-solid-hover: #03684b;
+  --brand-solid-active: #025c3f;
 
   /* ── Surfaces: four levels, not one ────────────────────────────────────
      One surface value makes every panel float on the same plane and the UI
      reads flat. Four gives you page → panel → subhead → disabled. */
-  --canvas: #f2f5fa;      /* the page behind every panel                    */
+  --canvas: #f1f7f3;      /* the page behind every panel                    */
   --surface: #ffffff;     /* panels, cards, rows                            */
   --card: #ffffff;        /* alias — some components read this name         */
-  --surface-2: #f7f9fc;   /* table heads · hovered rows · panel subheads     */
-  --surface-3: #e7edf6;   /* disabled inputs · scroll track                 */
+  --surface-2: #f5faf7;   /* table heads · hovered rows · panel subheads     */
+  --surface-3: #e5efe9;   /* disabled inputs · scroll track                 */
 
   /* ── Ink: three levels ─────────────────────────────────────────────────── */
-  --ink: #111827;         /* titles, primary values                          */
-  --ink-2: #414b5c;       /* body, labels                                    */
-  --muted: #5c6875;       /* captions, units, inactive tabs                  */
+  --ink: #101b16;         /* titles, primary values                          */
+  --ink-2: #3d4c44;       /* body, labels                                    */
+  --muted: #56675d;       /* captions, units, inactive tabs                  */
 
   /* ── Lines: three weights ──────────────────────────────────────────────
      A single line weight is the fastest way to look like a template. */
-  --line: #dde4ee;        /* panel border                                    */
-  --line-soft: #eaeff7;   /* row divider INSIDE a panel                      */
-  --line-strong: #c4cddc; /* section rule · input border                     */
+  --line: #dce7e0;        /* panel border                                    */
+  --line-soft: #e9f2ec;   /* row divider INSIDE a panel                      */
+  --line-strong: #c2d4c8; /* section rule · input border                     */
 
   /* ── Sidebar: a NEUTRAL panel ──────────────────────────────────────────
      Do not paint it in the brand colour. It is the largest colour field on
      the screen sitting where people look least, while the content area —
      where the work happens — gets none. The active item is brand TEXT on a
      brand TINT; a solid brand fill with a white label cannot pass AA. */
-  --sidebar: #14264a;
-  --sidebar-title: #f4f7fc;
-  --sidebar-fg: #a7b6cf;
-  --sidebar-fg-dim: #7f92b3;      /* group headings                          */
-  --sidebar-hover: #1c3159;
-  --sidebar-active-bg: rgb(147 197 253 / 0.16);
-  --sidebar-active-fg: #a9c6ff;
-  --sidebar-line: #21365f;
+  --sidebar: #123328;
+  --sidebar-title: #f2f9f5;
+  --sidebar-fg: #a9c8b8;
+  --sidebar-fg-dim: #8aab99;      /* group headings                          */
+  --sidebar-hover: #1a4433;
+  --sidebar-active-bg: rgb(110 231 183 / 0.16);
+  --sidebar-active-fg: #8fe0b7;
+  --sidebar-line: #1e4835;
 
   /* ── Status: fg / bg / ring — always three ─────────────────────────────
      The ring is what makes a badge read as an object. Without it, several
@@ -84,13 +84,13 @@
   /* ── Quantity scale: one hue, four steps ───────────────────────────────
      "how full is this" is a magnitude, not a verdict. Green→amber→red says
      29% is bad, when it may mean "this person can take more work". */
-  --scale-1: #c3d3f7; --scale-2: #86a6ea; --scale-3: #4470d4; --scale-4: #1b4fc4;
+  --scale-1: #c5e7d5; --scale-2: #7fc9a4; --scale-3: #2f9d6c; --scale-4: #0b6340;
 
   /* ── Chart fills ───────────────────────────────────────────────────────
      Status colours above are tuned to be READ AS TEXT on a light surface, so
      they are very dark. Used as bar/area fills they turn into muddy slabs.
      Same families, retuned as fills. */
-  --chart-brand: #2563eb; --chart-info: #2563eb; --chart-done: #12915a;
+  --chart-brand: #12915a; --chart-info: #2563eb; --chart-done: #12915a;
   --chart-progress: #d98324; --chart-urgent: #dc3226;
 
   /* ── Radius: assigned by ROLE, not by taste ────────────────────────────
@@ -106,7 +106,7 @@
   --sh-2: 0 2px 4px rgb(16 18 22 / 0.05), 0 6px 16px rgb(16 18 22 / 0.07);
   --sh-3: 0 8px 16px rgb(16 18 22 / 0.08), 0 24px 48px rgb(16 18 22 / 0.14);
 
-  --ring: rgb(29 78 216 / 0.38);   /* focus — derive from --brand */
+  --ring: rgb(4 120 87 / 0.38);    /* focus — derive from --brand */
 
   /* ── MONEY — รายรับ/รายจ่ายมีโทเคนของตัวเอง ไม่ยืม status มาใช้ ─────────
      "เข้า/ออก" เป็นทิศทางของเงิน ไม่ใช่สถานะของงาน ปนกันเมื่อไหร่จะแก้สีหนึ่ง
@@ -118,7 +118,7 @@
   --bar-time: #2563eb;   /* เวลาที่ผ่านไป   */
   --bar-paid: #0c6b3c;   /* เงินที่เก็บได้   */
   --bar-cost: #b45309;   /* ต้นทุนสะสม (ทั้งก้อน) */
-  --bar-track: #e2e8f2;
+  --bar-track: #e0ebe4;
 
   /* ── สามท่อนของแถบต้นทุน — ไล่เฉดเดียวกับ `--bar-cost` ไม่ใช่สามสีคนละเรื่อง
      สามก้อนนี้เป็น**ส่วนของยอดเดียวกัน** ใช้สีคนละวงศ์เมื่อไหร่ สายตาจะอ่านว่า
@@ -134,36 +134,36 @@
   color-scheme: dark;
 
   /* brand TEXT lightens; the -solid FILL family does not move */
-  --brand: #7da6ff;
-  --brand-tint: #16224a;
-  --brand-tint-strong: #25376b;
-  --brand-on-tint: #a9c6ff;
-  --brand-solid: #1d4ed8;
-  --brand-solid-hover: #2a5ce5;
-  --brand-solid-active: #16389b;
+  --brand: #63d3a4;
+  --brand-tint: #10291f;
+  --brand-tint-strong: #1d4433;
+  --brand-on-tint: #8fe0b7;
+  --brand-solid: #047857;
+  --brand-solid-hover: #05805a;
+  --brand-solid-active: #036444;
 
-  --canvas: #0b1017;
-  --surface: #141a23;
-  --card: #141a23;
-  --surface-2: #1a222d;
-  --surface-3: #232c39;
+  --canvas: #0a1210;
+  --surface: #121b16;
+  --card: #121b16;
+  --surface-2: #18231d;
+  --surface-3: #212e26;
 
-  --ink: #e6eaf1;
-  --ink-2: #bfc8d5;
-  --muted: #8e99a8;
+  --ink: #e5ede8;
+  --ink-2: #bdcac3;
+  --muted: #8b9c92;
 
-  --line: #28313e;
-  --line-soft: #1f2733;
-  --line-strong: #384252;
+  --line: #26332c;
+  --line-soft: #1d2822;
+  --line-strong: #36463c;
 
-  --sidebar: #0d1526;
-  --sidebar-title: #eef3fb;
-  --sidebar-fg: #9fadc4;
-  --sidebar-fg-dim: #78879f;
-  --sidebar-hover: #16203a;
-  --sidebar-active-bg: rgb(147 197 253 / 0.15);
-  --sidebar-active-fg: #a9c6ff;
-  --sidebar-line: #1c2740;
+  --sidebar: #091a13;
+  --sidebar-title: #ecf7f1;
+  --sidebar-fg: #9ebbac;
+  --sidebar-fg-dim: #7d9c8c;
+  --sidebar-hover: #10291d;
+  --sidebar-active-bg: rgb(110 231 183 / 0.15);
+  --sidebar-active-fg: #8fe0b7;
+  --sidebar-line: #163024;
 
   --status-pending: #aeb6c0;  --status-pending-bg: #23272d;  --status-pending-ring: #343941;
   --status-progress: #e8a95e; --status-progress-bg: #2e2317; --status-progress-ring: #4a3720;
@@ -172,14 +172,14 @@
   --urgent: #f4938a;          --urgent-bg: #33201e;          --urgent-ring: #4d2e2b;
   --urgent-solid: #d0342a;
 
-  --chart-brand: #6f9bff; --chart-info: #6f9bff; --chart-done: #34c07d;
+  --chart-brand: #34c07d; --chart-info: #6f9bff; --chart-done: #34c07d;
   --chart-progress: #e8a34a; --chart-urgent: #ef6a5e;
 
   --sh-1: 0 1px 2px rgb(0 0 0 / 0.4);
   --sh-2: 0 2px 4px rgb(0 0 0 / 0.4), 0 6px 16px rgb(0 0 0 / 0.5);
   --sh-3: 0 8px 16px rgb(0 0 0 / 0.5), 0 24px 48px rgb(0 0 0 / 0.6);
 
-  --ring: rgb(125 166 255 / 0.45);
+  --ring: rgb(99 211 164 / 0.45);
 
   --income: #34c07d;   --income-bg: #12291f;   --income-ring: #1f4331;
   --expense: #f4938a;  --expense-bg: #33201e;  --expense-ring: #4d2e2b;
@@ -187,7 +187,7 @@
   --bar-time: #6f9bff;
   --bar-paid: #34c07d;
   --bar-cost: #e8a34a;
-  --bar-track: #28313e;
+  --bar-track: #26332c;
 
   /* บนพื้นเข้มกลับด้าน: สว่าง = ก้อนหลัก · ท่อนที่จางที่สุดยังต้องแยกออกจาก
      `--bar-track` ให้ได้ ไม่งั้นส่วน "อื่น ๆ" จะกลายเป็นช่องว่าง */

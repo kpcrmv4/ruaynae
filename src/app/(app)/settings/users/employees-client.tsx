@@ -343,28 +343,37 @@ export function EmployeesClient({
       ) : (
         <div className="panel">
           {employees.map((e) => (
+            /* 🔴 บนจอ 390 ชื่อ · ค่าแรง · ปุ่มสามสี่ปุ่ม เคยเบียดกันบรรทัดเดียวจนชื่อ
+                เหลือ "วิชัย ทอง..." และแถวคนรายเดือน (มีปุ่มเพิ่มหนึ่งปุ่ม) ตกไปสอง
+                บรรทัดคนละแบบกับแถวอื่น (เจ้าของแจ้ง 19 ก.ย. 2569)
+                · ต่ำกว่า lg วางเป็นสองชั้นเสมอ: ชื่อเต็ม+ตำแหน่ง ↔ ค่าแรง แล้วปุ่ม
+                เรียงชิดขวาเป็นแถวของตัวเอง ทุกแถวหน้าตาเดียวกันไม่ว่ามีกี่ปุ่ม
+                · lg ขึ้นไป (มี sidebar แล้ว) ยังเป็นบรรทัดเดียวเหมือนเดิม */
             <div
               key={e.id}
-              className="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
+              className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-x-3 gap-y-2.5 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4 lg:grid-cols-[minmax(0,1fr)_auto_auto]"
             >
-              <div className="min-w-0 flex-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="truncate font-semibold text-ink">{e.full_name}</span>
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                  <span className="break-words font-semibold leading-6 text-ink">{e.full_name}</span>
                   {!e.is_active && <Badge tone="pending">ปิดใช้งาน</Badge>}
                   {e.profile_id && <Badge tone="info">มีบัญชีล็อกอิน</Badge>}
                 </div>
-                <div className="mt-0.5 truncate text-sm text-muted-token">
+                <div className="mt-0.5 text-sm leading-5 text-muted-token">
                   {e.job_title ?? 'ยังไม่ได้ระบุตำแหน่ง'} · {WAGE_TYPE_LABEL[e.wage_type]}
                 </div>
               </div>
 
-              <span className="shrink-0 text-sm font-semibold tnum text-ink">
-                {e.wage_type === 'daily'
-                  ? `${fmtBaht(e.daily_rate)} / วัน`
-                  : `${fmtBaht(e.monthly_salary)} / เดือน`}
-              </span>
+              <div className="shrink-0 text-right leading-5">
+                <span className="text-base font-bold tnum text-ink">
+                  {e.wage_type === 'daily' ? fmtBaht(e.daily_rate) : fmtBaht(e.monthly_salary)}
+                </span>
+                <span className="ml-1 text-sm text-muted-token">
+                  {e.wage_type === 'daily' ? '/ วัน' : '/ เดือน'}
+                </span>
+              </div>
 
-              <div className="flex shrink-0 items-center gap-1.5">
+              <div className="col-span-2 flex items-center justify-end gap-2 lg:col-span-1">
                 {/* 🔴 เฉพาะคนรายเดือน — คนรายวันมีค่าแรงเกิดตอนติ๊กเข้าโครงการ
                     อยู่แล้ว ตั้งเงินเดือนซ้ำจะทำให้ต้นทุนเป็นสองเท่า (§17 ข้อ 1)
                     · ปุ่มจึงไม่วาดเลยสำหรับคนรายวัน ไม่ใช่วาดแล้วกดไม่ผ่าน */}
@@ -375,7 +384,7 @@ export function EmployeesClient({
                     className="btn-secondary"
                   >
                     <CalendarClock className="size-4" />
-                    <span className="hidden sm:inline">เงินเดือนรายเดือน</span>
+                    <span className="hidden sm:inline">เงินเดือน</span>
                   </Link>
                 )}
                 <button
@@ -384,6 +393,7 @@ export function EmployeesClient({
                   className="btn-secondary"
                 >
                   <Pencil className="size-4" />
+                  <span className="hidden sm:inline">แก้ไข</span>
                 </button>
                 <button
                   onClick={() =>
@@ -401,6 +411,7 @@ export function EmployeesClient({
                   ) : (
                     <UserCheck className="size-4" />
                   )}
+                  <span className="hidden sm:inline">{e.is_active ? 'ปิดใช้งาน' : 'เปิดใช้งาน'}</span>
                 </button>
                 {/* ปิดใช้งาน ≠ ลบ — ปิดคือ "ไม่ทำงานกับเราแล้ว แต่ประวัติยังอยู่"
                     ส่วนลบคือเอาออกจากระบบจริง ๆ พร้อมประวัติที่ยังไม่ได้จ่ายเงิน */}

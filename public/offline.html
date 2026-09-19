@@ -8,23 +8,26 @@
   :root { color-scheme: light dark; }
   body {
     margin: 0; min-height: 100svh; display: grid; place-items: center;
-    background: #f7f8fa; color: #1b2027;
+    background: #f1f7f3; color: #101b16;
     font-family: 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
     line-height: 1.5; padding: 24px;
   }
-  @media (prefers-color-scheme: dark) { body { background: #12161c; color: #e6e9ee; } }
+  @media (prefers-color-scheme: dark) { body { background: #0a1210; color: #e5ede8; } }
   .box { max-width: 22rem; text-align: center; }
   h1 { font-size: 20px; margin: 0 0 8px; }
   p { margin: 0; font-size: 15px; opacity: .75; }
-  .hat { width: 56px; height: 56px; margin: 0 auto 16px; display: block; }
+  .mark { width: 56px; height: 56px; margin: 0 auto 16px; display: block; color: #047857; }
+  @media (prefers-color-scheme: dark) { .mark { color: #63d3a4; } }
 </style>
 </head>
 <body>
   <div class="box">
-    <svg class="hat" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
+    <!-- บ้าน — เครื่องหมายเดียวกับไอคอนแอป ไม่ใช่หมวกนิรภัยของแบรนด์เดิม -->
+    <svg class="mark" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"
          stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
-      <path d="M2 18h20"/><path d="M10 10V5a2 2 0 0 1 4 0v5"/>
-      <path d="M4 18a8 8 0 0 1 16 0"/>
+      <path d="M3 10.5 12 3l9 7.5"/>
+      <path d="M5 9.7V20h14V9.7"/>
+      <path d="M10 20v-5h4v5"/>
     </svg>
     <h1>ตอนนี้ออฟไลน์อยู่</h1>
     <p>หน้านี้ต้องใช้อินเทอร์เน็ต — ต่อสัญญาณแล้วลองใหม่อีกครั้ง

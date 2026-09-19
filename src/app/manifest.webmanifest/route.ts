@@ -24,9 +24,11 @@ export async function GET() {
       scope: '/',
       display: 'standalone',
       orientation: 'portrait',
-      // พื้นหลังตอนเปิดแอปใช้สีพื้นของธีมสว่าง · theme_color เป็นกรมท่าของ sidebar
-      background_color: '#f7f8fa',
-      theme_color: '#12213f',
+      // 🔴 สามค่านี้อยู่นอก `globals.css` จึงไม่ขยับตามตอนเปลี่ยนชุดสี และไม่มี
+      // ตัวตรวจไหนจับได้ — เห็นได้ตอนติดตั้งแอปจริงบนมือถือเท่านั้น
+      // background_color = `--canvas` โหมดสว่าง · theme_color = `--sidebar`
+      background_color: '#f1f7f3',
+      theme_color: '#123328',
       icons: [
         { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
         { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },

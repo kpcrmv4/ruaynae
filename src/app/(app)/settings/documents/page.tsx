@@ -1,4 +1,5 @@
 import { getSupabaseServer } from '@/lib/supabase/server'
+import { DOC_KINDS, type DocKind } from '@/lib/documents'
 import { DataError } from '@/components/ui/data-error'
 import { DocSettingsClient } from './documents-client'
 
@@ -19,15 +20,17 @@ export default async function DocumentSettingsPage() {
     return <DataError message="โหลดตั้งค่าเอกสารไม่สำเร็จ" />
   }
 
-  const of = (kind: 'quotation' | 'receipt') => {
+  // 🔴 วนจาก `DOC_KINDS` ไม่ใช่เขียนชื่อชนิดทีละตัว — เพิ่มชนิดที่สี่วันไหน
+  // หน้านี้ได้ช่องของมันเอง ไม่ใช่ลืมไว้เงียบ ๆ แล้วออกเอกสารชนิดนั้นไม่ได้
+  const of = (kind: DocKind) => {
     const row = (counters ?? []).find((c) => c.kind === kind)
     return row ? `${row.prefix}${String(row.last_no).padStart(row.pad, '0')}` : ''
   }
+  const lastNos = Object.fromEntries(DOC_KINDS.map((k) => [k, of(k)])) as Record<DocKind, string>
 
   return (
     <DocSettingsClient
-      quotationLastNo={of('quotation')}
-      receiptLastNo={of('receipt')}
+      lastNos={lastNos}
       phone={settings?.phone ?? ''}
       email={settings?.email ?? ''}
       branchLabel={settings?.branch_label ?? ''}

@@ -15,7 +15,7 @@ import { type WageDay } from './site-wage-edit'
 import { wageRowKey } from '@/lib/wage-row-key'
 import type { AdjustLine } from '@/lib/wage-adjustments'
 import { WorkGrid } from './work-grid'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'ค่าแรงและการจ่าย' }
@@ -194,16 +194,15 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">ค่าแรงและการจ่าย</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
+      <PageHeader
+        title="ค่าแรงและการจ่าย"
+        subtitle={
+          <>
             ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าโครงการ · การเบิกและการจ่ายคือ{' '}
             <span className="font-medium text-ink-2">เงินสดออก ไม่ใช่ต้นทุนใหม่</span>
-          </p>
-        </div>
-        <BackButton />
-      </div>
+          </>
+        }
+      />
 
       <MetricBar>
         <Metric

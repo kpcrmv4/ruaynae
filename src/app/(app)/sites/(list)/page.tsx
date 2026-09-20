@@ -9,7 +9,7 @@ import { EmptyState } from '@/components/ui/states'
 import { ListRow } from '@/components/ui/list-row'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 import { NewSiteButton } from '../sites-client'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'โครงการ' }
@@ -121,18 +121,11 @@ export default async function SitesPage({
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold text-ink">โครงการ</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            {isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะโครงการที่คุณดูแลอยู่ตอนนี้'}
-          </p>
-        </div>
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-          {isOwner && <NewSiteButton />}
-          <BackButton />
-        </div>
-      </div>
+      <PageHeader
+        title="โครงการ"
+        subtitle={isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะโครงการที่คุณดูแลอยู่ตอนนี้'}
+        action={isOwner ? <NewSiteButton /> : undefined}
+      />
 
       <ListToolbar
         basePath="/sites"

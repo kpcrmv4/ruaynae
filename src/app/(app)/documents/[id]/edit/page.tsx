@@ -2,7 +2,7 @@ import { notFound, redirect } from 'next/navigation'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { DOC_KIND_LABEL, isEditable } from '@/lib/documents'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 import { DocForm } from '@/components/documents/doc-form'
 
@@ -55,15 +55,11 @@ export default async function EditDocumentPage({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">แก้ไข{DOC_KIND_LABEL[doc.kind]}</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            เลขที่เอกสารไม่เปลี่ยนตามการแก้ · แก้ได้จนกว่าจะทำเครื่องหมายว่าส่งให้ลูกค้าแล้ว
-          </p>
-        </div>
-        <BackButton fallbackHref={`/documents/${id}`} />
-      </div>
+      <PageHeader
+        title={`แก้ไข${DOC_KIND_LABEL[doc.kind]}`}
+        subtitle="เลขที่เอกสารไม่เปลี่ยนตามการแก้ · แก้ได้จนกว่าจะทำเครื่องหมายว่าส่งให้ลูกค้าแล้ว"
+        backHref={`/documents/${id}`}
+      />
 
       <DocForm
         mode="edit"

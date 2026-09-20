@@ -2,8 +2,8 @@ import { notFound } from 'next/navigation'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtDate } from '@/lib/format'
-import { DOC_KIND_LABEL } from '@/lib/documents'
-import { BackButton } from '@/components/ui/back-button'
+import { DOC_KIND_LABEL, DOC_KIND_SHORT, SECOND_DATE_LABEL } from '@/lib/documents'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 import { PrintButton } from '@/components/documents/print-button'
 import type { SellerSnapshot } from '@/lib/doc-server'
@@ -55,10 +55,14 @@ export default async function PrintDocumentPage({
 
   return (
     <>
-      <div className="print-hide mb-4 flex flex-wrap items-center justify-between gap-2">
-        <PrintButton docId={doc.id} canMarkSent={doc.status === 'issued'} />
-        <BackButton fallbackHref={`/documents/${doc.id}`} />
-      </div>
+      {/* หัวข้อหน้ากับปุ่มย้อนกลับถูกซ่อนตอนพิมพ์ — กระดาษมีหัวของตัวเองอยู่แล้ว */}
+      <PageHeader
+        className="print-hide"
+        title={`พิมพ์${DOC_KIND_SHORT[doc.kind]}`}
+        subtitle={doc.doc_no ? `เลขที่ ${doc.doc_no}` : 'ยังเป็นร่าง — ยังไม่มีเลขที่เอกสาร'}
+        action={<PrintButton docId={doc.id} canMarkSent={doc.status === 'issued'} />}
+        backHref={`/documents/${doc.id}`}
+      />
 
       {!seller && (
         <p className="print-hide mb-3 rounded-lg border border-status-progress-ring bg-status-progress-bg px-3 py-2.5 text-sm text-status-progress">
@@ -92,9 +96,10 @@ export default async function PrintDocumentPage({
                   <td className="pr-2 text-right">วันที่</td>
                   <td className="text-left tnum">{fmtDate(doc.doc_date)}</td>
                 </tr>
-                {doc.valid_until && (
+                {/* วันที่สอง — "ยืนราคาถึง" บนใบเสนอราคา · "กำหนดชำระ" บนใบแจ้งหนี้ */}
+                {doc.valid_until && SECOND_DATE_LABEL[doc.kind] && (
                   <tr>
-                    <td className="pr-2 text-right">ยืนราคาถึง</td>
+                    <td className="pr-2 text-right">{SECOND_DATE_LABEL[doc.kind]}</td>
                     <td className="text-left tnum">{fmtDate(doc.valid_until)}</td>
                   </tr>
                 )}
@@ -179,13 +184,17 @@ export default async function PrintDocumentPage({
         <footer className="mt-10 grid grid-cols-2 gap-8 text-xs">
           <div className="text-center">
             <p className="border-b border-black pb-8" />
-            <p className="mt-1">ผู้รับเงิน / ผู้มีอำนาจลงนาม</p>
+            {/* "ผู้รับเงิน" เขียนได้เฉพาะใบที่เงินเข้าแล้ว — ใบแจ้งหนี้กับ
+                ใบเสนอราคายังไม่มีใครรับเงิน การพิมพ์คำนี้ลงไปคือการรับรองเท็จ */}
+            <p className="mt-1">
+              {doc.kind === 'receipt' ? 'ผู้รับเงิน / ผู้มีอำนาจลงนาม' : 'ผู้มีอำนาจลงนาม'}
+            </p>
             {seller?.signatoryName && <p className="mt-0.5">({seller.signatoryName})</p>}
             {seller?.signatoryTitle && <p>{seller.signatoryTitle}</p>}
           </div>
           <div className="text-center">
             <p className="border-b border-black pb-8" />
-            <p className="mt-1">ผู้รับเอกสาร</p>
+            <p className="mt-1">{doc.kind === 'invoice' ? 'ผู้รับวางบิล' : 'ผู้รับเอกสาร'}</p>
             <p className="mt-0.5">วันที่ ..........................</p>
           </div>
         </footer>

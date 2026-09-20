@@ -8,7 +8,7 @@ import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { fmtBaht, fmtDate } from '@/lib/format'
 import { monthOptions, recurringError } from '@/lib/recurring'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 
 type Rule = {
   id: string
@@ -149,25 +149,20 @@ export function RecurringClient({
 
   return (
     <div className="space-y-5">
-      <div>
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div className="min-w-0">
-            <h1 className="text-2xl font-bold text-ink">ค่าใช้จ่ายรายเดือน</h1>
-            <p className="mt-0.5 text-sm text-muted-token">
-              ตั้งครั้งเดียว ระบบลงเป็นรายจ่ายให้ทุกเดือน · เงินเดือน ค่าเช่า ค่าอินเทอร์เน็ต
-            </p>
-          </div>
-          <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-            {!adding && (
-              <button onClick={() => setAdding(true)} className="btn-primary shrink-0">
-                <Plus className="size-4" />
-                ตั้งรายการใหม่
-              </button>
-            )}
-            <BackButton fallbackHref="/settings" />
-          </div>
-        </div>
-      </div>
+      <PageHeader
+        title="ค่าใช้จ่ายรายเดือน"
+        subtitle="ตั้งครั้งเดียว ระบบลงเป็นรายจ่ายให้ทุกเดือน · เงินเดือน ค่าเช่า ค่าอินเทอร์เน็ต"
+        action={
+          !adding ? (
+            <button onClick={() => setAdding(true)} className="btn-primary shrink-0">
+              <Plus className="size-4" />
+              ตั้งรายการใหม่
+            </button>
+          ) : undefined
+        }
+        backHref="/settings"
+        className="mb-0"
+      />
 
       {/* ยอดที่ถึงกำหนดแล้วแต่ยังไม่ลง — ต้องเห็นก่อนเลื่อนหาเอง */}
       {totalDue > 0 && (

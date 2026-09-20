@@ -10,7 +10,7 @@ import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import { ApprovalActions } from './approvals-client'
 import { ApprovalDetailButton } from './approval-detail'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 
 export const metadata = { title: 'รออนุมัติ' }
 
@@ -75,23 +75,18 @@ export default async function ApprovalsPage({
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">รออนุมัติ</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            รายจ่ายที่หัวหน้าโครงการคีย์เข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด
-          </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
-          {(count ?? 0) > 0 && (
+      <PageHeader
+        title="รออนุมัติ"
+        titleExtra={
+          (count ?? 0) > 0 ? (
             <span className="chip text-status-progress bg-status-progress-bg ring-status-progress-ring">
               <ClipboardCheck className="size-3.5" />
               <span className="tnum">{count}</span> รายการ
             </span>
-          )}
-          <BackButton />
-        </div>
-      </div>
+          ) : null
+        }
+        subtitle="รายจ่ายที่หัวหน้าโครงการคีย์เข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด"
+      />
 
       {page.length === 0 ? (
         <EmptyState

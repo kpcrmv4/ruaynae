@@ -1825,6 +1825,15 @@ export type Database = {
           job_title: string
         }[]
       }
+      payroll_outstanding: {
+        Args: never
+        Returns: {
+          accrued: number
+          advanced: number
+          balance: number
+          people: number
+        }[]
+      }
       recurring_status: {
         Args: { p_through: string }
         Returns: {
@@ -1981,7 +1990,7 @@ export type Database = {
     Enums: {
       adjust_kind: "add" | "deduct"
       bond_kind: "cash" | "bank_guarantee"
-      doc_kind: "quotation" | "receipt"
+      doc_kind: "quotation" | "invoice" | "receipt"
       doc_status: "draft" | "issued" | "sent" | "accepted" | "void"
       income_kind: "deposit" | "installment" | "variation_order" | "other"
       notification_kind:
@@ -2126,7 +2135,7 @@ export const Constants = {
     Enums: {
       adjust_kind: ["add", "deduct"],
       bond_kind: ["cash", "bank_guarantee"],
-      doc_kind: ["quotation", "receipt"],
+      doc_kind: ["quotation", "invoice", "receipt"],
       doc_status: ["draft", "issued", "sent", "accepted", "void"],
       income_kind: ["deposit", "installment", "variation_order", "other"],
       notification_kind: [

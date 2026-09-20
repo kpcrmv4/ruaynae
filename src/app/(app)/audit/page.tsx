@@ -12,7 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 
 export const metadata = { title: 'ประวัติการแก้ไข' }
 
@@ -105,16 +105,15 @@ export default async function AuditPage({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">ประวัติการแก้ไข</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
+      <PageHeader
+        title="ประวัติการแก้ไข"
+        subtitle={
+          <>
             ใครแก้อะไร เมื่อไหร่ · บันทึกที่ระดับฐานข้อมูล{' '}
             <span className="font-medium text-ink-2">แก้หรือลบไม่ได้แม้แต่เจ้าของ</span>
-          </p>
-        </div>
-        <BackButton />
-      </div>
+          </>
+        }
+      />
 
       <div className="mb-3 flex flex-wrap gap-1.5">
         <FilterChip href={keep({ action: 'all' })} active={action === 'all'}>

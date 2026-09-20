@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { denyUnlessOwner } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { bahtText } from '@/lib/baht-text'
-import { MAX_CUSTOMER_NAME } from '@/lib/documents'
+import { MAX_CUSTOMER_NAME, hasSecondDate } from '@/lib/documents'
 import { isUuid } from '@/lib/transactions'
 import { isDocKindValue, parseLines, parseVatMode, parseVatRate, replaceLines } from '@/lib/doc-server'
 
@@ -76,7 +76,8 @@ export async function POST(req: NextRequest) {
       customer_address: String(body.customerAddress ?? '').trim() || null,
       customer_phone: String(body.customerPhone ?? '').trim() || null,
       doc_date: docDate,
-      valid_until: body.kind === 'quotation' ? validUntil : null,
+      // ใบเสนอราคา = "ยืนราคาถึง" · ใบแจ้งหนี้ = "กำหนดชำระ" · ใบเสร็จไม่มีวันที่สอง
+      valid_until: hasSecondDate(body.kind) ? validUntil : null,
       vat_mode: parseVatMode(body.vatMode),
       vat_rate: parseVatRate(body.vatRate),
       note: String(body.note ?? '').trim().slice(0, 500) || null,

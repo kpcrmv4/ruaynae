@@ -6,10 +6,10 @@ import { todayInBangkok } from '@/lib/format'
 import { asDateParam } from '@/lib/date-range'
 import { searchTerms } from '@/lib/search-core'
 import {
-  DOC_KIND_SHORT, DOC_STATUSES, DOC_STATUS_LABEL,
+  DOC_KINDS, DOC_KIND_SHORT, DOC_STATUSES, DOC_STATUS_LABEL,
   isDocKind, isDocStatus,
 } from '@/lib/documents'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
@@ -120,28 +120,23 @@ export default async function DocumentsPage({
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">เอกสาร</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            ใบเสนอราคาและใบเสร็จรับเงิน/ใบกำกับภาษี · ผูกกับโครงการหรือไม่ผูกก็ได้
-          </p>
-        </div>
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-          <NewDocButton kind={kind} />
-          <BackButton />
-        </div>
-      </div>
+      <PageHeader
+        title="เอกสาร"
+        subtitle="ใบเสนอราคา ใบแจ้งหนี้ และใบเสร็จรับเงิน/ใบกำกับภาษี · ผูกกับโครงการหรือไม่ผูกก็ได้"
+        action={<NewDocButton kind={kind} />}
+      />
 
-      {/* แท็บสองชนิด — คนใช้เห็นเป็นสองเรื่อง แม้เบื้องหลังเป็นตารางเดียว */}
-      <div className="mb-3 flex gap-2">
-        {(['quotation', 'receipt'] as const).map((k) => (
+      {/* แท็บชนิดเอกสาร — คนใช้เห็นเป็นคนละเรื่อง แม้เบื้องหลังเป็นตารางเดียว
+          · วนจาก `DOC_KINDS` เพื่อให้ชนิดที่เพิ่มวันหน้าได้แท็บของมันเอง
+          · เลื่อนแนวนอนได้บนจอแคบ — สามแท็บชื่อไทยยาวเกิน 390px ไปแล้ว */}
+      <div className="-mx-1 mb-3 flex gap-2 overflow-x-auto px-1 pb-1 no-scrollbar sm:flex-wrap sm:overflow-visible sm:pb-0">
+        {DOC_KINDS.map((k) => (
           <Link
             key={k}
             /* สลับชนิดแล้วช่วงเวลา/โครงการที่ตั้งไว้ต้องติดไปด้วย — ขอบเขตที่
                หายเงียบ ๆ ตอนกดแท็บคือที่มาของการอ่านตัวเลขผิดช่วง */
             href={keep({ kind: k, status: undefined, after: undefined })}
-            className={`rounded-md px-3.5 py-2 text-sm font-semibold transition-colors ${
+            className={`shrink-0 whitespace-nowrap rounded-md px-3.5 py-2 text-sm font-semibold transition-colors ${
               kind === k ? 'bg-brand-solid text-white' : 'border border-line bg-surface text-ink-2 hover:border-brand'
             }`}
           >

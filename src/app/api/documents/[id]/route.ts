@@ -2,7 +2,7 @@ import { NextResponse, type NextRequest } from 'next/server'
 import { denyUnlessOwner } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { bahtText } from '@/lib/baht-text'
-import { MAX_CUSTOMER_NAME, isEditable } from '@/lib/documents'
+import { MAX_CUSTOMER_NAME, hasSecondDate, isEditable } from '@/lib/documents'
 import { isUuid } from '@/lib/transactions'
 import { parseLines, parseVatMode, parseVatRate, replaceLines } from '@/lib/doc-server'
 import type { Database } from '@/lib/database.types'
@@ -73,7 +73,7 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
     patch.doc_date = body.docDate
   }
   if (body.validUntil !== undefined) {
-    patch.valid_until = doc.kind === 'quotation' && isDate(body.validUntil) ? body.validUntil : null
+    patch.valid_until = hasSecondDate(doc.kind) && isDate(body.validUntil) ? body.validUntil : null
   }
 
   if (Object.keys(patch).length > 0) {

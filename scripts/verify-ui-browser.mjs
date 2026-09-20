@@ -287,6 +287,48 @@ try {
     await page.close()
   }
 
+  // ══ BACK-08 · ปุ่มย้อนกลับอยู่แถวเดียวกับหัวข้อ และชิดขวาของเนื้อหาเสมอ ══
+  // 🔴 วัด **พิกัดจริงในเบราว์เซอร์** ไม่ใช่ลำดับใน HTML — เจ้าของแจ้งว่าปุ่ม
+  // "ไม่ได้อยู่แถวเดียวกับชื่อหน้า" ซึ่งเป็นเรื่องของ layout ที่ HTML บอกไม่ได้:
+  // แถวที่ `flex-wrap` จะพับลงบรรทัดใหม่เมื่อจอแคบ โดยที่ลำดับแท็กไม่เปลี่ยนเลย
+  // · ตรวจทุกหน้า × สามความกว้าง เพราะอาการโผล่เฉพาะบางความกว้าง
+  {
+    const page = await ctx.newPage()
+    const routes = routesUnder('src/app/(app)').filter((r) => !r.includes('[id]'))
+    const bad = []
+    for (const w of [390, 768, 1440]) {
+      await page.setViewportSize({ width: w, height: 900 })
+      for (const path of routes) {
+        await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' }).catch(() => {})
+        const m = await page.evaluate(() => {
+          const btn = document.querySelector('[aria-label="ย้อนกลับ"]')
+          const h1 = document.querySelector('h1')
+          if (!btn || !h1) return null
+          const b = btn.getBoundingClientRect()
+          const t = h1.getBoundingClientRect()
+          // ขอบขวาของ "เนื้อหา" = ขอบขวาของกล่องที่หัวข้ออยู่ข้างใน
+          const row = btn.parentElement?.getBoundingClientRect()
+          return {
+            sameRow: b.top < t.bottom && t.top < b.bottom,
+            gapRight: row ? row.right - b.right : 999,
+            rightOfTitle: b.left >= t.right - 1,
+          }
+        })
+        if (!m) { bad.push(`${w}px ${path}: ไม่พบปุ่มหรือหัวข้อ`); continue }
+        if (!m.sameRow) bad.push(`${w}px ${path}: ปุ่มไม่ได้อยู่แถวเดียวกับหัวข้อ`)
+        else if (!m.rightOfTitle) bad.push(`${w}px ${path}: ปุ่มไม่ได้อยู่ทางขวาของหัวข้อ`)
+        else if (m.gapRight > 2) bad.push(`${w}px ${path}: ปุ่มห่างขอบขวา ${Math.round(m.gapRight)}px`)
+      }
+    }
+    check(
+      `BACK-08 ปุ่มย้อนกลับอยู่แถวเดียวกับหัวข้อและชิดขวาสุด ทุกหน้า × 390/768/1440`,
+      bad.length === 0,
+      bad.slice(0, 4).join(' · ') || `ตรวจ ${routes.length * 3} ชุด สะอาดทั้งหมด`,
+    )
+    await page.setViewportSize({ width: 1440, height: 900 })
+    await page.close()
+  }
+
   // ══ R12-UI-20 · สามความกว้าง × สองธีม ═════════════════════════════
   {
     const page = await ctx.newPage()

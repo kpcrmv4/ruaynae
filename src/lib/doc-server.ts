@@ -2,8 +2,8 @@ import 'server-only'
 
 import { getSupabaseServer } from '@/lib/supabase/server'
 import {
-  DEFAULT_VAT_RATE, MAX_DESCRIPTION, MAX_LINES, isVatMode,
-  type DocKind, type VatMode,
+  DEFAULT_VAT_RATE, MAX_DESCRIPTION, MAX_LINES, isDocKind, isVatMode,
+  type VatMode,
 } from '@/lib/documents'
 
 /**
@@ -124,4 +124,12 @@ export const parseVatRate = (v: unknown): number => {
   return Number.isFinite(n) && n >= 0 && n <= 1 ? n : DEFAULT_VAT_RATE
 }
 
-export const isDocKindValue = (v: unknown): v is DocKind => v === 'quotation' || v === 'receipt'
+/**
+ * 🔴 ส่งต่อ `isDocKind` ตัวเดียวกับที่ทั้งแอปใช้ — **ห้ามเขียนรายการชนิดซ้ำที่นี่**
+ *
+ * ของเดิมเป็นสำเนา `v === 'quotation' || v === 'receipt'` · วันที่เพิ่ม
+ * `invoice` เข้า enum ทุกอย่างเขียวหมด (tsc · build · types ที่ generate มา)
+ * แต่ `POST /api/documents` ปฏิเสธใบแจ้งหนี้ทุกใบด้วย `DOC_KIND_INVALID`
+ * — ชนิดใหม่มีครบทุกที่ยกเว้นประตูทางเข้า
+ */
+export const isDocKindValue = isDocKind

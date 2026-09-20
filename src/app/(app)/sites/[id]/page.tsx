@@ -26,13 +26,14 @@ import { CategoryTotals } from '@/components/sites/category-totals'
 import { TxnDetailProvider } from '@/components/ledger/txn-detail'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
+import { DOC_KINDS, DOC_KIND_SHORT } from '@/lib/documents'
 import { DocRow } from '@/components/documents/doc-row'
 import {
   BOND_KIND_LABEL, BOND_STATUS_LABEL, BOND_STATUS_TONE, WARRANTY_DEFAULT_MONTHS, bondStatusOf,
 } from '@/lib/bonds'
 import { SiteDetailActions } from './site-detail-client'
 import { BondReturnButton } from './bond-return'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 
 /** กี่แถวล่าสุดที่โชว์ในหน้าโครงการ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
@@ -232,43 +233,38 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           ในแถวหัวข้อแทน (คำสั่งเจ้าของ 20 ก.ย. 2569) — ลูกศรสองอันซ้อนกันคนละที่
           บนหน้าเดียวคือความสับสน · ปุ่มถอยตามประวัติจริง และถ้าเปิดลิงก์ตรงเข้ามา
           จะพาไป `/sites` เหมือนลิงก์เดิมทุกประการ */}
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-ink">{site.name}</h1>
-            <Badge tone={SITE_STATUS_TONE[site.status]} dot>
-              {SITE_STATUS_LABEL[site.status]}
-            </Badge>
-          </div>
-          {/* ไม่มีชื่อลูกค้า = ไม่เขียนอะไรเลย · "ยังไม่ได้ระบุ" กินบรรทัดเท่าข้อมูลจริง
-              แต่ไม่ได้บอกอะไรใหม่ (เจ้าของสั่ง 4 ก.ย. 2569) — ช่องกรอกอยู่ในกล่อง
-              "แก้ไข" ซึ่งเจ้าของเห็นอยู่แล้วทางขวา */}
-          {site.client_name && (
-            <p className="mt-0.5 text-sm text-muted-token">ลูกค้า: {site.client_name}</p>
-          )}
-        </div>
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
-        {isOwner && (
-          <SiteDetailActions
-            site={site}
-            contractAmount={money.contract ?? 0}
-            bond={{
-              contract_no: bond?.contract_no ?? null,
-              contract_date: bond?.contract_date ?? null,
-              bond_kind: bond?.bond_kind ?? null,
-              bond_amount: bond?.bond_amount ?? 0,
-              bond_ref: bond?.bond_ref ?? null,
-              handover_date: bond?.handover_date ?? null,
-              warranty_months: bond?.warranty_months ?? WARRANTY_DEFAULT_MONTHS,
-            }}
-            crew={crew ?? []}
-            milestones={milestones ?? []}
-            people={people}
-          />
-        )}
-          <BackButton fallbackHref="/sites" />
-        </div>
-      </div>
+      <PageHeader
+        title={site.name}
+        titleExtra={
+          <Badge tone={SITE_STATUS_TONE[site.status]} dot>
+            {SITE_STATUS_LABEL[site.status]}
+          </Badge>
+        }
+        /* ไม่มีชื่อลูกค้า = ไม่เขียนอะไรเลย · "ยังไม่ได้ระบุ" กินบรรทัดเท่าข้อมูลจริง
+           แต่ไม่ได้บอกอะไรใหม่ (เจ้าของสั่ง 4 ก.ย. 2569) */
+        subtitle={site.client_name ? `ลูกค้า: ${site.client_name}` : undefined}
+        action={
+          isOwner ? (
+            <SiteDetailActions
+              site={site}
+              contractAmount={money.contract ?? 0}
+              bond={{
+                contract_no: bond?.contract_no ?? null,
+                contract_date: bond?.contract_date ?? null,
+                bond_kind: bond?.bond_kind ?? null,
+                bond_amount: bond?.bond_amount ?? 0,
+                bond_ref: bond?.bond_ref ?? null,
+                handover_date: bond?.handover_date ?? null,
+                warranty_months: bond?.warranty_months ?? WARRANTY_DEFAULT_MONTHS,
+              }}
+              crew={crew ?? []}
+              milestones={milestones ?? []}
+              people={people}
+            />
+          ) : undefined
+        }
+        backHref="/sites"
+      />
 
       {/* ── ปุ่มลัดของโครงการนี้ ─────────────────────────────────────────
           เปิดหน้าโครงการแล้วงานถัดไปเกือบทุกครั้งคือ "บันทึกของโครงการนี้" —
@@ -648,12 +644,15 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
                 ยังไม่มีเอกสารที่ผูกกับโครงการนี้
               </p>
               <div className="mt-3 flex flex-wrap justify-center gap-2">
-                <Link href={`/documents/new?kind=quotation&site=${site.id}`} className="btn-secondary">
-                  สร้างใบเสนอราคา
-                </Link>
-                <Link href={`/documents/new?kind=receipt&site=${site.id}`} className="btn-secondary">
-                  สร้างใบเสร็จรับเงิน
-                </Link>
+                {DOC_KINDS.map((k) => (
+                  <Link
+                    key={k}
+                    href={`/documents/new?kind=${k}&site=${site.id}`}
+                    className="btn-secondary"
+                  >
+                    สร้าง{DOC_KIND_SHORT[k]}
+                  </Link>
+                ))}
               </div>
             </div>
           ) : (
@@ -664,12 +663,15 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
                 ))}
               </ul>
               <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3">
-                <Link href={`/documents/new?kind=quotation&site=${site.id}`} className="btn-secondary">
-                  สร้างใบเสนอราคา
-                </Link>
-                <Link href={`/documents/new?kind=receipt&site=${site.id}`} className="btn-secondary">
-                  สร้างใบเสร็จรับเงิน
-                </Link>
+                {DOC_KINDS.map((k) => (
+                  <Link
+                    key={k}
+                    href={`/documents/new?kind=${k}&site=${site.id}`}
+                    className="btn-secondary"
+                  >
+                    สร้าง{DOC_KIND_SHORT[k]}
+                  </Link>
+                ))}
                 {hasMoreDoc && (
                   <Link
                     href={`/documents?site=${site.id}`}

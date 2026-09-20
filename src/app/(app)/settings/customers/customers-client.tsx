@@ -5,7 +5,7 @@ import { BookUser, Check, Loader2, Pencil, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { EmptyState } from '@/components/ui/states'
 
 export type CustomerRow = {
@@ -119,16 +119,12 @@ export function CustomersClient({ rows }: { rows: CustomerRow[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">ทะเบียนลูกค้า</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            ที่อยู่และเลขผู้เสียภาษีที่ฟอร์มเอกสารเติมให้ · เพิ่มรายใหม่จากปุ่ม
-            &ldquo;เก็บเข้าทะเบียนลูกค้า&rdquo; ในฟอร์มเอกสาร
-          </p>
-        </div>
-        <BackButton fallbackHref="/settings" />
-      </div>
+      <PageHeader
+        title="ทะเบียนลูกค้า"
+        subtitle="ที่อยู่และเลขผู้เสียภาษีที่ฟอร์มเอกสารเติมให้ · เพิ่มรายใหม่จากปุ่ม “เก็บเข้าทะเบียนลูกค้า” ในฟอร์มเอกสาร"
+        backHref="/settings"
+        className="mb-0"
+      />
 
       <p className="rounded-lg border border-line bg-surface-2 px-3 py-2.5 text-sm text-ink-2">
         แก้ตรงนี้<span className="font-semibold text-ink">ไม่ย้อนไปแก้ใบที่ออกไปแล้ว</span> —

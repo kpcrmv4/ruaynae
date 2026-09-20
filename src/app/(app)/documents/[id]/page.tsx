@@ -5,10 +5,10 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { fmtBaht, fmtDate, fmtDateTime } from '@/lib/format'
 import {
-  DOC_KIND_LABEL, DOC_STATUS_LABEL, DOC_STATUS_TONE, whtHint,
+  DOC_KIND_LABEL, DOC_STATUS_LABEL, DOC_STATUS_TONE, SECOND_DATE_LABEL, whtHint,
 } from '@/lib/documents'
 import { Badge } from '@/components/ui/badge'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 import { DataError } from '@/components/ui/data-error'
 import { DocActions } from '@/components/documents/doc-actions'
 
@@ -61,16 +61,14 @@ export default async function DocumentDetailPage({
 
   return (
     <>
-      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-bold tnum text-ink">{doc.doc_no ?? 'ร่าง'}</h1>
-            <Badge tone={DOC_STATUS_TONE[doc.status]} dot>{DOC_STATUS_LABEL[doc.status]}</Badge>
-          </div>
-          <p className="mt-0.5 text-sm text-muted-token">{DOC_KIND_LABEL[doc.kind]}</p>
-        </div>
-        <BackButton fallbackHref="/documents" />
-      </div>
+      <PageHeader
+        title={doc.doc_no ?? 'ร่าง'}
+        titleExtra={
+          <Badge tone={DOC_STATUS_TONE[doc.status]} dot>{DOC_STATUS_LABEL[doc.status]}</Badge>
+        }
+        subtitle={DOC_KIND_LABEL[doc.kind]}
+        backHref="/documents"
+      />
 
       {/* แถบเตือนที่ยังแก้ได้ — ตัวล็อกคือ "ส่งแล้ว" ไม่ใช่ "ออกเลขแล้ว" */}
       {doc.status === 'issued' && (
@@ -139,9 +137,9 @@ export default async function DocumentDetailPage({
             <dt className="text-xs text-muted-token">วันที่เอกสาร</dt>
             <dd className="tnum text-ink-2">{fmtDate(doc.doc_date)}</dd>
           </div>
-          {doc.valid_until && (
+          {doc.valid_until && SECOND_DATE_LABEL[doc.kind] && (
             <div>
-              <dt className="text-xs text-muted-token">ยืนราคาถึง</dt>
+              <dt className="text-xs text-muted-token">{SECOND_DATE_LABEL[doc.kind]}</dt>
               <dd className="tnum text-ink-2">{fmtDate(doc.valid_until)}</dd>
             </div>
           )}
@@ -165,7 +163,7 @@ export default async function DocumentDetailPage({
                   href={`/documents/${doc.source_document_id}`}
                   className="inline-flex items-center gap-1 text-brand hover:underline"
                 >
-                  ใบเสนอราคาต้นทาง <ExternalLink className="size-3.5" />
+                  เปิดใบต้นทาง <ExternalLink className="size-3.5" />
                 </Link>
               </dd>
             </div>

@@ -7,7 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { PIN_LENGTH } from '@/lib/pin-core'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 
 type Row = {
   id: string
@@ -100,24 +100,25 @@ export function UsersClient({ meId, users }: { meId: string; users: Row[] }) {
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start gap-3">
-        <div className="min-w-0 flex-1">
-          <h1 className="text-lg font-bold text-ink">ผู้ใช้ระบบ</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
+      <PageHeader
+        title="ผู้ใช้ระบบ"
+        subtitle={
+          <>
             คนที่ล็อกอินเข้าระบบได้ ·{' '}
             <Link href="/settings/users?tab=workers" className="font-medium text-brand hover:underline">
               คนงานที่มีแค่ค่าแรงอยู่ที่นี่
             </Link>
-          </p>
-        </div>
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+          </>
+        }
+        action={
           <button onClick={() => setAdding((v) => !v)} className="btn-primary shrink-0">
             <Plus className="size-4" />
             เพิ่มผู้ใช้
           </button>
-          <BackButton fallbackHref="/settings" />
-        </div>
-      </div>
+        }
+        backHref="/settings"
+        className="mb-0"
+      />
 
       {adding && (
         <section className="rounded-lg border border-line bg-surface p-4">

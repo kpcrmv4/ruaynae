@@ -4,8 +4,10 @@ import { Check, Loader2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
-import { DOC_KIND_SHORT, nextDocNoPreview, parseDocNo } from '@/lib/documents'
-import { BackButton } from '@/components/ui/back-button'
+import {
+  DOC_KINDS, DOC_KIND_SHORT, nextDocNoPreview, parseDocNo, type DocKind,
+} from '@/lib/documents'
+import { PageHeader } from '@/components/ui/page-header'
 
 const MESSAGES: Record<string, string> = {
   UNAUTHENTICATED: 'เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่',
@@ -21,17 +23,23 @@ const MESSAGES: Record<string, string> = {
  * (คำสั่งเจ้าของ 20 ก.ย. 2569) — เจ้าของเปิดแฟ้มเก่าดูใบสุดท้ายแล้วพิมพ์ตามนั้น
  * ไม่ต้องบวกเอง · หน้าจอโชว์ให้เห็นทันทีว่าใบต่อไปจะเป็นเลขอะไร
  */
+/** ค่าตั้งต้นของช่องเลข เมื่อเจ้าของยังไม่เคยตั้ง — ใช้เป็น placeholder เท่านั้น */
+const PLACEHOLDER: Record<DocKind, string> = {
+  quotation: 'QT0000',
+  invoice: 'IV0000',
+  receipt: 'RC1140',
+}
+
 export function DocSettingsClient({
-  quotationLastNo,
-  receiptLastNo,
+  lastNos,
   phone,
   email,
   branchLabel,
   bankAccount,
   docFooter,
 }: {
-  quotationLastNo: string
-  receiptLastNo: string
+  /** เลขล่าสุดของทุกชนิด — คีย์มาจาก `DOC_KINDS` ไม่ใช่ prop ต่อชนิด */
+  lastNos: Record<DocKind, string>
   phone: string
   email: string
   branchLabel: string
@@ -41,11 +49,11 @@ export function DocSettingsClient({
   const router = useRouter()
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState('')
-  const [f, setF] = useState({
-    quotationLastNo, receiptLastNo, phone, email, branchLabel, bankAccount, docFooter,
-  })
+  const [nos, setNos] = useState<Record<DocKind, string>>(lastNos)
+  const [f, setF] = useState({ phone, email, branchLabel, bankAccount, docFooter })
 
   const set = (k: keyof typeof f, v: string) => setF((p) => ({ ...p, [k]: v }))
+  const setNo = (k: DocKind, v: string) => setNos((p) => ({ ...p, [k]: v }))
 
   const preview = (raw: string) => {
     if (raw.trim() === '') return null
@@ -61,7 +69,11 @@ export function DocSettingsClient({
       const r = await fetch('/api/settings/documents', {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(f),
+        // `<kind>LastNo` ต่อชนิด — route วน `DOC_KINDS` ฝั่งตัวเองเหมือนกัน
+        body: JSON.stringify({
+          ...f,
+          ...Object.fromEntries(DOC_KINDS.map((k) => [`${k}LastNo`, nos[k]])),
+        }),
       })
       const b = await r.json().catch(() => ({}))
       if (!r.ok) {
@@ -84,15 +96,12 @@ export function DocSettingsClient({
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">ตั้งค่าเอกสาร</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            เลขที่เอกสาร และข้อมูลผู้ขายที่จะถูกพิมพ์ลงบนใบเสนอราคา/ใบเสร็จ
-          </p>
-        </div>
-        <BackButton fallbackHref="/settings" />
-      </div>
+      <PageHeader
+        title="ตั้งค่าเอกสาร"
+        subtitle="เลขที่เอกสาร และข้อมูลผู้ขายที่จะถูกพิมพ์ลงบนใบเสนอราคา ใบแจ้งหนี้ และใบเสร็จ"
+        backHref="/settings"
+        className="mb-0"
+      />
 
       <section className="panel p-4">
         <h2 className="mb-1 text-sm font-semibold text-ink">เลขที่เอกสาร</h2>
@@ -102,20 +111,21 @@ export function DocSettingsClient({
           {' '}· จำนวนหลักมาจากที่พิมพ์ (<span className="tnum">CM011</span> → <span className="tnum">CM012</span>)
         </p>
 
-        <div className="grid gap-3 sm:grid-cols-2">
-          {([['quotationLastNo', 'quotation'], ['receiptLastNo', 'receipt']] as const).map(
-            ([key, kind]) => {
-              const p = preview(f[key])
+        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {DOC_KINDS.map(
+            (kind) => {
+              const key = `${kind}LastNo`
+              const p = preview(nos[kind])
               return (
-                <div key={key}>
+                <div key={kind}>
                   <label htmlFor={key} className="label-base">
                     {DOC_KIND_SHORT[kind]} — เลขล่าสุด
                   </label>
                   <input
                     id={key}
-                    value={f[key]}
-                    onChange={(e) => set(key, e.target.value)}
-                    placeholder={kind === 'receipt' ? 'RC1140' : 'QT0000'}
+                    value={nos[kind]}
+                    onChange={(e) => setNo(kind, e.target.value)}
+                    placeholder={PLACEHOLDER[kind]}
                     className="input-base tnum"
                   />
                   <p className="mt-1 text-xs">

@@ -1,13 +1,17 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { BadgeCheck, Check, FileCheck, Loader2, Printer, Receipt, Send, Trash2, Wallet, X } from 'lucide-react'
+import {
+  BadgeCheck, Check, FileCheck, FileText, Loader2, Printer, Receipt, Send, Trash2, Wallet, X,
+} from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht } from '@/lib/format'
-import { isEditable, type DocKind, type DocStatus } from '@/lib/documents'
+import {
+  CONVERT_TARGETS, DOC_KIND_SHORT, isEditable, type DocKind, type DocStatus,
+} from '@/lib/documents'
 
 type IncomeCategory = { id: string; name: string }
 
@@ -22,7 +26,8 @@ const MESSAGES: Record<string, string> = {
   DOC_ALREADY_VOID: 'เอกสารนี้ถูกยกเลิกไปแล้ว',
   DOC_LINES_EMPTY: 'ต้องมีอย่างน้อยหนึ่งรายการก่อนออกเอกสาร',
   DOC_DELETE_ISSUED: 'เอกสารที่ออกเลขแล้วลบไม่ได้ ให้ยกเลิกแทน',
-  DOC_ALREADY_CONVERTED: 'ใบเสร็จของใบเสนอราคานี้ถูกสร้างไปแล้ว',
+  DOC_ALREADY_CONVERTED: 'ใบชนิดนี้ถูกสร้างจากใบนี้ไปแล้ว — เปิดใบเดิมแทนการสร้างซ้ำ',
+  CONVERT_PATH_INVALID: 'สร้างใบชนิดนี้ต่อจากใบนี้ไม่ได้',
   DOC_INCOME_LINKED: 'ใบนี้ผูกกับรายรับไปแล้ว',
   INCOME_RECEIPT_ONLY: 'ลงรายรับได้เฉพาะใบเสร็จ',
   ACCEPT_QUOTATION_ONLY: 'สถานะตอบรับมีเฉพาะใบเสนอราคา',
@@ -143,20 +148,31 @@ export function DocActions({
           </button>
         )}
 
-        {kind === 'quotation' && status !== 'void' && status !== 'draft' && (
-          <button
-            type="button"
-            onClick={async () => {
-              const b = await call('convert', `/api/documents/${id}/convert`, undefined, 'สร้างร่างใบเสร็จแล้ว')
-              if (b?.id) router.push(`/documents/${b.id}`)
-            }}
-            disabled={busy !== null}
-            className="btn-secondary disabled:opacity-60"
-          >
-            {spin('convert') ? <Loader2 className="size-4 animate-spin" /> : <Receipt className="size-4" />}
-            สร้างใบเสร็จจากใบนี้
-          </button>
-        )}
+        {/* ใบเสนอราคา → ใบแจ้งหนี้/ใบเสร็จ · ใบแจ้งหนี้ → ใบเสร็จ
+            ข้ามใบแจ้งหนี้ได้โดยตั้งใจ — งานเล็กที่รับเงินสดหน้างานไม่มีใครวางบิลก่อน */}
+        {status !== 'void' && status !== 'draft' &&
+          CONVERT_TARGETS[kind].map((to) => (
+            <button
+              key={to}
+              type="button"
+              onClick={async () => {
+                const b = await call(
+                  `convert-${to}`,
+                  `/api/documents/${id}/convert`,
+                  { to },
+                  `สร้างร่าง${DOC_KIND_SHORT[to]}แล้ว`,
+                )
+                if (b?.id) router.push(`/documents/${b.id}`)
+              }}
+              disabled={busy !== null}
+              className="btn-secondary disabled:opacity-60"
+            >
+              {spin(`convert-${to}`)
+                ? <Loader2 className="size-4 animate-spin" />
+                : to === 'invoice' ? <FileText className="size-4" /> : <Receipt className="size-4" />}
+              สร้าง{DOC_KIND_SHORT[to]}จากใบนี้
+            </button>
+          ))}
 
         {kind === 'receipt' && status !== 'draft' && status !== 'void' && !txnId && (
           <button

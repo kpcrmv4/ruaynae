@@ -39,7 +39,7 @@ const check = (label, ok, detail = '') => {
  * ท้ายไฟล์** ซึ่งเป็นชุดที่ล้มไม่ได้ที่สุด — ล้มเมื่อไหร่คือทิ้งเอกสารทดสอบไว้ใน
  * ฐานของลูกค้าจริง และทิ้งตัวนับเลขที่เอกสารไว้ผิดค่า (CLAUDE.md §17 ข้อ 9)
  */
-const sql = async (q, tries = 5) => {
+const sql = async (q, tries = 7) => {
   for (let i = 0; ; i++) {
     const r = await fetch(
       `https://api.supabase.com/v1/projects/${env.SUPABASE_PROJECT_REF}/database/query`,
@@ -55,7 +55,7 @@ const sql = async (q, tries = 5) => {
     const t = await r.text()
     if (r.ok) return JSON.parse(t)
     if ((r.status === 429 || /Throttler/i.test(t)) && i < tries - 1) {
-      await new Promise((res) => setTimeout(res, 2000 * 2 ** i))
+      await new Promise((res) => setTimeout(res, 3000 * 2 ** i))
       continue
     }
     throw new Error(`${q.slice(0, 80)} → ${t.slice(0, 300)}`)
@@ -263,7 +263,8 @@ try {
     track('docs', a.id)
     const dup = await sqlTry(
       `insert into public.documents (kind, doc_no, status, customer_name, doc_date)
-       values ('receipt', 'ZZTEST0001', 'issued', ${q(MARK)}, current_date)`)
+       values ('receipt', 'ZZTEST0001', 'issued', ${q(MARK)}, current_date) returning id`)
+    if (dup.rows?.[0]?.id) track('docs', dup.rows[0].id)
     const other = await sqlTry(
       `insert into public.documents (kind, doc_no, status, customer_name, doc_date)
        values ('quotation', 'ZZTEST0001', 'issued', ${q(MARK)}, current_date) returning id`)
@@ -759,6 +760,136 @@ try {
       sellerOld.p === 'ZZ-เบอร์เก่า' && sellerNew.p === 'ZZ-เบอร์ใหม่',
       `ใบเก่า "${sellerOld.p}" · ใบใหม่ "${sellerNew.p}"`)
 
+    // ═══ ใบแจ้งหนี้ (R12-INV-*) ══════════════════════════════════
+    console.log('\n── R12-INV · ใบแจ้งหนี้ ─────────────────────────────────────')
+    {
+      // INV-01 · enum มีสามค่า และเรียงตามลำดับงานจริง
+      const labels = (await sql(
+        `select enumlabel from pg_enum where enumtypid = 'public.doc_kind'::regtype
+          order by enumsortorder`)).map((r) => r.enumlabel)
+      check('R12-INV-01 `doc_kind` มี 3 ค่า เรียงตามลำดับงาน เสนอราคา → แจ้งหนี้ → เก็บเงิน',
+        labels.join(',') === 'quotation,invoice,receipt', labels.join(' → '))
+
+      // INV-02 · ใบแจ้งหนี้เดินเลขชุดของตัวเอง ไม่ก้าวก่ายอีกสองชนิด
+      const beforeQ = (await sql(`select last_no from public.doc_counters where kind = 'quotation'`))[0]
+      const beforeR = (await sql(`select last_no from public.doc_counters where kind = 'receipt'`))[0]
+      const setIv = await setCounter(ownerJar, 'invoiceLastNo', 'IV0300')
+      const dIv = await draft(ownerJar, { kind: 'invoice' })
+      const iIv = await (await req('POST', `/api/documents/${dIv.body.id}/issue`,
+        undefined, { cookie: ownerJar })).json()
+      const afterQ = (await sql(`select last_no from public.doc_counters where kind = 'quotation'`))[0]
+      const afterR = (await sql(`select last_no from public.doc_counters where kind = 'receipt'`))[0]
+      check('R12-INV-02 ตั้ง `IV0300` แล้วใบแรกเป็น `IV0301` · ตัวนับของอีกสองชนิดไม่ขยับ',
+        setIv.status === 200 && iIv.doc_no === 'IV0301'
+          && afterQ.last_no === beforeQ.last_no && afterR.last_no === beforeR.last_no,
+        `ตั้งค่า HTTP ${setIv.status} · ออกเลขได้ ${iIv.doc_no ?? iIv.error} · quotation ${beforeQ.last_no}→${afterQ.last_no} · receipt ${beforeR.last_no}→${afterR.last_no}`)
+
+      // INV-03 · เลขซ้ำข้ามชนิดได้ (unique เป็นต่อชนิด)
+      const dup = await sqlTry(
+        `insert into public.documents (kind, doc_no, status, customer_name, doc_date)
+         values ('invoice', 'IV0301', 'issued', ${q(MARK)}, current_date) returning id`)
+      if (dup.rows?.[0]?.id) track('docs', dup.rows[0].id)
+      const cross = await sqlTry(
+        `insert into public.documents (kind, doc_no, status, customer_name, doc_date)
+         values ('quotation', 'IV0301', 'issued', ${q(MARK)}, current_date) returning id`)
+      if (cross.rows?.[0]?.id) track('docs', cross.rows[0].id)
+      check('R12-INV-03 เลขใบแจ้งหนี้ซ้ำในชนิดเดียวกันถูกปฏิเสธ · ชนิดอื่นใช้เลขเดียวกันได้',
+        Boolean(dup.error) && /documents_kind_no_uniq/.test(dup.error) && Boolean(cross.rows),
+        dup.error ? 'documents_kind_no_uniq' : 'ไม่ถูกปฏิเสธ (ไม่ควร)')
+
+      // INV-04 · "กำหนดชำระ" ใช้คอลัมน์เดียวกับ "ยืนราคาถึง" แต่คนละป้าย
+      const dDue = await draft(ownerJar, { kind: 'invoice', validUntil: '2026-10-15' })
+      const dRec = await draft(ownerJar, { kind: 'receipt', validUntil: '2026-10-15' })
+      const [rowDue] = await sql(
+        `select valid_until::text as v from public.documents where id = ${q(dDue.body.id)}`)
+      const [rowRec] = await sql(
+        `select valid_until::text as v from public.documents where id = ${q(dRec.body.id)}`)
+      check('R12-INV-04 ใบแจ้งหนี้เก็บ "กำหนดชำระ" ได้ · ใบเสร็จไม่มีวันที่สอง (ถูกล้างเป็น null)',
+        rowDue.v === '2026-10-15' && rowRec.v === null,
+        `invoice=${rowDue.v} · receipt=${rowRec.v}`)
+
+      const detailDue = await page(`/documents/${dDue.body.id}`, ownerJar)
+      const formDue = await page(`/documents/${dDue.body.id}/edit`, ownerJar)
+      check('R12-INV-05 หน้ารายละเอียดใบแจ้งหนี้เขียนว่า "กำหนดชำระ" ไม่ใช่ "ยืนราคาถึง"',
+        detailDue.includes('กำหนดชำระ') && !detailDue.includes('ยืนราคาถึง')
+          && formDue.includes('ใบแจ้งหนี้'),
+        'ป้ายของวันที่สองตรงตามชนิด')
+
+      // INV-06 · เส้นทางการแปลง — เสนอราคา → แจ้งหนี้ → เก็บเงิน
+      const src = await draft(ownerJar, { kind: 'quotation', siteId: made.sites[0] })
+      await req('POST', `/api/documents/${src.body.id}/issue`, undefined, { cookie: ownerJar })
+      const toInv = await req('POST', `/api/documents/${src.body.id}/convert`,
+        { to: 'invoice' }, { cookie: ownerJar })
+      const invBody = await toInv.json().catch(() => ({}))
+      if (invBody.id) track('docs', invBody.id)
+      const [invRow] = invBody.id
+        ? await sql(`select kind::text as k, status::text as s, source_document_id, total::float8 as t,
+                            site_id from public.documents where id = ${q(invBody.id)}`)
+        : [{}]
+      const [srcRow] = await sql(
+        `select status::text as s, total::float8 as t from public.documents where id = ${q(src.body.id)}`)
+      check('R12-INV-06 ใบเสนอราคา → ใบแจ้งหนี้ · ร่าง · ยอด/โครงการ/ต้นทางครบ · ใบต้นทางไม่เปลี่ยนสถานะ',
+        toInv.status === 201 && invRow.k === 'invoice' && invRow.s === 'draft'
+          && invRow.source_document_id === src.body.id && invRow.t === srcRow.t
+          && invRow.site_id === made.sites[0] && srcRow.s === 'issued',
+        `${invRow.k}/${invRow.s} · ยอด ${invRow.t} · ต้นทางยังเป็น ${srcRow.s}`)
+
+      await req('POST', `/api/documents/${invBody.id}/issue`, undefined, { cookie: ownerJar })
+      const toRec = await req('POST', `/api/documents/${invBody.id}/convert`,
+        { to: 'receipt' }, { cookie: ownerJar })
+      const recBody = await toRec.json().catch(() => ({}))
+      if (recBody.id) track('docs', recBody.id)
+      check('R12-INV-07 ใบแจ้งหนี้ → ใบเสร็จ (ต่อกันได้ครบเส้นทาง)',
+        toRec.status === 201 && recBody.kind === 'receipt', `HTTP ${toRec.status} ${recBody.kind}`)
+
+      // INV-08 · ใบเสนอราคายังมีใบเสร็จของตัวเองได้ แม้ทำใบแจ้งหนี้ไปแล้ว
+      const alsoRec = await req('POST', `/api/documents/${src.body.id}/convert`,
+        { to: 'receipt' }, { cookie: ownerJar })
+      const alsoBody = await alsoRec.json().catch(() => ({}))
+      if (alsoBody.id) track('docs', alsoBody.id)
+      const dupInv = await req('POST', `/api/documents/${src.body.id}/convert`,
+        { to: 'invoice' }, { cookie: ownerJar })
+      const dupInvBody = await dupInv.json().catch(() => ({}))
+      check('R12-INV-08 กันสร้างซ้ำ **ต่อชนิดปลายทาง** — ใบเสร็จของใบเดิมยังสร้างได้ · ใบแจ้งหนี้ซ้ำไม่ได้',
+        alsoRec.status === 201 && dupInv.status === 409
+          && dupInvBody.error === 'DOC_ALREADY_CONVERTED' && dupInvBody.id === invBody.id,
+        `ใบเสร็จ ${alsoRec.status} · ใบแจ้งหนี้ซ้ำ ${dupInv.status}`)
+
+      // INV-09 · เส้นทางย้อนกลับต้องถูกปฏิเสธ
+      const back = await req('POST', `/api/documents/${recBody.id}/convert`,
+        { to: 'invoice' }, { cookie: ownerJar })
+      const backBody = await back.json().catch(() => ({}))
+      const self = await req('POST', `/api/documents/${invBody.id}/convert`,
+        { to: 'invoice' }, { cookie: ownerJar })
+      check('R12-INV-09 ใบเสร็จ → ใบแจ้งหนี้ และ ใบแจ้งหนี้ → ใบแจ้งหนี้ ถูกปฏิเสธ (422 CONVERT_PATH_INVALID)',
+        back.status === 422 && backBody.error === 'CONVERT_PATH_INVALID' && self.status === 422,
+        `ย้อนกลับ ${back.status} ${backBody.error} · วนตัวเอง ${self.status}`)
+
+      // INV-10 · ใบแจ้งหนี้ลงรายรับไม่ได้ (ยังไม่ได้รับเงิน)
+      const incInv = await req('POST', `/api/documents/${invBody.id}/income`,
+        { categoryId: incomeCat.id }, { cookie: ownerJar })
+      const incInvBody = await incInv.json().catch(() => ({}))
+      const accInv = await req('POST', `/api/documents/${invBody.id}/accept`,
+        undefined, { cookie: ownerJar })
+      check('R12-INV-10 ใบแจ้งหนี้ลงรายรับไม่ได้ (422) และไม่มีสถานะ "ตอบรับ" (422)',
+        incInv.status === 422 && incInvBody.error === 'INCOME_RECEIPT_ONLY' && accInv.status === 422,
+        `income ${incInv.status} · accept ${accInv.status}`)
+
+      // INV-11 · กระดาษของใบแจ้งหนี้ไม่เขียนว่า "ผู้รับเงิน"
+      const printInv = await page(`/documents/${invBody.id}/print`, ownerJar)
+      const paperInv = printInv.slice(printInv.indexOf('class="paper'), printInv.indexOf('</article>'))
+      check('R12-INV-11 กระดาษใบแจ้งหนี้ไม่มีคำว่า "ผู้รับเงิน" — ยังไม่มีใครรับเงิน',
+        paperInv.includes('ใบแจ้งหนี้') && !paperInv.includes('ผู้รับเงิน')
+          && paperInv.includes('ผู้รับวางบิล'),
+        'ผู้มีอำนาจลงนาม + ผู้รับวางบิล')
+
+      // INV-12 · หน้าตั้งค่ามีช่องเลขของทั้งสามชนิด
+      const setPage2 = await page('/settings/documents', ownerJar)
+      check('R12-INV-12 หน้าตั้งค่าเอกสารมีช่องเลขล่าสุดครบทั้ง 3 ชนิด',
+        ['quotationLastNo', 'invoiceLastNo', 'receiptLastNo'].every((id) => setPage2.includes(id)),
+        'ช่องละชนิด')
+    }
+
     // ── เดินเครื่องสถานะให้ครบทุกเส้น (R12-ST-*) ──────────────────
     console.log('\n── R12-ST · เครื่องสถานะของเอกสาร ──────────────────────────')
     {
@@ -888,10 +1019,10 @@ try {
 
     const list = await page('/documents', ownerJar)
     const STATUS_CHIPS = ['ทั้งหมด', 'ร่าง', 'ออกเลขแล้ว', 'ส่งให้ลูกค้าแล้ว', 'ลูกค้าตอบรับแล้ว', 'ยกเลิกแล้ว']
-    check('R12-UI-04 `/documents` มีแท็บสองชนิด และตัวกรองสถานะครบ 6 ค่า',
-      list.includes('ใบเสนอราคา') && list.includes('ใบเสร็จรับเงิน')
+    check('R12-UI-04 `/documents` มีแท็บครบ 3 ชนิด และตัวกรองสถานะครบ 6 ค่า',
+      ['ใบเสนอราคา', 'ใบแจ้งหนี้', 'ใบเสร็จ'].every((k) => list.includes(k))
         && STATUS_CHIPS.every((s) => list.includes(s)),
-      STATUS_CHIPS.filter((s) => !list.includes(s)).join(' · ') || 'แท็บ + ชิปสถานะครบ')
+      STATUS_CHIPS.filter((s) => !list.includes(s)).join(' · ') || 'แท็บ 3 ชนิด + ชิปสถานะครบ')
 
     // กรองด้วย id ของเอกสารจริง ไม่ใช่เดาจากเลขที่ — prefix เปลี่ยนได้ (NO-07)
     const listSite = await page(`/documents?kind=receipt&site=${made.sites[0]}`, ownerJar)
@@ -1048,10 +1179,11 @@ try {
       shown.filter((id) => !siteDocIds.has(id)).join(' · ') || 'ไม่มีใบของโครงการอื่นหลุดเข้ามา')
     // `&` ใน href ถูก escape เป็น `&amp;` ใน HTML — เทียบแบบถอด escape ก่อน
     const plain = (h) => h.replace(/&amp;/g, '&')
-    check('R12-SITE-04 มีปุ่มออกเอกสารของโครงการนี้ (พาไปฟอร์มพร้อมเลือกโครงการไว้แล้ว)',
-      plain(sitePage).includes(`/documents/new?kind=quotation&site=${made.sites[0]}`)
-        && plain(sitePage).includes(`/documents/new?kind=receipt&site=${made.sites[0]}`),
-      'ทั้งสองชนิด')
+    const KINDS = ['quotation', 'invoice', 'receipt']
+    check('R12-SITE-04 มีปุ่มออกเอกสารของโครงการนี้ครบทุกชนิด (พาไปฟอร์มพร้อมเลือกโครงการไว้)',
+      KINDS.every((k) => plain(sitePage).includes(`/documents/new?kind=${k}&site=${made.sites[0]}`)),
+      KINDS.filter((k) => !plain(sitePage).includes(`/documents/new?kind=${k}&site=${made.sites[0]}`))
+        .join(' · ') || 'ครบ 3 ชนิด')
     check('R12-SITE-08 โครงการที่มีเอกสารมากกว่า 5 ใบ → โชว์ล่าสุด 5 ใบ + ทางไปดูทั้งหมด',
       sitePage.includes('ยังมีอีก — ดูทั้งหมด')
         && (sitePage.match(/\/documents\/[0-9a-f-]{36}"/g) ?? []).length <= 6,
@@ -1197,8 +1329,8 @@ try {
 
     const detailSrc = src('src/app/(app)/documents/[id]/page.tsx')
     check('R12-DEAD-04 `source_document_id` ถูกอ่านจริง — หน้ารายละเอียดลิงก์กลับไปใบต้นทาง',
-      detailSrc.includes('source_document_id') && detailSrc.includes('ใบเสนอราคาต้นทาง'),
-      'ลิงก์ "ใบเสนอราคาต้นทาง"')
+      detailSrc.includes('source_document_id') && detailSrc.includes('เปิดใบต้นทาง'),
+      'ลิงก์ "เปิดใบต้นทาง"')
 
     const cols = (await sql(
       `select column_name from information_schema.columns

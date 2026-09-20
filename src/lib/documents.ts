@@ -9,20 +9,51 @@ import type { BadgeTone } from '@/components/ui/badge'
  * (`scripts/verify-doc-math.mjs` เป็นตัวกระทบยอด)
  */
 
-export type DocKind = 'quotation' | 'receipt'
+export type DocKind = 'quotation' | 'invoice' | 'receipt'
 export type DocStatus = 'draft' | 'issued' | 'sent' | 'accepted' | 'void'
 export type VatMode = 'inclusive' | 'exclusive' | 'none'
 
-export const DOC_KINDS = ['quotation', 'receipt'] as const satisfies readonly DocKind[]
+/** เรียงตามลำดับงานจริง: เสนอราคา → แจ้งหนี้ → เก็บเงิน */
+export const DOC_KINDS = ['quotation', 'invoice', 'receipt'] as const satisfies readonly DocKind[]
 export const DOC_KIND_LABEL: Record<DocKind, string> = {
   quotation: 'ใบเสนอราคา',
+  invoice: 'ใบแจ้งหนี้',
   receipt: 'ใบเสร็จรับเงิน / ใบกำกับภาษี',
 }
 /** ชื่อสั้นสำหรับปุ่มและแท็บ — ชื่อเต็มยาวเกินไปบนจอ 390px */
 export const DOC_KIND_SHORT: Record<DocKind, string> = {
   quotation: 'ใบเสนอราคา',
+  invoice: 'ใบแจ้งหนี้',
   receipt: 'ใบเสร็จ',
 }
+
+/**
+ * ใบชนิดนี้สร้างใบชนิดไหนต่อได้บ้าง (ปุ่ม "สร้าง… จากใบนี้")
+ *
+ * 🔴 ใบเสนอราคาข้ามไปออกใบเสร็จได้เลย — งานเล็กที่รับเงินสดหน้างานไม่มีใคร
+ * วางบิลก่อน · บังคับให้ผ่านใบแจ้งหนี้เมื่อไหร่ เจ้าของจะออกใบแจ้งหนี้ทิ้ง
+ * เปล่า ๆ เพียงเพื่อผ่านด่าน แล้วเลขที่ใบแจ้งหนี้จะกลายเป็นเลขที่ไม่มีความหมาย
+ */
+export const CONVERT_TARGETS: Record<DocKind, readonly DocKind[]> = {
+  quotation: ['invoice', 'receipt'],
+  invoice: ['receipt'],
+  receipt: [],
+}
+
+/**
+ * ป้ายของ `valid_until` ซึ่งแปลว่าคนละเรื่องกันในแต่ละชนิด
+ *
+ * ใช้คอลัมน์เดียวกันเพราะมันคือ "วันที่สองของหัวกระดาษ" ทั้งคู่ และทั้งคู่
+ * ต้องไม่ก่อนวันที่เอกสาร (`documents_valid_until_after`) — แยกคอลัมน์
+ * จะได้ช่องที่ว่างตลอดกาลหนึ่งช่องต่อชนิด โดยไม่มีหน้าจอไหนได้ประโยชน์
+ * · `null` = ชนิดนี้ไม่มีวันที่สอง และ route จะล้างค่าทิ้งให้เอง
+ */
+export const SECOND_DATE_LABEL: Record<DocKind, string | null> = {
+  quotation: 'ยืนราคาถึง',
+  invoice: 'กำหนดชำระ',
+  receipt: null,
+}
+export const hasSecondDate = (kind: DocKind) => SECOND_DATE_LABEL[kind] !== null
 
 export const DOC_STATUSES = ['draft', 'issued', 'sent', 'accepted', 'void'] as const
 export const DOC_STATUS_LABEL: Record<DocStatus, string> = {
@@ -55,7 +86,8 @@ export const MAX_LINES = 30
 export const MAX_DESCRIPTION = 300
 export const MAX_CUSTOMER_NAME = 120
 
-export const isDocKind = (v: unknown): v is DocKind => v === 'quotation' || v === 'receipt'
+export const isDocKind = (v: unknown): v is DocKind =>
+  v === 'quotation' || v === 'invoice' || v === 'receipt'
 export const isDocStatus = (v: unknown): v is DocStatus =>
   typeof v === 'string' && v in DOC_STATUS_LABEL
 export const isVatMode = (v: unknown): v is VatMode =>

@@ -6,8 +6,8 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht } from '@/lib/format'
 import {
-  DOC_KIND_SHORT, MAX_LINES, VAT_MODES, VAT_MODE_LABEL,
-  docTotals, whtHint,
+  DOC_KIND_SHORT, MAX_LINES, SECOND_DATE_LABEL, VAT_MODES, VAT_MODE_LABEL,
+  docTotals, hasSecondDate, whtHint,
   type DocFormInitial, type DocKind, type LineDraft, type VatMode,
 } from '@/lib/documents'
 
@@ -154,7 +154,7 @@ export function DocForm({
       customerPhone: f.customerPhone,
       siteId: f.siteId || null,
       docDate: f.docDate,
-      validUntil: kind === 'quotation' ? f.validUntil || null : null,
+      validUntil: hasSecondDate(kind) ? f.validUntil || null : null,
       vatMode: f.vatMode,
       vatRate: f.vatRate,
       note: f.note,
@@ -310,9 +310,11 @@ export function DocForm({
               className="input-base tnum"
             />
           </div>
-          {kind === 'quotation' && (
+          {/* ช่องวันที่สอง — "ยืนราคาถึง" ของใบเสนอราคา และ "กำหนดชำระ" ของ
+              ใบแจ้งหนี้คือคอลัมน์เดียวกัน คนละความหมาย · ใบเสร็จไม่มี */}
+          {hasSecondDate(kind) && (
             <div>
-              <label htmlFor="doc-valid" className="label-base">ยืนราคาถึง</label>
+              <label htmlFor="doc-valid" className="label-base">{SECOND_DATE_LABEL[kind]}</label>
               <input
                 id="doc-valid"
                 type="date"

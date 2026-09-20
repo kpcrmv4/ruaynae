@@ -6,7 +6,7 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { categoryError, TXN_KINDS, TXN_KIND_LABEL, type TxnKind } from '@/lib/categories'
-import { BackButton } from '@/components/ui/back-button'
+import { PageHeader } from '@/components/ui/page-header'
 
 type Row = {
   id: string
@@ -59,17 +59,18 @@ export function CategoriesClient({ categories }: { categories: Row[] }) {
 
   return (
     <div className="space-y-5">
-      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">หมวดรายรับ-รายจ่าย</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          หมวดที่ปิดจะหายจากฟอร์มบันทึก แต่รายการเก่ายังแสดงชื่อหมวดได้ตามปกติ ·
-          หมวดรายจ่ายที่ติ๊ก <span className="font-medium text-ink-2">ค่าวัสดุ</span>{' '}
-          จะถูกนับรวมเป็นช่อง &ldquo;ค่าวัสดุ&rdquo; ในแถบต้นทุนของแต่ละโครงการ
-          </p>
-        </div>
-        <BackButton fallbackHref="/settings" />
-      </div>
+      <PageHeader
+        title="หมวดรายรับ-รายจ่าย"
+        subtitle={
+          <>
+            หมวดที่ปิดจะหายจากฟอร์มบันทึก แต่รายการเก่ายังแสดงชื่อหมวดได้ตามปกติ ·
+            หมวดรายจ่ายที่ติ๊ก <span className="font-medium text-ink-2">ค่าวัสดุ</span>{' '}
+            จะถูกนับรวมเป็นช่อง &ldquo;ค่าวัสดุ&rdquo; ในแถบต้นทุนของแต่ละโครงการ
+          </>
+        }
+        backHref="/settings"
+        className="mb-0"
+      />
 
       {/* ── เพิ่มหมวด ─────────────────────────────────────────────── */}
       <section className="panel p-4">

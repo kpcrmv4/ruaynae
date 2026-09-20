@@ -1,12 +1,12 @@
 'use client'
 
 import { Check, Eye, EyeOff, Loader2, Pencil, Plus, X } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { fmtBaht } from '@/lib/format'
+import { BackButton } from '@/components/ui/back-button'
 import {
   ADJUST_KIND_LABEL, ADJUST_KINDS, adjustError, type AdjustKind, type AdjustPreset,
 } from '@/lib/wage-adjustments'
@@ -105,18 +105,15 @@ export function WageAdjustmentsClient({ presets }: { presets: AdjustPreset[] }) 
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          href="/settings"
-          className="text-sm font-medium text-muted-token transition-colors hover:text-ink"
-        >
-          ← ตั้งค่า
-        </Link>
-        <h1 className="mt-1 text-2xl font-bold text-ink">รายการปรับค่าแรง</h1>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink">รายการปรับค่าแรง</h1>
         <p className="mt-0.5 text-sm text-muted-token">
           OT · เบี้ยเลี้ยง · มาสาย — ตั้งไว้ครั้งเดียว แล้วเลือกใช้ตอนติ๊กคนเข้าโครงการ
           · ยอดที่ตั้งเป็น<span className="font-medium text-ink-2">ค่าเริ่มต้น</span> แก้เป็นครั้ง ๆ ได้
-        </p>
+          </p>
+        </div>
+        <BackButton fallbackHref="/settings" />
       </div>
 
       {/* ── เพิ่มรายการ ───────────────────────────────────────────── */}

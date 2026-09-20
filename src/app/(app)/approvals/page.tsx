@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import { ApprovalActions } from './approvals-client'
 import { ApprovalDetailButton } from './approval-detail'
+import { BackButton } from '@/components/ui/back-button'
 
 export const metadata = { title: 'รออนุมัติ' }
 
@@ -81,12 +82,15 @@ export default async function ApprovalsPage({
             รายจ่ายที่หัวหน้าโครงการคีย์เข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด
           </p>
         </div>
-        {(count ?? 0) > 0 && (
-          <span className="chip text-status-progress bg-status-progress-bg ring-status-progress-ring">
-            <ClipboardCheck className="size-3.5" />
-            <span className="tnum">{count}</span> รายการ
-          </span>
-        )}
+        <div className="flex shrink-0 items-center gap-2">
+          {(count ?? 0) > 0 && (
+            <span className="chip text-status-progress bg-status-progress-bg ring-status-progress-ring">
+              <ClipboardCheck className="size-3.5" />
+              <span className="tnum">{count}</span> รายการ
+            </span>
+          )}
+          <BackButton />
+        </div>
       </div>
 
       {page.length === 0 ? (

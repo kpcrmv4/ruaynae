@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { EmployeeDelete, type DeleteInfo } from './employee-delete'
+import { BackButton } from '@/components/ui/back-button'
 
 export type EmployeeRow = {
   id: string
@@ -174,6 +175,7 @@ export function EmployeesClient({
             <Plus className="size-4" />
             เพิ่มคนงาน
           </button>
+          <BackButton fallbackHref="/settings" />
         </div>
         <p className="mt-1 text-sm leading-6 text-muted-token">
           ทุกคนที่มีค่าแรงต้องจ่าย · <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span>{' '}

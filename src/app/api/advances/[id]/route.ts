@@ -19,13 +19,16 @@ export async function DELETE(_req: NextRequest, ctx: { params: Promise<{ id: str
   const sb = await getSupabaseServer()
 
   const { data: existing, error: rErr } = await sb
-    .from('advances').select('id, payroll_run_id').eq('id', id).maybeSingle()
+    .from('advances').select('id, payroll_run_id, deducted_amount').eq('id', id).maybeSingle()
   if (rErr) {
     console.error('[advances] อ่านใบเบิกไม่ได้', rErr.message)
     return NextResponse.json({ error: 'READ_FAILED' }, { status: 500 })
   }
   if (!existing) return NextResponse.json({ error: 'NOT_FOUND' }, { status: 404 })
-  if (existing.payroll_run_id) {
+  // 🔴 ตั้งแต่เบิกเกินได้ ใบหนึ่งใบถูกหักคืน **บางส่วน** ได้ — ใบแบบนั้น
+  // `payroll_run_id` ยังว่างอยู่ แต่เงินถูกหักไปแล้วบางส่วน ลบทิ้งคือการ
+  // ทำให้ยอดของรอบที่ปิดไปแล้วไม่มีใบรองรับ (ตัวจริงกันที่ `advances_guard_delete`)
+  if (existing.payroll_run_id || Number(existing.deducted_amount ?? 0) > 0) {
     return NextResponse.json({ error: 'PAYROLL_CLOSED' }, { status: 409 })
   }
 

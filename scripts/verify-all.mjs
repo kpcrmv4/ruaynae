@@ -26,11 +26,12 @@ const clearAttempts = async () => {
 
 const SCRIPTS = [
   'verify-p0', 'verify-p0-rest', 'verify-rls', 'verify-auth', 'verify-shell',
-  'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api', 'verify-txn', 'verify-txn-edit', 'verify-slips', 'verify-ledger', 'verify-money', 'verify-notify', 'verify-approvals', 'verify-bell', 'verify-employees', 'verify-workers', 'verify-attendance', 'verify-payroll', 'verify-payroll-ui', 'verify-pay-wage', 'verify-recurring', 'verify-digest', 'verify-audit', 'verify-pwa', 'verify-mcp', 'verify-mcp-write',
+  'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api', 'verify-txn', 'verify-txn-edit', 'verify-slips', 'verify-ledger', 'verify-money', 'verify-notify', 'verify-approvals', 'verify-bell', 'verify-employees', 'verify-workers', 'verify-attendance', 'verify-payroll', 'verify-payroll-ui', 'verify-pay-wage', 'verify-recurring', 'verify-digest', 'verify-audit', 'verify-pwa', 'verify-mcp', 'verify-mcp-write', 'verify-back-button',
   // ท้ายสุดเสมอ — ตรวจว่า "ติ๊ก" ในตารางตรวจรับมีของจริงรองรับ
   // ตัวนี้ไม่ได้ทดสอบแอป มันทดสอบ**เอกสารที่บอกว่าแอปถูกทดสอบแล้ว**
   'verify-ship',
   // E2E ผ่านเบราว์เซอร์จริง — ต้องมี dev server อยู่ที่ 3200
+  'verify-ui-browser',
   'verify-e2e',
   'verify-matrix',
 ]

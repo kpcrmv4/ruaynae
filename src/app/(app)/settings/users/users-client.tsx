@@ -7,6 +7,7 @@ import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { PIN_LENGTH } from '@/lib/pin-core'
+import { BackButton } from '@/components/ui/back-button'
 
 type Row = {
   id: string
@@ -109,10 +110,13 @@ export function UsersClient({ meId, users }: { meId: string; users: Row[] }) {
             </Link>
           </p>
         </div>
-        <button onClick={() => setAdding((v) => !v)} className="btn-primary shrink-0">
-          <Plus className="size-4" />
-          เพิ่มผู้ใช้
-        </button>
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+          <button onClick={() => setAdding((v) => !v)} className="btn-primary shrink-0">
+            <Plus className="size-4" />
+            เพิ่มผู้ใช้
+          </button>
+          <BackButton fallbackHref="/settings" />
+        </div>
       </div>
 
       {adding && (

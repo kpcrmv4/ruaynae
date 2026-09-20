@@ -1,7 +1,6 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
-  ArrowLeft,
   Banknote,
   CalendarDays,
   FileCheck,
@@ -31,6 +30,8 @@ import {
 } from '@/lib/bonds'
 import { SiteDetailActions } from './site-detail-client'
 import { BondReturnButton } from './bond-return'
+import { BackButton } from '@/components/ui/back-button'
+import { DataError } from '@/components/ui/data-error'
 
 /** กี่แถวล่าสุดที่โชว์ในหน้าโครงการ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
 const RECENT_TXN = 10
@@ -50,10 +51,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   if (error) {
     console.error('[sites] อ่านโครงการไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดข้อมูลโครงการไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดข้อมูลโครงการไม่สำเร็จ" />
     )
   }
   // 🔴 หัวหน้าโครงการที่ไม่ได้ดูแลโครงการนี้จะได้ 0 แถวจาก RLS → 404 ไม่ใช่หน้าเปล่า
@@ -208,14 +206,10 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
 
   return (
     <>
-      <Link
-        href="/sites"
-        className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-token transition-colors hover:text-ink"
-      >
-        <ArrowLeft className="size-4" />
-        โครงการทั้งหมด
-      </Link>
-
+      {/* ลิงก์ "โครงการทั้งหมด" ที่เคยลอยอยู่เหนือหัวข้อถูกยุบมาเป็นปุ่มย้อนกลับ
+          ในแถวหัวข้อแทน (คำสั่งเจ้าของ 20 ก.ย. 2569) — ลูกศรสองอันซ้อนกันคนละที่
+          บนหน้าเดียวคือความสับสน · ปุ่มถอยตามประวัติจริง และถ้าเปิดลิงก์ตรงเข้ามา
+          จะพาไป `/sites` เหมือนลิงก์เดิมทุกประการ */}
       <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2.5">
@@ -231,6 +225,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             <p className="mt-0.5 text-sm text-muted-token">ลูกค้า: {site.client_name}</p>
           )}
         </div>
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
         {isOwner && (
           <SiteDetailActions
             site={site}
@@ -249,6 +244,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
             people={people}
           />
         )}
+          <BackButton fallbackHref="/sites" />
+        </div>
       </div>
 
       {/* ── ปุ่มลัดของโครงการนี้ ─────────────────────────────────────────
@@ -631,9 +628,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           <CategoryTotals rows={catTotals} />
 
           {txnResult.error ? (
-            <p className="px-4 py-6 text-center text-sm text-urgent">
-              โหลดรายการของโครงการนี้ไม่สำเร็จ — ลองรีเฟรชหน้านี้อีกครั้ง
-            </p>
+            <DataError message="โหลดรายการของโครงการนี้ไม่สำเร็จ" />
           ) : recentTxns.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-token">
               ยังไม่มีรายการของโครงการนี้

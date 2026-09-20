@@ -14,6 +14,8 @@ import { SiteHistory } from './site-history'
 import { wageRowKey, type WageDay } from './site-wage-edit'
 import type { AdjustLine } from '@/lib/wage-adjustments'
 import { WorkGrid } from './work-grid'
+import { BackButton } from '@/components/ui/back-button'
+import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'ค่าแรงและการจ่าย' }
 
@@ -35,10 +37,21 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
   const month = period.mode === 'month' ? period : parsePeriod(today.slice(0, 7), today)
   const monthDays = daysInRange(month.from, month.to)
 
-  const [{ data: balances, error: bErr }, { data: payments, error: rErr }, { data: sites }, { data: openAdvances }] =
+  const [
+    { data: balances, error: bErr },
+    { data: adjustDays, error: adErr },
+    { data: payments, error: rErr },
+    { data: sites },
+    { data: openAdvances },
+  ] =
     await Promise.all([
       // 🔴 RPC ตัวเดียวคืนยอดของทุกคน — ไม่ใช่ยิง employee_balance ทีละคน (N+1)
       sb.rpc('payroll_balances'),
+      // เบี้ย/ค่าหักของแต่ละคน **พร้อมวันที่** — เจ้าของต้องตอบให้ได้ว่า
+      // "เบี้ยตจว. ให้ครบวันที่เขาออกต่างจังหวัดหรือยัง" ซึ่งยอดรวมตอบไม่ได้
+      tab === 'balances'
+        ? sb.rpc('payroll_adjustment_days')
+        : Promise.resolve({ data: null, error: null }),
       // ประวัติการจ่าย — เฉพาะที่ปิดแล้ว เพราะรอบที่ยังเปิดค้างอยู่ไม่ใช่การจ่าย
       // และไม่มีทางเกิดใหม่แล้ว (ปุ่มจ่ายสร้างแล้วปิดในทรานแซกชันเดียว)
       sb
@@ -50,7 +63,7 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
       sb.from('sites').select('id, name').order('name', { ascending: true }).range(0, PAGE_SIZE - 1),
       sb
         .from('advances')
-        .select('id, employee_id, amount, advance_date, employees(full_name)')
+        .select('id, employee_id, amount, advance_date, deducted_amount, employees(full_name)')
         .is('payroll_run_id', null)
         .order('advance_date', { ascending: false })
         .range(0, PAGE_SIZE - 1),
@@ -118,17 +131,14 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
           { data: null, error: null },
         ]
 
-  if (bErr || rErr || gErr || pErr || wErr || sdErr || slErr || spErr) {
+  if (bErr || adErr || rErr || gErr || pErr || wErr || sdErr || slErr || spErr) {
     console.error(
       '[payroll] โหลดข้อมูลไม่ได้',
-      bErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message ?? wErr?.message
+      bErr?.message ?? adErr?.message ?? rErr?.message ?? gErr?.message ?? pErr?.message ?? wErr?.message
         ?? sdErr?.message ?? slErr?.message ?? spErr?.message,
     )
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดข้อมูลค่าแรงไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดข้อมูลค่าแรงไม่สำเร็จ" />
     )
   }
 
@@ -137,9 +147,23 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
     full_name: b.full_name,
     job_title: b.job_title,
     days: Number(b.days),
+    // สามก้อนนี้บวกกันได้ `accrued` เป๊ะเสมอ (base + extra − deduct) — ฐานข้อมูล
+    // คำนวณให้ ไม่ใช่หน้าจอบวกเอง ตัวเลขบนจอจึงขัดกันเองไม่ได้
+    base: Number(b.base),
+    extra: Number(b.extra),
+    deduct: Number(b.deduct),
     accrued: Number(b.accrued),
     advanced: Number(b.advanced),
     balance: Number(b.balance),
+    adjustments: (adjustDays ?? [])
+      .filter((a) => a.employee_id === b.employee_id)
+      .map((a) => ({
+        name: a.name,
+        kind: a.kind,
+        total: Number(a.total),
+        times: Number(a.times),
+        days: a.days ?? [],
+      })),
   }))
 
   // รายวันของ คน×โครงการ สำหรับกล่องแก้ค่าแรง — คีย์เดียวกับแถวสรุป
@@ -169,12 +193,15 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <div className="mb-5">
-        <h1 className="text-2xl font-bold text-ink">ค่าแรงและการจ่าย</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าโครงการ · การเบิกและการจ่ายคือ{' '}
-          <span className="font-medium text-ink-2">เงินสดออก ไม่ใช่ต้นทุนใหม่</span>
-        </p>
+      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink">ค่าแรงและการจ่าย</h1>
+          <p className="mt-0.5 text-sm text-muted-token">
+            ค่าแรงเกิดขึ้นตอนติ๊กคนเข้าโครงการ · การเบิกและการจ่ายคือ{' '}
+            <span className="font-medium text-ink-2">เงินสดออก ไม่ใช่ต้นทุนใหม่</span>
+          </p>
+        </div>
+        <BackButton />
       </div>
 
       <MetricBar>
@@ -333,6 +360,8 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
             employee_id: a.employee_id,
             amount: Number(a.amount),
             advance_date: a.advance_date,
+            // > 0 = ใบนี้ถูกหักคืนไปแล้วบางส่วนตอนจ่ายค่าแรงรอบก่อน — ลบไม่ได้
+            deducted_amount: Number(a.deducted_amount ?? 0),
             full_name: a.employees?.full_name ?? 'ไม่ทราบชื่อ',
           }))}
         />

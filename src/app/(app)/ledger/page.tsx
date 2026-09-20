@@ -14,6 +14,7 @@ import { LedgerFilters, type StatusChip } from '@/components/ledger/ledger-filte
 import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
+import { BackButton } from '@/components/ui/back-button'
 
 export const metadata = { title: 'รายรับ-รายจ่าย' }
 
@@ -235,15 +236,18 @@ export default async function LedgerPage({
             {isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของโครงการที่คุณดูแล'}
           </p>
         </div>
-        {/* บันทึกได้จากหน้านี้เลย ไม่ต้องเด้งไป /entry แล้วเดินกลับมาดูว่าลงไหม
-            · กล่องใช้ฟอร์มชุดเดียวกับหน้า /entry ทุกช่อง */}
-        <TxnCreateButton
-          role={me.role}
-          today={today}
-          sites={sitesResult.data ?? []}
-          categories={categoriesResult.data ?? []}
-          initialSiteId={sp.site && sp.site !== 'central' ? sp.site : undefined}
-        />
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+          {/* บันทึกได้จากหน้านี้เลย ไม่ต้องเด้งไป /entry แล้วเดินกลับมาดูว่าลงไหม
+              · กล่องใช้ฟอร์มชุดเดียวกับหน้า /entry ทุกช่อง */}
+          <TxnCreateButton
+            role={me.role}
+            today={today}
+            sites={sitesResult.data ?? []}
+            categories={categoriesResult.data ?? []}
+            initialSiteId={sp.site && sp.site !== 'central' ? sp.site : undefined}
+          />
+          <BackButton />
+        </div>
       </div>
 
       {/* ── ตัวเลขบนเมนูมาจากไหน ────────────────────────────────────

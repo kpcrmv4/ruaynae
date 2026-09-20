@@ -21,6 +21,7 @@ import { MoneyBars, OverrunBadge, ProfitChip, SiteSummary } from '@/components/s
 import { TodayBoard } from '@/components/overview/today-board'
 import { BondAlert } from '@/components/overview/bond-alert'
 import { BOND_SOON_DAYS } from '@/lib/bonds'
+import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'วันนี้' }
 
@@ -81,10 +82,7 @@ export default async function OverviewPage() {
   if (loadError) {
     console.error('[overview] โหลดภาพรวมไม่ได้', loadError.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดภาพรวมไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดภาพรวมไม่สำเร็จ" />
     )
   }
 

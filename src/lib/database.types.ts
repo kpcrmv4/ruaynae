@@ -20,6 +20,7 @@ export type Database = {
           amount: number
           created_at: string
           created_by: string | null
+          deducted_amount: number
           employee_id: string
           id: string
           mcp_key_id: string | null
@@ -34,6 +35,7 @@ export type Database = {
           amount: number
           created_at?: string
           created_by?: string | null
+          deducted_amount?: number
           employee_id: string
           id?: string
           mcp_key_id?: string | null
@@ -48,6 +50,7 @@ export type Database = {
           amount?: number
           created_at?: string
           created_by?: string | null
+          deducted_amount?: number
           employee_id?: string
           id?: string
           mcp_key_id?: string | null
@@ -1520,14 +1523,28 @@ export type Database = {
           run_id: string
         }[]
       }
+      payroll_adjustment_days: {
+        Args: never
+        Returns: {
+          days: string[]
+          employee_id: string
+          kind: Database["public"]["Enums"]["adjust_kind"]
+          name: string
+          times: number
+          total: number
+        }[]
+      }
       payroll_balances: {
         Args: never
         Returns: {
           accrued: number
           advanced: number
           balance: number
+          base: number
           days: number
+          deduct: number
           employee_id: string
+          extra: number
           full_name: string
           job_title: string
         }[]

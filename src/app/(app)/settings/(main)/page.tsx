@@ -7,6 +7,7 @@ import { getBranding } from '@/lib/branding'
 import { BrandingForm } from '../branding-form'
 import { PasswordForm } from '../password-form'
 import { StorageCard } from '../storage-card'
+import { BackButton } from '@/components/ui/back-button'
 
 export const metadata = { title: 'ตั้งค่า' }
 
@@ -16,9 +17,12 @@ export default async function SettingsPage() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-lg font-bold text-ink">ตั้งค่า</h1>
-        <p className="mt-0.5 text-sm text-muted-token">แบรนด์ ผู้ใช้ แจ้งเตือน และหมวดค่าใช้จ่าย</p>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-lg font-bold text-ink">ตั้งค่า</h1>
+          <p className="mt-0.5 text-sm text-muted-token">แบรนด์ ผู้ใช้ แจ้งเตือน และหมวดค่าใช้จ่าย</p>
+        </div>
+        <BackButton />
       </div>
 
       <section className="rounded-lg border border-line bg-surface">

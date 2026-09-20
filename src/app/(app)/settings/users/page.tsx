@@ -5,6 +5,7 @@ import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
 import { UsersClient } from './users-client'
 import { EmployeesClient } from './employees-client'
+import { DataError } from '@/components/ui/data-error'
 
 const isWorkers = (tab?: string) => tab === 'workers'
 
@@ -78,10 +79,7 @@ export default async function UsersPage({
   if (pErr || eErr) {
     console.error('[users] อ่านรายชื่อไม่ได้', pErr?.message ?? eErr?.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดรายชื่อไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดรายชื่อไม่สำเร็จ" />
     )
   }
 

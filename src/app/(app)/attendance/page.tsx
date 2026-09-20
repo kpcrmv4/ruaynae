@@ -8,6 +8,7 @@ import { EmptyState } from '@/components/ui/states'
 import { DataError } from '@/components/ui/data-error'
 import type { AdjustLine } from '@/lib/wage-adjustments'
 import { AttendanceBoard } from './attendance-client'
+import { BackButton } from '@/components/ui/back-button'
 
 export const metadata = { title: 'คนเข้าโครงการ' }
 
@@ -249,11 +250,14 @@ export default async function AttendancePage({
 
 function Header({ date }: { date: string }) {
   return (
-    <div className="mb-4">
-      <h1 className="text-2xl font-bold text-ink">คนเข้าโครงการ</h1>
-      <p className="mt-0.5 text-sm text-muted-token">
-        {fmtDateLong(date)} · ติ๊กคนที่มาทำงาน — ค่าแรงเข้าต้นทุนโครงการทันทีโดยไม่ต้องรออนุมัติ
-      </p>
+    <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-bold text-ink">คนเข้าโครงการ</h1>
+        <p className="mt-0.5 text-sm text-muted-token">
+          {fmtDateLong(date)} · ติ๊กคนที่มาทำงาน — ค่าแรงเข้าต้นทุนโครงการทันทีโดยไม่ต้องรออนุมัติ
+        </p>
+      </div>
+      <BackButton />
     </div>
   )
 }

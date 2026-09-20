@@ -21,6 +21,7 @@ import { BarList, type BarItem } from '@/components/reports/bar-list'
 import { BondReport, ReportTabs, toBondRow } from '@/components/reports/bond-report'
 import { todayInBangkok } from '@/lib/format'
 import { BOND_SOON_DAYS } from '@/lib/bonds'
+import { BackButton } from '@/components/ui/back-button'
 
 export const metadata = { title: 'รายงาน' }
 
@@ -48,9 +49,12 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const sum = bondSum?.[0]
     return (
       <>
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
-          <p className="mt-0.5 text-sm text-muted-token">หลักประกันสัญญา · ประกันผลงาน · ณ {today.slice(8, 10)}/{today.slice(5, 7)}/{Number(today.slice(0, 4)) + 543}</p>
+        <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+          <div className="min-w-0">
+            <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
+            <p className="mt-0.5 text-sm text-muted-token">หลักประกันสัญญา · ประกันผลงาน · ณ {today.slice(8, 10)}/{today.slice(5, 7)}/{Number(today.slice(0, 4)) + 543}</p>
+          </div>
+          <BackButton />
         </div>
         <ReportTabs active="bonds" periodKey={period.key} />
         <BondReport
@@ -188,11 +192,14 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          {period.label} · {siteName ?? 'ทั้งบริษัท'} · เทียบกับ {period.prev.label}
-        </p>
+      <div className="mb-4 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
+          <p className="mt-0.5 text-sm text-muted-token">
+            {period.label} · {siteName ?? 'ทั้งบริษัท'} · เทียบกับ {period.prev.label}
+          </p>
+        </div>
+        <BackButton />
       </div>
 
       <ReportTabs active="money" periodKey={period.key} />

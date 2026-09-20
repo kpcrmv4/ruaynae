@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/states'
 import { ListRow } from '@/components/ui/list-row'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 import { NewSiteButton } from '../sites-client'
+import { BackButton } from '@/components/ui/back-button'
+import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'โครงการ' }
 
@@ -94,10 +96,7 @@ export default async function SitesPage({
   if (error) {
     console.error('[sites] อ่านรายการโครงการไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดรายการโครงการไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดรายการโครงการไม่สำเร็จ" />
     )
   }
 
@@ -129,7 +128,10 @@ export default async function SitesPage({
             {isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะโครงการที่คุณดูแลอยู่ตอนนี้'}
           </p>
         </div>
-        {isOwner && <NewSiteButton />}
+        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+          {isOwner && <NewSiteButton />}
+          <BackButton />
+        </div>
       </div>
 
       <ListToolbar

@@ -10,10 +10,13 @@ export const runtime = 'nodejs'
 /**
  * POST /api/advances — บันทึกเบิกล่วงหน้า (เจ้าของเท่านั้น)
  *
- * 🔴 เพดานบังคับที่ **trigger ในฐานข้อมูล** ไม่ใช่ที่นี่ — หน้าจอกับ route
- * เป็นแค่คำแนะนำ ฐานข้อมูลเป็นความจริง (DESIGN.md §5.6)
- * ที่นี่แค่แปลง error ของ trigger ให้เป็นข้อความที่ผู้ใช้อ่านรู้เรื่อง
- * **พร้อมตัวเลขเพดานที่เหลือจริง** ไม่ใช่ "ทำรายการไม่สำเร็จ" ลอย ๆ
+ * 🔴 **เบิกเกินค่าแรงค้างจ่ายได้** (คำสั่งเจ้าของ 20 ก.ย. 2569) — เดิม
+ * `guard_advance` ปฏิเสธด้วย `ADVANCE_OVER_CEILING` ตอนนี้ไม่ปฏิเสธแล้ว
+ * · ยอดคงเหลือที่คืนไปติดลบได้ และเป็นหน้าที่ของหน้าจอที่จะเตือน
+ * ไม่ใช่หน้าที่ของฐานข้อมูลที่จะห้าม — คนตัดสินใจคือเจ้าของ
+ *
+ * วันที่รับจาก client ได้ (ลงย้อนหลังได้) แต่ยังห้ามวันในอนาคต
+ * และห้ามปี พ.ศ. หลุดลงฐานข้อมูล
  */
 export async function POST(req: NextRequest) {
   const me = await getCurrentUserOrNull()
@@ -68,14 +71,6 @@ export async function POST(req: NextRequest) {
     .maybeSingle()
 
   if (error) {
-    const over = /ADVANCE_OVER_CEILING: ([^"]+)/.exec(error.message ?? '')
-    if (over) {
-      // ส่งข้อความจาก trigger ต่อไปตรง ๆ — มันมีตัวเลขเพดานที่เหลืออยู่ในนั้นแล้ว
-      return NextResponse.json(
-        { error: 'ADVANCE_OVER_CEILING', detail: over[1].trim() },
-        { status: 409 },
-      )
-    }
     if (/PAYROLL_CLOSED/.test(error.message ?? '')) {
       return NextResponse.json({ error: 'PAYROLL_CLOSED' }, { status: 409 })
     }
@@ -88,5 +83,14 @@ export async function POST(req: NextRequest) {
   // RLS ที่ปฏิเสธไม่คืน error เสมอไป — อ่านแถวกลับมาดูว่ามีจริง
   if (!data) return NextResponse.json({ error: 'FORBIDDEN' }, { status: 403 })
 
-  return NextResponse.json({ ok: true, advance: data }, { status: 201 })
+  // ยอดคงเหลือ **หลังบันทึกแล้ว** — ติดลบ = เบิกเกินค่าแรงที่ทำไปแล้ว
+  // 🔴 อ่านกลับจากฐานข้อมูล ไม่ใช่ลบเอาเองจากยอดที่หน้าจอถืออยู่ เพราะระหว่างนั้น
+  // อาจมีคนลงชื่อเข้าโครงการเพิ่มหรือเบิกอีกใบ แล้วตัวเลขที่เตือนจะไม่ใช่ของจริง
+  const { data: bal } = await sb.rpc('employee_balance', { p_employee: employeeId }).maybeSingle()
+  const balance = bal ? Number(bal.balance) : null
+
+  return NextResponse.json(
+    { ok: true, advance: data, balance, overdrawn: balance !== null && balance < 0 },
+    { status: 201 },
+  )
 }

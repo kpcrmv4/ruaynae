@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { BackButton } from '@/components/ui/back-button'
 
 /**
  * Page title + the page's own primary action.
@@ -16,10 +17,13 @@ export function PageHeader({
   title,
   subtitle,
   action,
+  backHref = '/',
 }: {
   title: string
   subtitle?: ReactNode
   action?: ReactNode
+  /** ปลายทางตอนไม่มีประวัติให้ถอย (เปิดลิงก์ตรงเข้าหน้านี้) — ดู `BackButton` */
+  backHref?: string
 }) {
   return (
     <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
@@ -35,9 +39,13 @@ export function PageHeader({
         wide on a 390px screen and the rightmost button was simply gone.
         `max-w-full` + `flex-wrap` makes them wrap instead of vanish.
       */}
-      {action && (
-        <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">{action}</div>
-      )}
+      {/* ปุ่มย้อนกลับอยู่ **ขวาสุดเสมอ** ต่อจากปุ่มของหน้านั้น (คำสั่งเจ้าของ 20 ก.ย. 2569)
+          — อยู่ในนี้ ไม่ใช่ให้แต่ละหน้าใส่เอง หน้าที่ใช้ `PageHeader` จึงได้ปุ่มครบ
+          โดยอัตโนมัติ และไม่มีทางมีหน้าไหนหล่นหาย */}
+      <div className="flex max-w-full shrink-0 flex-wrap items-center justify-end gap-2">
+        {action}
+        <BackButton fallbackHref={backHref} />
+      </div>
     </div>
   )
 }

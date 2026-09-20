@@ -10,6 +10,7 @@ import {
   type DraftCategory, type DraftSite,
 } from '@/components/ledger/txn-draft'
 import type { TxnKind } from '@/lib/transactions'
+import { BackButton } from '@/components/ui/back-button'
 
 /**
  * หน้าบันทึกเต็มจอ — **เปลือก**ของฟอร์มที่อยู่ใน `components/ledger/txn-draft.tsx`
@@ -49,9 +50,12 @@ export function EntryForm({
 
   return (
     <div className="mx-auto w-full max-w-xl">
-      <h1 className="mb-1 text-2xl font-bold text-ink">
-        {draft.isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
-      </h1>
+      <div className="mb-1 flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <h1 className="min-w-0 text-2xl font-bold text-ink">
+          {draft.isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
+        </h1>
+        <BackButton />
+      </div>
       {/* 🔴 ตอบ "คีย์ให้โครงการไหน" ตั้งแต่บรรทัดบน ไม่ใช่ให้ตาเลื่อนลงไปหา
           กล่องเลือกกลางฟอร์ม · คนคีย์บิลเป็นตั้งจะสลับโครงการแล้วลืม แล้วยอด
           ไปเข้าโครงการผิดโดยไม่มีอะไรทัก */}

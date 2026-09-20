@@ -1,12 +1,12 @@
 'use client'
 
 import { Eye, EyeOff, Loader2, Plus } from 'lucide-react'
-import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import { categoryError, TXN_KINDS, TXN_KIND_LABEL, type TxnKind } from '@/lib/categories'
+import { BackButton } from '@/components/ui/back-button'
 
 type Row = {
   id: string
@@ -59,19 +59,16 @@ export function CategoriesClient({ categories }: { categories: Row[] }) {
 
   return (
     <div className="space-y-5">
-      <div>
-        <Link
-          href="/settings"
-          className="text-sm font-medium text-muted-token transition-colors hover:text-ink"
-        >
-          ← ตั้งค่า
-        </Link>
-        <h1 className="mt-1 text-2xl font-bold text-ink">หมวดรายรับ-รายจ่าย</h1>
+      <div className="flex flex-wrap items-start justify-between gap-x-4 gap-y-2">
+        <div className="min-w-0">
+          <h1 className="text-2xl font-bold text-ink">หมวดรายรับ-รายจ่าย</h1>
         <p className="mt-0.5 text-sm text-muted-token">
           หมวดที่ปิดจะหายจากฟอร์มบันทึก แต่รายการเก่ายังแสดงชื่อหมวดได้ตามปกติ ·
           หมวดรายจ่ายที่ติ๊ก <span className="font-medium text-ink-2">ค่าวัสดุ</span>{' '}
           จะถูกนับรวมเป็นช่อง &ldquo;ค่าวัสดุ&rdquo; ในแถบต้นทุนของแต่ละโครงการ
-        </p>
+          </p>
+        </div>
+        <BackButton fallbackHref="/settings" />
       </div>
 
       {/* ── เพิ่มหมวด ─────────────────────────────────────────────── */}

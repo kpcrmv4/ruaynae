@@ -12,14 +12,17 @@
  *      คือการเขียนข้อมูลจริงทิ้งไว้
  * · สคริปต์นี้ **ไม่กดปุ่มที่เขียนข้อมูลเลยสักปุ่ม** เปิดกล่อง พิมพ์ อ่านผล แล้วปิด
  *
- * red-tested: 21 ก.ย. 2569 — BACK-05 แดงจริงในรอบแรก (คาด history.idx=0 แต่ได้ null)
+ * red-tested: 21 ก.ย. 2569 — P0-BROWSER-01 คืนโค้ดที่เรียก `wageRowKey()` ข้ามฝั่ง
+ *   กลับเข้าไปแล้วมันแดงทันทีพร้อมชี้หน้าที่พัง (`/payroll?tab=sites (error boundary)`)
+ *   ใส่กลับ → เขียว · และ BACK-05 แดงจริงในรอบแรก (คาด history.idx=0 แต่ได้ null)
  * · P5-UI-04 มีคู่ตรงข้าม P5-UI-04b ที่ต้องผ่านเมื่อยอดอยู่ในคงเหลือ — ถ้าตัวตรวจ
  *   มองไม่เห็นความต่างของสองสถานะนี้ แถวใดแถวหนึ่งจะแดงทันที
  *
  * 🔴 การล้นขอบวัดจาก **ขอบขวาของแต่ละอิลิเมนต์** ไม่ใช่ `documentElement.scrollWidth`
  * ซึ่งเป็น 0 เสมอเพราะเชลล์ตั้ง `overflow-x: clip` ไว้ (CLAUDE.md §17 ข้อ 7)
  */
-import { readFileSync } from 'node:fs'
+import { readFileSync, readdirSync } from 'node:fs'
+import { join } from 'node:path'
 import { chromium } from 'playwright'
 
 const BASE = process.argv[2] ?? 'http://localhost:3200'
@@ -34,6 +37,20 @@ const env = Object.fromEntries(
     .map((l) => l.match(/^([A-Z0-9_]+)=(.*)$/)).filter(Boolean)
     .map((m) => [m[1], m[2].trim()]),
 )
+
+/** ทุก `page.tsx` ใต้ `(app)` → เส้นทางจริง (ตัด route group ในวงเล็บทิ้ง) */
+function routesUnder(dir, prefix = '') {
+  const out = []
+  for (const e of readdirSync(dir, { withFileTypes: true })) {
+    if (e.isDirectory()) {
+      const seg = e.name.startsWith('(') ? '' : `/${e.name}`
+      out.push(...routesUnder(join(dir, e.name), prefix + seg))
+    } else if (e.name === 'page.tsx') {
+      out.push(prefix === '' ? '/' : prefix)
+    }
+  }
+  return out
+}
 
 const results = []
 const check = (label, ok, detail = '') => {
@@ -184,6 +201,35 @@ try {
     }
 
     await page.keyboard.press('Escape')
+    await page.close()
+  }
+
+  // ══ P0-BROWSER-01 · ทุกหน้าเปิดได้ในเบราว์เซอร์จริง ═══════════════
+  // 🔴 แถวนี้เกิดเพราะ `/payroll?tab=sites` พังบน production แต่ตัวตรวจที่ยิงด้วย
+  // `fetch` ได้ **200 พร้อม HTML ที่ดูปกติ** ทุกครั้ง · error เป็นของฝั่ง client
+  // (เรียกฟังก์ชันของโมดูล 'use client' จากเซิร์ฟเวอร์) ซึ่งโผล่ตอนเบราว์เซอร์
+  // ประมวลผลสตรีม RSC เท่านั้น — เจ้าของเจอก่อนตัวตรวจ (21 ก.ย. 2569)
+  {
+    const routes = routesUnder('src/app/(app)')
+      .map((r) => (r.includes('[id]') ? null : r))
+      .filter(Boolean)
+      .concat(['/payroll?tab=sites', '/payroll?tab=grid', '/settings/users?tab=workers'])
+    const page = await ctx.newPage()
+    const broken = []
+    for (const path of routes) {
+      const errs = []
+      const onErr = (e) => errs.push(e.message.split(/\r?\n/)[0].slice(0, 100))
+      page.on('pageerror', onErr)
+      await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' }).catch(() => {})
+      const boundary = await page.getByText('เปิดหน้านี้ไม่สำเร็จ').isVisible().catch(() => false)
+      page.off('pageerror', onErr)
+      if (boundary || errs.length) broken.push(`${path}${boundary ? ' (error boundary)' : ''}${errs.length ? ' · ' + errs[0] : ''}`)
+    }
+    check(
+      `P0-BROWSER-01 ทุกหน้าเปิดได้ในเบราว์เซอร์จริง ไม่ตกลง error boundary — ตรวจ ${routes.length} หน้า`,
+      broken.length === 0,
+      broken.length ? broken.join(' · ') : `${routes.length}/${routes.length} หน้า สะอาด`,
+    )
     await page.close()
   }
 

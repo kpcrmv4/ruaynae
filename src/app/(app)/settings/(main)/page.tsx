@@ -1,4 +1,14 @@
-import { CalendarClock, ChevronRight, HardHat, Lock, SlidersHorizontal, Tags, Users } from 'lucide-react'
+import {
+  BookUser,
+  CalendarClock,
+  ChevronRight,
+  FileText,
+  HardHat,
+  Lock,
+  SlidersHorizontal,
+  Tags,
+  Users,
+} from 'lucide-react'
 import Link from 'next/link'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { PushToggle } from '../push-client'
@@ -131,6 +141,42 @@ export default async function SettingsPage() {
             <span className="block text-sm font-semibold text-ink">ค่าใช้จ่ายรายเดือน</span>
             <span className="block text-xs text-muted-token">
               เงินเดือน ค่าเช่า ค่าเน็ต — ตั้งครั้งเดียว ระบบลงให้ทุกเดือน
+            </span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-token" />
+        </Link>
+      )}
+
+      {/* เลขที่เอกสาร + ข้อมูลผู้ขายที่พิมพ์ลงกระดาษ · ใบที่ออกไปแล้วเก็บสำเนา
+          ของตัวเอง การแก้ตรงนี้จึงมีผลกับใบถัดไปเท่านั้น ไม่ย้อนไปแก้ใบเก่า */}
+      {isOwner && (
+        <Link
+          href="/settings/documents"
+          className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-brand"
+        >
+          <FileText className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">เอกสาร</span>
+            <span className="block text-xs text-muted-token">
+              เลขที่ใบเสนอราคา/ใบเสร็จ และข้อมูลผู้ขายที่พิมพ์ลงกระดาษ
+            </span>
+          </span>
+          <ChevronRight className="size-4 shrink-0 text-muted-token" />
+        </Link>
+      )}
+
+      {/* ทะเบียนลูกค้า — ที่อยู่ที่ฟอร์มเอกสารเติมให้ · แก้ที่นี่มีผลกับใบถัดไป
+          เท่านั้น เพราะใบที่ออกไปแล้วถือสำเนาของตัวเอง */}
+      {isOwner && (
+        <Link
+          href="/settings/customers"
+          className="flex items-center gap-3 rounded-lg border border-line bg-surface px-4 py-3.5 transition-colors hover:border-brand"
+        >
+          <BookUser className="size-5 shrink-0 text-brand" strokeWidth={1.8} />
+          <span className="min-w-0 flex-1">
+            <span className="block text-sm font-semibold text-ink">ทะเบียนลูกค้า</span>
+            <span className="block text-xs text-muted-token">
+              ชื่อ ที่อยู่ และเลขผู้เสียภาษีที่ฟอร์มเอกสารเติมให้อัตโนมัติ
             </span>
           </span>
           <ChevronRight className="size-4 shrink-0 text-muted-token" />

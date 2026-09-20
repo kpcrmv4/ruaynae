@@ -101,7 +101,12 @@ export type Database = {
       app_settings: {
         Row: {
           address: string | null
+          bank_account: string | null
+          branch_label: string | null
+          doc_footer: string | null
+          email: string | null
           id: boolean
+          phone: string | null
           signatory_name: string | null
           signatory_title: string | null
           slip_retention_years: number | null
@@ -110,7 +115,12 @@ export type Database = {
         }
         Insert: {
           address?: string | null
+          bank_account?: string | null
+          branch_label?: string | null
+          doc_footer?: string | null
+          email?: string | null
           id?: boolean
+          phone?: string | null
           signatory_name?: string | null
           signatory_title?: string | null
           slip_retention_years?: number | null
@@ -119,7 +129,12 @@ export type Database = {
         }
         Update: {
           address?: string | null
+          bank_account?: string | null
+          branch_label?: string | null
+          doc_footer?: string | null
+          email?: string | null
           id?: boolean
+          phone?: string | null
           signatory_name?: string | null
           signatory_title?: string | null
           slip_retention_years?: number | null
@@ -400,6 +415,258 @@ export type Database = {
           sort_order?: number
         }
         Relationships: []
+      }
+      customers: {
+        Row: {
+          address: string | null
+          branch: string | null
+          created_at: string
+          email: string | null
+          id: string
+          name: string
+          phone: string | null
+          tax_id: string | null
+          updated_at: string
+        }
+        Insert: {
+          address?: string | null
+          branch?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name: string
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Update: {
+          address?: string | null
+          branch?: string | null
+          created_at?: string
+          email?: string | null
+          id?: string
+          name?: string
+          phone?: string | null
+          tax_id?: string | null
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      doc_counters: {
+        Row: {
+          kind: Database["public"]["Enums"]["doc_kind"]
+          last_no: number
+          pad: number
+          prefix: string
+          updated_at: string
+        }
+        Insert: {
+          kind: Database["public"]["Enums"]["doc_kind"]
+          last_no: number
+          pad: number
+          prefix: string
+          updated_at?: string
+        }
+        Update: {
+          kind?: Database["public"]["Enums"]["doc_kind"]
+          last_no?: number
+          pad?: number
+          prefix?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      document_lines: {
+        Row: {
+          created_at: string
+          description: string
+          document_id: string
+          id: string
+          line_total: number
+          qty: number
+          seq: number
+          unit: string | null
+          unit_price: number
+        }
+        Insert: {
+          created_at?: string
+          description: string
+          document_id: string
+          id?: string
+          line_total?: number
+          qty?: number
+          seq: number
+          unit?: string | null
+          unit_price?: number
+        }
+        Update: {
+          created_at?: string
+          description?: string
+          document_id?: string
+          id?: string
+          line_total?: number
+          qty?: number
+          seq?: number
+          unit?: string | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "document_lines_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      documents: {
+        Row: {
+          accepted_at: string | null
+          amount_words: string
+          created_at: string
+          created_by: string | null
+          customer_address: string | null
+          customer_branch: string | null
+          customer_id: string | null
+          customer_name: string
+          customer_phone: string | null
+          customer_tax_id: string | null
+          doc_date: string
+          doc_no: string | null
+          id: string
+          issued_at: string | null
+          issued_by: string | null
+          kind: Database["public"]["Enums"]["doc_kind"]
+          note: string | null
+          seller: Json | null
+          sent_at: string | null
+          site_id: string | null
+          source_document_id: string | null
+          status: Database["public"]["Enums"]["doc_status"]
+          subtotal: number
+          total: number
+          txn_id: string | null
+          updated_at: string
+          valid_until: string | null
+          vat_amount: number
+          vat_mode: Database["public"]["Enums"]["vat_mode"]
+          vat_rate: number
+          void_reason: string | null
+          voided_at: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          amount_words?: string
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_branch?: string | null
+          customer_id?: string | null
+          customer_name: string
+          customer_phone?: string | null
+          customer_tax_id?: string | null
+          doc_date: string
+          doc_no?: string | null
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          kind: Database["public"]["Enums"]["doc_kind"]
+          note?: string | null
+          seller?: Json | null
+          sent_at?: string | null
+          site_id?: string | null
+          source_document_id?: string | null
+          status?: Database["public"]["Enums"]["doc_status"]
+          subtotal?: number
+          total?: number
+          txn_id?: string | null
+          updated_at?: string
+          valid_until?: string | null
+          vat_amount?: number
+          vat_mode?: Database["public"]["Enums"]["vat_mode"]
+          vat_rate?: number
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          amount_words?: string
+          created_at?: string
+          created_by?: string | null
+          customer_address?: string | null
+          customer_branch?: string | null
+          customer_id?: string | null
+          customer_name?: string
+          customer_phone?: string | null
+          customer_tax_id?: string | null
+          doc_date?: string
+          doc_no?: string | null
+          id?: string
+          issued_at?: string | null
+          issued_by?: string | null
+          kind?: Database["public"]["Enums"]["doc_kind"]
+          note?: string | null
+          seller?: Json | null
+          sent_at?: string | null
+          site_id?: string | null
+          source_document_id?: string | null
+          status?: Database["public"]["Enums"]["doc_status"]
+          subtotal?: number
+          total?: number
+          txn_id?: string | null
+          updated_at?: string
+          valid_until?: string | null
+          vat_amount?: number
+          vat_mode?: Database["public"]["Enums"]["vat_mode"]
+          vat_rate?: number
+          void_reason?: string | null
+          voided_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "documents_created_by_fkey"
+            columns: ["created_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_customer_id_fkey"
+            columns: ["customer_id"]
+            isOneToOne: false
+            referencedRelation: "customers"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_issued_by_fkey"
+            columns: ["issued_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_site_id_fkey"
+            columns: ["site_id"]
+            isOneToOne: false
+            referencedRelation: "sites"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_source_document_id_fkey"
+            columns: ["source_document_id"]
+            isOneToOne: false
+            referencedRelation: "documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "documents_txn_id_fkey"
+            columns: ["txn_id"]
+            isOneToOne: false
+            referencedRelation: "transactions"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       employee_wages: {
         Row: {
@@ -1392,6 +1659,7 @@ export type Database = {
       }
       cron_call: { Args: { p_path: string }; Returns: number }
       delete_employee: { Args: { p_id: string }; Returns: Json }
+      doc_recalc: { Args: { p_doc: string }; Returns: undefined }
       employee_balance: {
         Args: { p_employee: string }
         Returns: {
@@ -1416,6 +1684,10 @@ export type Database = {
         Returns: number
       }
       is_owner: { Args: never; Returns: boolean }
+      issue_document: {
+        Args: { p_id: string; p_seller: Json }
+        Returns: string
+      }
       mcp_assume_owner: { Args: { p_actor: string }; Returns: undefined }
       mcp_begin_write: {
         Args: { p_actor: string; p_key: string }
@@ -1512,6 +1784,10 @@ export type Database = {
       mcp_update_transaction: {
         Args: { p_actor: string; p_id: string; p_key: string; p_patch: Json }
         Returns: Json
+      }
+      next_doc_no: {
+        Args: { p_kind: Database["public"]["Enums"]["doc_kind"] }
+        Returns: string
       }
       pay_employee_wage: {
         Args: { p_employee: string }
@@ -1705,6 +1981,8 @@ export type Database = {
     Enums: {
       adjust_kind: "add" | "deduct"
       bond_kind: "cash" | "bank_guarantee"
+      doc_kind: "quotation" | "receipt"
+      doc_status: "draft" | "issued" | "sent" | "accepted" | "void"
       income_kind: "deposit" | "installment" | "variation_order" | "other"
       notification_kind:
         | "txn_pending"
@@ -1717,6 +1995,7 @@ export type Database = {
       txn_kind: "income" | "expense"
       txn_status: "pending" | "approved" | "rejected"
       user_role: "owner" | "site_supervisor"
+      vat_mode: "inclusive" | "exclusive" | "none"
       wage_type: "daily" | "monthly"
     }
     CompositeTypes: {
@@ -1847,6 +2126,8 @@ export const Constants = {
     Enums: {
       adjust_kind: ["add", "deduct"],
       bond_kind: ["cash", "bank_guarantee"],
+      doc_kind: ["quotation", "receipt"],
+      doc_status: ["draft", "issued", "sent", "accepted", "void"],
       income_kind: ["deposit", "installment", "variation_order", "other"],
       notification_kind: [
         "txn_pending",
@@ -1860,6 +2141,7 @@ export const Constants = {
       txn_kind: ["income", "expense"],
       txn_status: ["pending", "approved", "rejected"],
       user_role: ["owner", "site_supervisor"],
+      vat_mode: ["inclusive", "exclusive", "none"],
       wage_type: ["daily", "monthly"],
     },
   },

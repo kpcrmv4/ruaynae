@@ -16,7 +16,6 @@
 · ห้ามคัดลอกมาไว้ในโค้ด (§5) · ค่าตั้งต้นของเครื่องที่ติดตั้งใหม่อยู่ใน
 migration `20260831040000_branding_company_name.sql` ซึ่งเติม**เฉพาะตอนที่ยังว่าง**
 
-
 เว็บแอปสำหรับผู้รับเหมาก่อสร้างรายเล็ก-กลาง (**บริษัทเดียว ไม่ใช่ SaaS หลายผู้เช่า**)
 บันทึกรายรับ-รายจ่ายรายวันต่อโครงการ แนบสลิป/บิล จัดการพนักงานและค่าแรง
 และให้เจ้าของเห็นว่าแต่ละโปรเจ็คคืบหน้าแค่ไหน เก็บเงินได้เท่าไหร่ เหลือกำไรเท่าไหร่
@@ -102,6 +101,10 @@ create type payroll_status as enum ('open','closed');
 | `payroll_runs` | `period_start`, `period_end`, `site_id`, `status`, `total_accrued`, `total_advance_deducted`, `total_paid` | **owner เท่านั้น** |
 | `payroll_lines` | `run_id`, `employee_id`, `days`, `accrued`, `advance_deducted`, `net_paid` | ตาม run |
 | `recurring_expenses` | ค่าใช้จ่ายรายเดือนที่ระบบลงให้เอง: `name`, `amount`, `category_id`, `site_id` (NULL = ส่วนกลาง), `employee_id` (NULL = ไม่ผูกคน), `day_of_month`, `start_month`, `end_month`, `is_active` | **owner เท่านั้น** |
+| `customers` | ทะเบียนลูกค้าสำหรับเติมที่อยู่ให้ฟอร์มเอกสาร (R12): `name` (unique แบบ trim+lower), `tax_id`, `branch`, `address`, `phone`, `email` · แก้/ลบที่ `/settings/customers` · **ลบแล้วเอกสารเก่าไม่หายและไม่เปลี่ยน** เพราะใบถือสำเนาของตัวเอง | **owner เท่านั้น** |
+| `doc_counters` | ตัวนับเลขที่เอกสารต่อชนิด: `kind` (pk), `prefix`, `pad`, **`last_no`** = เลข**ล่าสุดที่ออกไปแล้ว** ไม่ใช่เลขถัดไป (คำสั่งเจ้าของ 20 ก.ย. 2569) · ไม่มีค่าตั้งต้นในโค้ด — ยังไม่ตั้ง = ออกเอกสารไม่ได้ (`DOC_COUNTER_NOT_SET`) | **owner เท่านั้น** |
+| `documents` | ใบเสนอราคา/ใบเสร็จ (R12): `kind`, `doc_no` (null จนกว่าจะออกเลข), `status`, `site_id` (null = ไม่ผูกโครงการ), **สำเนาผู้ซื้อ+`seller` jsonb แช่แข็งตอนออกเอกสาร**, `vat_mode`, `vat_rate`, `subtotal`/`vat_amount`/`total` (trigger คิดจากบรรทัด ไม่รับจากหน้าจอ), `amount_words`, `txn_id`, `source_document_id` · ออกเลขผ่าน `issue_document()` ที่ `for update` ก่อนอ่านสถานะ | **owner เท่านั้น** |
+| `document_lines` | บรรทัดรายการ: `seq`, `description`, `qty`, `unit`, `unit_price` (**ตัวเลขที่เจ้าของพิมพ์** — โหมด inclusive คือรวม VAT แล้ว), `line_total` (ยอดก่อน VAT ที่ปัดแล้ว · Σ = `subtotal` เป๊ะ) | **owner เท่านั้น** |
 | `audit_log` | `table_name`, `row_id`, `action`, `actor`, `before` jsonb, `after` jsonb, `at`, **`mcp_key_id`** (มีค่า = AI ทำแทนเจ้าของ · **ไม่มี FK** โดยตั้งใจ ดู §17 ข้อ 19) | **อ่านได้เฉพาะ owner · ไม่มี policy ให้ UPDATE/DELETE กับใครทั้งนั้น** |
 | `notifications` | `user_id`, `kind`, `title`, `body`, `link`, `read_at` | ของตัวเอง |
 | `push_subscriptions` | `user_id`, `endpoint` (unique), `p256dh`, `auth`, `last_ok_at` | ของตัวเอง |
@@ -373,6 +376,14 @@ src/
 #                            เข้าจาก **สองปุ่มแยกกัน** บนหน้าตั้งค่า ไม่มีแถบแท็บแล้ว
     (app)/settings/branding  ชื่อบริษัท + โลโก้
     (app)/settings/wage-adjustments  รายการปรับค่าแรงสำเร็จรูป (OT · เบี้ยเลี้ยง · มาสาย)
+    (app)/settings/documents  เลขที่เอกสาร (กรอก**เลขล่าสุด**) + ข้อมูลผู้ขายบนกระดาษ (R12)
+    (app)/settings/customers  ทะเบียนลูกค้า — แก้/ลบได้ · มีผลกับใบถัดไปเท่านั้น
+    (app)/documents/*        ใบเสนอราคา + ใบเสร็จ/ใบกำกับภาษี (เจ้าของเท่านั้น)
+#                            (list) · new · [id] · [id]/edit · [id]/print
+    components/documents/*   doc-form · doc-actions · doc-row · doc-filters · print-button
+    lib/{documents,doc-server,baht-text,date-range}.ts
+#                            documents.ts = สูตรเงิน + ค่าตั้งต้นฟอร์ม (คู่กับ SQL doc_recalc)
+#                            baht-text.ts = แทน BAHTTEXT ของ Excel · date-range.ts ใช้ร่วมกับ /ledger
     (app)/attendance/adjust-dialog.tsx  กล่องปรับค่าแรงของคนหนึ่งคนในหนึ่งวัน — ใช้ทั้ง /attendance และ /payroll
     (app)/payroll/site-wage-edit.tsx    ดินสอแก้ค่าแรงที่จ่ายจริงในแท็บ "ทำงานที่ไหนบ้าง"
     (app)/sites/[id]/bond-return.tsx    ปุ่ม "ได้รับหลักประกันคืนแล้ว" (R11) · api/sites/[id]/bond-return
@@ -480,6 +491,14 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       (เหลือ 30 วัน / ครบวันนี้) · ปุ่ม "ได้รับหลักประกันคืนแล้ว" — **เงินสดลงเป็นรายรับ** หมวด
       "หลักประกันสัญญาคืน" ทันที · หนังสือค้ำแค่บันทึกวัน · ยอด 5% เติมให้แล้วแก้ได้
       · `scripts/import-bonds.mjs` นำเข้าสเปรดชีตเก่า (พ.ศ. → ค.ศ. ในสคริปต์)
+- [x] **R12 · ใบเสนอราคา + ใบเสร็จรับเงิน/ใบกำกับภาษี** (21 ก.ย. 2569) — ตาราง `customers` ·
+      `doc_counters` · `documents` · `document_lines` (owner-only ทั้งสี่) · สูตรเงิน
+      **inclusive แบบ VAT รับเศษ** ที่สร้างไฟล์ของเจ้าของซ้ำได้เป๊ะทั้งสองใบ ·
+      `bahtText()` แทน `BAHTTEXT` ของ Excel · เลขที่เอกสารเจ้าของกรอก**เลขล่าสุด**
+      (`RC1140` → ใบแรก `RC1141`) ไม่มีค่าตั้งต้นในโค้ด · `issue_document()` ออกเลข
+      แบบอะตอมมิก (`for update` ก่อนอ่านสถานะ) · ผูกหรือไม่ผูกโครงการก็ได้ และที่ผูก
+      โผล่ในหน้าโครงการ · พิมพ์ผ่าน `@media print` (ยังไม่ทำ PDF จริง) · ทะเบียนลูกค้า
+      ที่ `/settings/customers` · ตารางตรวจรับ `docs/test-plan/R12.md` 136 แถว
 - [x] **R9 · รอบคำสั่งเจ้าของ 4 ก.ย. 2569** — เรียกหน่วยงานว่า "โครงการ" ทั้งระบบ · ปิดการ์ด
       "งานวันนี้" · ต้นทุนสะสมแยกสามก้อน (ค่าแรง/ค่าวัสดุ/อื่น ๆ) + ธง `categories.is_material`
       · ยอดรวมแยกหมวดในหน้าโครงการ · **จ่ายค่าแรงรายคนปุ่มเดียว** (เลิกใช้คำว่า "รอบจ่าย"
@@ -708,6 +727,35 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    ที่ guard ปฏิเสธ (วันที่จ่ายเงินไปแล้ว) **ทั้งคำสั่งล้ม ไม่มีอะไรถูกลบเลย**
    แล้วสคริปต์ยังพิมพ์ว่า "ลบข้อมูลทดสอบแล้ว" — ต้องลบรอบจ่ายก่อนเสมอ และต้อง
    **อ่านกลับมานับ** ว่าเหลือ 0 แถวจริง ไม่ใช่เชื่อว่าคำสั่ง delete สำเร็จ
+
+25. **ฟังก์ชันที่ export จากโมดูล `'use client'` แล้วเรียกจากเซิร์ฟเวอร์ = หน้าพังให้ผู้ใช้ทุกคน โดยทุกไฟเขียว**
+   กัดสองครั้งในวันเดียวกัน (21 ก.ย. 2569): `wageRowKey()` ที่ `/payroll?tab=sites`
+   และ `emptyDraft()` ที่ `/documents/new` · อาการเหมือนกันเป๊ะ —
+   `tsc --noEmit` เขียว · `next build` เขียว · **ตัวตรวจที่ยิงด้วย `fetch` ได้ 200
+   พร้อม HTML ที่ดูปกติ** เพราะโครงร่างของ `loading.tsx` ถูกส่งออกไปก่อนแล้ว
+   ส่วน error เกิดตอน **เบราว์เซอร์ประมวลผลสตรีม RSC** เท่านั้น
+   (`"Attempted to call emptyDraft() from the server but emptyDraft is on the client"`)
+   · เจ้าของเป็นคนแจ้งครั้งแรก ตัวตรวจไม่เคยเห็น
+   · **แก้:** ย้ายฟังก์ชันไปไฟล์ล้วนใน `src/lib/` แล้วให้ทั้งสองฝั่ง import จากที่นั่น
+   (`src/lib/wage-row-key.ts` · `emptyDraft` ใน `src/lib/documents.ts` ·
+   `rangeDates`/`detectRange` ใน `src/lib/date-range.ts` ซึ่งย้ายออกมาก่อนจะโดน)
+   · **ตัวจับ:** `scripts/verify-client-boundary.mjs` (`P0-BOUNDARY-01`) อ่านซอร์สล้วน ๆ
+   หาไฟล์ที่ไม่มี `'use client'` แต่ import **ค่า**ชื่อขึ้นต้นตัวพิมพ์เล็กจากไฟล์ที่มี
+   — ต่อเข้า `npm run gate` แล้ว (เร็วกว่ารอ `P0-BROWSER-01` ที่ต้องเปิด Chrome ไล่ทุกหน้า)
+   · red-test แล้ว: ใส่บั๊กกลับ → แดงพร้อมชี้บรรทัด · ถอดออก → เขียว
+
+26. **`on delete set null` ยิง `UPDATE` เข้า guard ของตารางลูก — แล้วการลบแถวแม่ล้มทั้งคำสั่ง**
+   `documents.site_id` เป็น `on delete set null` · `guard_document` ห้ามเปลี่ยน
+   `site_id` ของใบที่ส่งให้ลูกค้าแล้ว · ผลคือ **ลบโครงการที่เคยออกใบเสร็จไปแล้ว
+   ไม่ได้เลยตลอดกาล** และข้อความที่เจ้าของเห็นคือ `DOC_LOCKED` ซึ่งไม่ได้พูดถึง
+   โครงการสักคำ — อ่านแล้วนึกว่าระบบพัง
+   · **แก้:** guard ต้องแยก "ค่ากลายเป็น null เพราะแถวที่อ้างถึงหายไปแล้ว"
+   (`not exists (select 1 from sites where id = old.site_id)`) ออกจาก "มีคนย้ายโครงการ"
+   · **บทเรียนทั่วไป:** ก่อนเขียน guard บนคอลัมน์ที่เป็น FK ให้ไล่ดูว่า FK นั้นมี
+   `on delete`/`on update` action อะไร — action พวกนั้นเขียนคอลัมน์ผ่าน guard ของเรา
+   เหมือนคนกดแก้ทุกประการ และมันจะล้มในวันที่เราไม่ได้ดู (เหมือน §17 ข้อ 19)
+   · ต้องมี**คู่ตรงข้าม**ในตารางตรวจรับเสมอ (`R12-DB-10` ลบได้ / `R12-DB-10b` ย้ายไม่ได้)
+   ไม่งั้นการแก้ข้อนี้จะกลายเป็นการเปิดรูให้ย้ายใบที่ล็อกแล้วเงียบ ๆ
 
 ## 18. ตัวแปรสภาพแวดล้อม
 

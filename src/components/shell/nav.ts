@@ -2,6 +2,7 @@ import {
   Banknote,
   BarChart3,
   CalendarDays,
+  FileText,
   HandCoins,
   Home,
   Inbox,
@@ -43,6 +44,14 @@ export const NAV: NavGroup[] = [
       { href: '/', label: 'วันนี้', sub: 'งานประจำวันและสรุปทุกโครงการ', icon: Home },
       { href: '/sites', label: 'โครงการ', sub: 'งานที่กำลังทำอยู่', icon: Warehouse },
       { href: '/ledger', label: 'รายรับ-รายจ่าย', sub: 'ทุกรายการ ค้นหาและกรอง', icon: Receipt },
+      // เอกสารมีค่างานและกำไรอยู่ในตัว จึงเป็นของเจ้าของเหมือน site_finance
+      {
+        href: '/documents',
+        label: 'เอกสาร',
+        sub: 'ใบเสนอราคา ใบเสร็จ/ใบกำกับภาษี',
+        icon: FileText,
+        ownerOnly: true,
+      },
     ],
   },
   {

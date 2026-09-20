@@ -429,3 +429,34 @@
     scroll-behavior: auto !important;
   }
 }
+
+/*
+  ── กระดาษ A4 ────────────────────────────────────────────────────────
+  หน้าพิมพ์เอกสาร (`/documents/[id]/print`) ต้องออกมาเป็น **กระดาษเปล่า**
+  ไม่มีเมนู ไม่มีหัวระบบ ไม่มีแถบล่าง · ใช้ชั้นเดียวกับแอปเพื่อให้ auth กับ
+  การอ่านข้อมูลเหมือนหน้าอื่นทุกประการ แล้วซ่อนเปลือกตอนพิมพ์แทน
+
+  🔴 บังคับพื้นขาวตัวดำเสมอ ไม่ตามธีมของแอป — พิมพ์โหมดมืดออกมาคือ
+  กระดาษดำทั้งแผ่น ซึ่งกินหมึกและอ่านไม่ออก
+*/
+@media print {
+  .print-hide { display: none !important; }
+
+  html, body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  main { padding: 0 !important; max-width: none !important; }
+
+  .paper {
+    width: 100% !important;
+    margin: 0 !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  @page { size: A4 portrait; margin: 12mm; }
+}

@@ -55,17 +55,30 @@ function routesUnder(dir, prefix = '') {
 const results = []
 const check = (label, ok, detail = '') => {
   results.push({ label, ok })
-  console.log(`  ${ok ? '✅' : '❌'} ${label}${detail ? ` — ${detail}` : ''}`)
+  console.log(`  ${ok === 'skip' ? '⏭' : ok ? '✅' : '❌'} ${label}${detail ? ` — ${detail}` : ''}`)
 }
 
-/** อิลิเมนต์ที่ขอบขวาเลยความกว้างจอ — ตัวเลขที่ `scrollWidth` มองไม่เห็น */
+/**
+ * อิลิเมนต์ที่ขอบขวาเลยความกว้างจอ — ตัวเลขที่ `scrollWidth` มองไม่เห็น
+ *
+ * 🔴 ข้ามอันที่อยู่ในแถบที่ **ตั้งใจให้เลื่อนแนวนอน** (`overflow-x: auto/scroll`)
+ * เช่นแถบชิปสถานะของ `ListToolbar` · ของที่เลื่อนได้ไม่ใช่ของที่หายไป —
+ * สิ่งที่แถวนี้ตามล่าคือของที่ถูก `overflow-x: clip` ของเชลล์ตัดทิ้งเงียบ ๆ
+ */
 const overflowing = (page) =>
   page.evaluate(() => {
     const w = document.documentElement.clientWidth
+    const inScroller = (el) => {
+      for (let p = el.parentElement; p && p !== document.body; p = p.parentElement) {
+        const ox = getComputedStyle(p).overflowX
+        if (ox === 'auto' || ox === 'scroll') return true
+      }
+      return false
+    }
     return [...document.querySelectorAll('body *')]
       .filter((el) => {
         const r = el.getBoundingClientRect()
-        return r.width > 0 && r.right > w + 1
+        return r.width > 0 && r.right > w + 1 && !inScroller(el)
       })
       .slice(0, 3)
       .map((el) => `${el.tagName.toLowerCase()}.${(el.className || '').toString().split(' ')[0]}`)
@@ -204,6 +217,97 @@ try {
     await page.close()
   }
 
+  // ══ R12-UI-10 / R12-UI-11 · ฟอร์มเอกสาร ═══════════════════════════
+  // 🔴 ตัดสินที่นี่เพราะ `fetch` มองไม่เห็น — หน้าที่เนื้อหาเป็น client component
+  // ถูกห่อด้วย `loading.tsx` แล้ว HTML ที่สตรีมออกมามีแต่โครงร่าง
+  // · ไม่กดบันทึก จึงไม่มีเอกสารทดสอบค้างในฐาน
+  {
+    const page = await ctx.newPage()
+    await page.goto(`${BASE}/documents/new?kind=receipt`, { waitUntil: 'networkidle' })
+
+    const vat = page.locator('#doc-vat')
+    const options = await vat.locator('option').allTextContents()
+    check('R12-UI-10 ฟอร์มเอกสารมีสวิตช์ VAT ครบ 3 ค่า และค่าตั้งต้นคือ "รวม VAT แล้ว"',
+      options.length === 3 && (await vat.inputValue()) === 'inclusive',
+      `${options.join(' · ')} · ค่าตั้งต้น ${await vat.inputValue()}`)
+
+    // เปลี่ยนโหมดแล้วป้ายราคาต่อหน่วยต้องเปลี่ยนตาม — คู่ตรงข้ามของ 3 ค่าข้างบน
+    // (ถ้าสวิตช์วาดครบแต่ไม่ได้ต่อกับอะไรเลย แถวข้างบนยังเขียว แถวนี้แดง)
+    await vat.selectOption('exclusive')
+    const labelEx = (await page.locator('label[for="price-0"]').first().textContent())?.trim()
+    await vat.selectOption('inclusive')
+    const labelIn = (await page.locator('label[for="price-0"]').first().textContent())?.trim()
+    check('R12-UI-10b เปลี่ยนโหมดแล้วป้ายราคาต่อหน่วยเปลี่ยนตามจริง',
+      labelEx !== labelIn && (labelIn ?? '').includes('รวม VAT'),
+      `exclusive="${labelEx}" · inclusive="${labelIn}"`)
+
+    const lines = page.locator('textarea[aria-label^="รายละเอียดบรรทัดที่"]')
+    const before = await lines.count()
+    const firstDelete = page.getByRole('button', { name: 'ลบบรรทัดที่ 1' })
+    const lockedAtOne = before === 1 && (await firstDelete.isDisabled())
+    await page.getByRole('button', { name: 'เพิ่มรายการ' }).click()
+    const added = await lines.count()
+    await page.getByRole('button', { name: `ลบบรรทัดที่ ${added}` }).click()
+    const removed = await lines.count()
+    check('R12-UI-11 เพิ่มบรรทัดแล้วเพิ่มจริง · ลบแล้วลดจริง · บรรทัดสุดท้ายลบไม่ได้',
+      added === before + 1 && removed === before && lockedAtOne,
+      `${before} → ${added} → ${removed} แถว · ปุ่มลบตอนเหลือบรรทัดเดียว ${lockedAtOne ? 'ถูกปิด' : 'ยังกดได้'}`)
+
+    // R12-CUS-02 · เลือกลูกค้าเดิมแล้วช่องต้องถูกเติมให้
+    // ตัดสินได้เฉพาะเมื่อทะเบียนมีคนอยู่แล้ว — ไม่สร้างลูกค้าทดสอบทิ้งไว้ในฐานจริง
+    {
+      const picker = page.locator('#doc-customer')
+      if (await picker.count() === 0) {
+        check('R12-CUS-02 เลือกลูกค้าเดิม → ชื่อ/ที่อยู่ถูกเติมให้', 'skip',
+          'ทะเบียนลูกค้ายังว่าง — undecided (ไม่สร้างข้อมูลทดสอบในฐานจริง)')
+      } else {
+        const values = await picker.locator('option').evaluateAll(
+          (els) => els.map((e) => e.value).filter(Boolean))
+        await picker.selectOption(values[0])
+        const name = await page.locator('#doc-name').inputValue()
+        const label = await picker.locator(`option[value="${values[0]}"]`).textContent()
+        check('R12-CUS-02 เลือกลูกค้าเดิม → ชื่อในฟอร์มถูกเติมให้ตรงกับรายที่เลือก',
+          name.trim() !== '' && name.trim() === (label ?? '').trim(),
+          `เลือก "${label?.trim()}" → ช่องชื่อ "${name}"`)
+      }
+    }
+
+    // R12-UI-21 · ชื่อลูกค้า/รายการยาวมาก ต้องไม่ดันอะไรล้นขอบ
+    {
+      const long = 'องค์การบริหารส่วนตำบลทดสอบความยาวของชื่อที่ยาวมากจนน่าจะดันขอบ'.repeat(3)
+      await page.locator('#doc-name').fill(long)
+      await page.locator('textarea[aria-label="รายละเอียดบรรทัดที่ 1"]').fill(long)
+      await page.setViewportSize({ width: 390, height: 844 })
+      const over = await overflowing(page)
+      check('R12-UI-21 ชื่อลูกค้า/รายละเอียดยาวมากบนจอ 390px → ไม่มีอะไรล้นขอบ',
+        over.length === 0, over.join(' · ') || 'ไม่มีอิลิเมนต์ล้น')
+      await page.setViewportSize({ width: 1440, height: 900 })
+    }
+
+    await page.close()
+  }
+
+  // ══ R12-UI-20 · สามความกว้าง × สองธีม ═════════════════════════════
+  {
+    const page = await ctx.newPage()
+    const bad = []
+    for (const theme of ['light', 'dark']) {
+      await page.emulateMedia({ colorScheme: theme })
+      for (const w of [390, 768, 1440]) {
+        await page.setViewportSize({ width: w, height: 900 })
+        for (const path of ['/documents', '/documents/new?kind=receipt', '/settings/customers']) {
+          await page.goto(`${BASE}${path}`, { waitUntil: 'networkidle' })
+          const over = await overflowing(page)
+          if (over.length) bad.push(`${theme} ${w}px ${path}: ${over.join(', ')}`)
+        }
+      }
+    }
+    check('R12-UI-20 หน้าเอกสารที่ 390/768/1440 ทั้งโหมดสว่างและมืด — ไม่มีอะไรล้นขอบ',
+      bad.length === 0, bad.join(' · ') || 'ตรวจ 18 ชุด (3 หน้า × 3 ความกว้าง × 2 ธีม)')
+    await page.emulateMedia({ colorScheme: null })
+    await page.close()
+  }
+
   // ══ P0-BROWSER-01 · ทุกหน้าเปิดได้ในเบราว์เซอร์จริง ═══════════════
   // 🔴 แถวนี้เกิดเพราะ `/payroll?tab=sites` พังบน production แต่ตัวตรวจที่ยิงด้วย
   // `fetch` ได้ **200 พร้อม HTML ที่ดูปกติ** ทุกครั้ง · error เป็นของฝั่ง client
@@ -239,6 +343,8 @@ try {
 }
 
 console.log('\n══════════════════════════════════════════════')
-const pass = results.filter((r) => r.ok).length
-console.log(`  ${results.length} แถว: ผ่าน ${pass} · ตก ${results.length - pass}`)
-process.exit(pass === results.length ? 0 : 1)
+const pass = results.filter((r) => r.ok === true).length
+const skip = results.filter((r) => r.ok === 'skip').length
+const fail = results.length - pass - skip
+console.log(`  ${results.length} แถว: ผ่าน ${pass} · ข้าม ${skip} · ตก ${fail}`)
+process.exit(fail === 0 ? 0 : 1)

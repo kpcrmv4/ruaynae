@@ -4,6 +4,7 @@ import {
   Banknote,
   CalendarDays,
   FileCheck,
+  FileText,
   Phone,
   MapPin,
   Receipt,
@@ -25,6 +26,7 @@ import { CategoryTotals } from '@/components/sites/category-totals'
 import { TxnDetailProvider } from '@/components/ledger/txn-detail'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
+import { DocRow } from '@/components/documents/doc-row'
 import {
   BOND_KIND_LABEL, BOND_STATUS_LABEL, BOND_STATUS_TONE, WARRANTY_DEFAULT_MONTHS, bondStatusOf,
 } from '@/lib/bonds'
@@ -35,6 +37,9 @@ import { DataError } from '@/components/ui/data-error'
 
 /** กี่แถวล่าสุดที่โชว์ในหน้าโครงการ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
 const RECENT_TXN = 10
+
+/** เอกสารล่าสุดของโครงการ — ที่เหลืออยู่ที่ /documents ซึ่งกรองตามโครงการได้ */
+const RECENT_DOC = 5
 
 export const metadata = { title: 'รายละเอียดโครงการ' }
 
@@ -69,6 +74,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
     pickerSites,
     pickerCategories,
     catTotals,
+    docResult,
     bondRow,
   ] = await Promise.all([
     sb
@@ -164,6 +170,20 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         if (e) console.error('[sites] อ่านยอดรวมแยกหมวดไม่ได้', e.message)
         return data ?? []
       }),
+    // เอกสารของโครงการนี้ (R12) — RLS ของ `documents` เป็น owner-only
+    // หัวหน้าโครงการจึงได้ 0 แถวเอง ไม่ต้องมี if ตรงนี้ · ดึงเกินมา 1 แถว
+    // เพื่อรู้ว่ายังมีต่อโดยไม่ต้องนับทั้งตาราง (§7)
+    sb
+      .from('documents')
+      .select('id, kind, doc_no, status, doc_date, customer_name, total')
+      .eq('site_id', id)
+      .order('doc_date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(0, RECENT_DOC)
+      .then(({ data, error: e }) => {
+        if (e) console.error('[sites] อ่านเอกสารของโครงการไม่ได้', e.message)
+        return { rows: data ?? [], failed: Boolean(e) }
+      }),
     // หลักประกันสัญญา (R11) — `site_finance` owner-only · หัวหน้าโครงการได้ null เอง
     sb
       .from('site_finance')
@@ -203,6 +223,8 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   const txnRows = txnResult.data ?? []
   const hasMoreTxn = txnRows.length > RECENT_TXN
   const recentTxns = hasMoreTxn ? txnRows.slice(0, RECENT_TXN) : txnRows
+  const hasMoreDoc = docResult.rows.length > RECENT_DOC
+  const recentDocs = hasMoreDoc ? docResult.rows.slice(0, RECENT_DOC) : docResult.rows
 
   return (
     <>
@@ -600,6 +622,67 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           </ul>
         )}
       </section>
+
+      {/* ── เอกสารของโครงการนี้ (R12) — เจ้าของเท่านั้น ────────────────────
+          ใบเสนอราคากับใบเสร็จของงานเดียวกันควรอยู่ตรงที่คนเปิดดูงานนั้น
+          ไม่ใช่ให้เดินออกไปหน้ารวมแล้วกรองกลับมาเอง · ใบที่ไม่ผูกโครงการ
+          (งานนอก ขายของเบ็ดเตล็ด) ไม่โผล่ตรงนี้ตามการออกแบบ */}
+      {isOwner && (
+        <section className="panel mt-4">
+          <div className="panel-head">
+            <FileText className="size-4 shrink-0 text-muted-token" strokeWidth={1.8} />
+            เอกสารของโครงการนี้
+            <Link
+              href={`/documents?site=${site.id}`}
+              className="ml-auto text-xs font-semibold text-brand hover:underline"
+            >
+              ดูทั้งหมด
+            </Link>
+          </div>
+
+          {docResult.failed ? (
+            <DataError message="โหลดเอกสารของโครงการนี้ไม่สำเร็จ" />
+          ) : recentDocs.length === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm text-muted-token">
+                ยังไม่มีเอกสารที่ผูกกับโครงการนี้
+              </p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                <Link href={`/documents/new?kind=quotation&site=${site.id}`} className="btn-secondary">
+                  สร้างใบเสนอราคา
+                </Link>
+                <Link href={`/documents/new?kind=receipt&site=${site.id}`} className="btn-secondary">
+                  สร้างใบเสร็จรับเงิน
+                </Link>
+              </div>
+            </div>
+          ) : (
+            <>
+              <ul>
+                {recentDocs.map((d) => (
+                  <DocRow key={d.id} doc={d} showSite={false} showKind />
+                ))}
+              </ul>
+              <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3">
+                <Link href={`/documents/new?kind=quotation&site=${site.id}`} className="btn-secondary">
+                  สร้างใบเสนอราคา
+                </Link>
+                <Link href={`/documents/new?kind=receipt&site=${site.id}`} className="btn-secondary">
+                  สร้างใบเสร็จรับเงิน
+                </Link>
+                {hasMoreDoc && (
+                  <Link
+                    href={`/documents?site=${site.id}`}
+                    className="ml-auto text-xs font-semibold text-brand hover:underline"
+                  >
+                    ยังมีอีก — ดูทั้งหมด
+                  </Link>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
 
       {/* ── รายรับ-รายจ่ายของโครงการนี้ ──────────────────────────────────
           เดิมหน้านี้บอกแค่ "ยอดรวมเท่าไร" แล้วให้เดินออกไปอีกหน้าเพื่อดูว่า

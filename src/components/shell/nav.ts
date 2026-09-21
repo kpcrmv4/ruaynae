@@ -33,6 +33,9 @@ export type NavItem = {
   sub: string
   icon: LucideIcon
   ownerOnly?: boolean
+  /** เห็นเฉพาะหัวหน้าโครงการ — งานที่เจ้าของทำจากอีกหน้าหนึ่งอยู่แล้ว
+   *  (เจ้าของเบิกให้ลูกน้องที่ `/payroll` ซึ่งจ่ายทันที ไม่ต้องยื่นคำขอกับตัวเอง) */
+  supervisorOnly?: boolean
 }
 
 export type NavGroup = { heading: string; items: NavItem[] }
@@ -66,6 +69,15 @@ export const NAV: NavGroup[] = [
         sub: 'ค้างจ่าย เบิก จ่ายค่าแรง',
         icon: Users,
         ownerOnly: true,
+      },
+      // หัวหน้าโครงการยื่นคำขอเบิกแทนลูกน้อง แล้วเจ้าของอนุมัติทีหลัง
+      // (คำสั่งเจ้าของ 21 ก.ย. 2569) · ตัวเลขเงินค่าแรงยังเป็นความลับจากเขา
+      {
+        href: '/advances',
+        label: 'ตั้งเบิกค่าแรง',
+        sub: 'ยื่นคำขอแทนลูกน้อง รอเจ้าของอนุมัติ',
+        icon: HandCoins,
+        supervisorOnly: true,
       },
     ],
   },
@@ -115,10 +127,13 @@ export const NAV: NavGroup[] = [
  * ⚠️ นี่คือการ "ซ่อนปุ่ม" ไม่ใช่การควบคุมสิทธิ์ — สิทธิ์จริงอยู่ที่ RLS
  * ซ่อนเมนูแล้วคิดว่าปลอดภัยคือการเข้าใจผิดที่แพงที่สุดเรื่องหนึ่ง
  */
+export const visibleTo = (role: Role, i: NavItem | QuickAddItem): boolean =>
+  (!i.ownerOnly || role === 'owner') && (!i.supervisorOnly || role === 'site_supervisor')
+
 export function navFor(role: Role): NavGroup[] {
   return NAV.map((g) => ({
     ...g,
-    items: g.items.filter((i) => !i.ownerOnly || role === 'owner'),
+    items: g.items.filter((i) => visibleTo(role, i)),
   })).filter((g) => g.items.length > 0)
 }
 
@@ -157,15 +172,23 @@ export const QUICK_ADD: QuickAddItem[] = [
   {
     href: '/payroll',
     label: 'เบิกล่วงหน้า',
-    sub: 'เลือกคนแล้วระบบเช็คเพดานให้',
+    sub: 'เลือกคนแล้วจ่ายได้ทันที',
     icon: HandCoins,
     tone: 'brand',
     ownerOnly: true,
   },
+  {
+    href: '/advances',
+    label: 'ตั้งเบิกค่าแรง',
+    sub: 'ยื่นคำขอแทนลูกน้อง รอเจ้าของอนุมัติ',
+    icon: HandCoins,
+    tone: 'brand',
+    supervisorOnly: true,
+  },
 ]
 
 export const quickAddFor = (role: Role): QuickAddItem[] =>
-  QUICK_ADD.filter((i) => !i.ownerOnly || role === 'owner')
+  QUICK_ADD.filter((i) => visibleTo(role, i))
 
 /**
  * 3 ช่องเมนูของแถบล่าง (ช่องกลางคือปุ่มบันทึก · ช่องที่ 5 คือ "เพิ่มเติม" เสมอ)

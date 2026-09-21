@@ -30,6 +30,8 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
     { count, error: cErr },
     { count: pendingCount, error: pErr },
     { count: rejectedCount, error: rErr },
+    { count: advancePendingCount, error: apErr },
+    { count: advanceRejectedCount, error: arErr },
   ] = await Promise.all([
       sb
         .from('notifications')
@@ -53,13 +55,23 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
       // ที่ตีกลับไปแล้วยังค้าง · หัวหน้าโครงการเห็นเฉพาะของโครงการตัวเองซึ่งเป็นใบ
       // ที่ต้องแก้แล้วส่งใหม่ · ทั้งสองคนอ่านได้ประโยคเดียวกันว่า "ค้างอยู่"
       sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
+      // คำขอเบิกค่าแรงที่รอเจ้าของกด (R14) — บวกเข้าป้ายเดียวกับรายจ่ายที่คิว
+      // "รออนุมัติ" เพราะมันคือกองงานกองเดียวกันของคนคนเดียวกัน
+      user.role === 'owner'
+        ? sb.from('advances').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+        : Promise.resolve({ count: 0, error: null }),
+      // ของค้างของหัวหน้าโครงการ = คำขอที่ถูกตีกลับและยังไม่ได้แก้ส่งใหม่
+      // 🔴 ไม่มีเงื่อนไข role — RLS เป็นคนกำหนดขอบเขต: เจ้าของเห็นทุกใบที่
+      // ตีกลับไปแล้วยังค้าง · หัวหน้าโครงการเห็นเฉพาะของตัวเอง
+      sb.from('advances').select('id', { count: 'exact', head: true }).eq('status', 'rejected'),
     ])
 
-  if (nErr || cErr || pErr || rErr) {
+  if (nErr || cErr || pErr || rErr || apErr || arErr) {
     // กระดิ่ง/ตัวเลขเมนูพังต้องไม่ทำให้ทั้งแอปพัง — บันทึกไว้แล้วแสดงเป็นค่าว่าง
     console.error(
       '[shell] อ่านแจ้งเตือนไม่ได้',
-      nErr?.message ?? cErr?.message ?? pErr?.message ?? rErr?.message,
+      nErr?.message ?? cErr?.message ?? pErr?.message ?? rErr?.message
+        ?? apErr?.message ?? arErr?.message,
     )
   }
 
@@ -67,8 +79,9 @@ export default async function AppLayout({ children }: LayoutProps<'/'>) {
   // เพิ่มเมนูที่มีของค้างในอนาคตให้เติมคีย์ตรงนี้ที่เดียว แล้วมันจะไปโผล่
   // ครบทั้งสองแถบ และถูกรวมยอดขึ้นปุ่ม "เพิ่มเติม" ให้เองถ้าเมนูนั้นถูกซ่อน
   const navBadges: NavBadges = {
-    '/approvals': pendingCount ?? 0,
+    '/approvals': (pendingCount ?? 0) + (advancePendingCount ?? 0),
     '/ledger': rejectedCount ?? 0,
+    '/advances': advanceRejectedCount ?? 0,
   }
 
   return (

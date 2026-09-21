@@ -66,6 +66,9 @@ export default async function PayrollPage({ searchParams }: { searchParams: Prom
         .from('advances')
         .select('id, employee_id, amount, advance_date, deducted_amount, employees(full_name)')
         .is('payroll_run_id', null)
+        // 🔴 เฉพาะที่อนุมัติแล้ว = เงินที่จ่ายออกไปจริง · คำขอที่หัวหน้าโครงการ
+        // ยื่นเข้ามา (R14) ยังไม่ใช่เงิน และรอเจ้าของกดอยู่ที่ /approvals
+        .eq('status', 'approved')
         .order('advance_date', { ascending: false })
         .range(0, PAGE_SIZE - 1),
     ])

@@ -27,7 +27,7 @@ migration `20260831040000_branding_company_name.sql` ซึ่งเติม**�
 | Role | ล็อกอิน | เห็น | ทำได้ |
 |---|---|---|---|
 | `owner` | อีเมล + รหัสผ่าน | ทุกโครงการ ทุกตัวเลข กำไร audit log | ทุกอย่าง · อนุมัติ/ตีกลับ · ปิดรอบจ่ายค่าแรง · CRUD ทั้งหมด |
-| `site_supervisor` | PIN 6 หลัก | เฉพาะโครงการที่ดูแล **ณ ช่วงเวลานั้น** | คีย์รายจ่ายโครงการตัวเอง (เข้าคิวรออนุมัติ) · ลงชื่อคนเข้าโครงการ · บันทึกเบิกล่วงหน้า |
+| `site_supervisor` | PIN 6 หลัก | เฉพาะโครงการที่ดูแล **ณ ช่วงเวลานั้น** | คีย์รายจ่ายโครงการตัวเอง (เข้าคิวรออนุมัติ) · ลงชื่อคนเข้าโครงการ · **ตั้งเบิกค่าแรงให้ลูกน้อง (เข้าคิวรออนุมัติ ไม่ใช่การจ่ายเงิน)** |
 
 **คนงานไม่ล็อกอิน** — เป็นแถวใน `employees` ไม่ใช่ผู้ใช้ระบบ `role` ถูกกำหนดฝั่งเซิร์ฟเวอร์เท่านั้น ห้ามเชื่อ metadata จาก client
 
@@ -76,6 +76,7 @@ create type pay_method     as enum ('cash','transfer');
 create type income_kind    as enum ('deposit','installment','variation_order','other');
 create type wage_type      as enum ('daily','monthly');
 create type payroll_status as enum ('open','closed');
+create type advance_status as enum ('pending','approved','rejected');
 ```
 
 ### ตาราง
@@ -97,7 +98,7 @@ create type payroll_status as enum ('open','closed');
 | `transactions` | `kind`, `site_id` (NULL = ส่วนกลาง), `category_id`, `amount`, `txn_date`, `pay_method`, `status`, `income_kind`, `installment_no`, **`mcp_key_id`** (NULL = คนคีย์เอง · มีค่า = AI คีย์ผ่านคีย์ใบนั้น) | supervisor เขียน `pending` ของโครงการตัวเอง · **แก้เป็น `approved` ได้เฉพาะ owner** |
 | `attachments` | `transaction_id`, `object_key`, `thumb_key`, `byte_size`, `content_type` | ตาม transaction |
 | `upload_intents` | `object_key`, `thumb_key`, `created_by`, `site_id`, `expires_at`, `consumed_at` | ของตัวเองเท่านั้น |
-| `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date` (**เลือกวันเองได้ ลงย้อนหลังได้**), `pay_method`, `site_id`, `payroll_run_id` (มีค่า = หักครบทั้งใบแล้ว), **`deducted_amount`** (หักคืนไปแล้วเท่าไหร่ · > 0 แต่ไม่ครบ = ค้างไปหักรอบหน้า), `mcp_key_id` | supervisor เขียนของโครงการตัวเอง |
+| `advances` | เบิกล่วงหน้า: `employee_id`, `amount`, `advance_date` (**เลือกวันเองได้ ลงย้อนหลังได้**), `pay_method`, `site_id`, `payroll_run_id` (มีค่า = หักครบทั้งใบแล้ว), **`deducted_amount`** (หักคืนไปแล้วเท่าไหร่ · > 0 แต่ไม่ครบ = ค้างไปหักรอบหน้า), `mcp_key_id`, **`status`** (R14 · `pending` = คำขอของหัวหน้าโครงการ **ยังไม่ใช่เงิน** · `approved` = จ่ายแล้ว · `rejected` + `rejected_reason`), `approved_by/_at` | supervisor ยื่นคำขอ (`pending`) ของโครงการตัวเอง และเห็นเฉพาะใบที่ตัวเองยื่น · **เปลี่ยนสถานะเองไม่ได้** |
 | `payroll_runs` | `period_start`, `period_end`, `site_id`, `status`, `total_accrued`, `total_advance_deducted`, `total_paid` | **owner เท่านั้น** |
 | `payroll_lines` | `run_id`, `employee_id`, `days`, `accrued`, `advance_deducted`, `net_paid` | ตาม run |
 | `recurring_expenses` | ค่าใช้จ่ายรายเดือนที่ระบบลงให้เอง: `name`, `amount`, `category_id`, `site_id` (NULL = ส่วนกลาง), `employee_id` (NULL = ไม่ผูกคน), `day_of_month`, `start_month`, `end_month`, `is_active` | **owner เท่านั้น** |
@@ -150,6 +151,13 @@ create type payroll_status as enum ('open','closed');
    · 🔴 **ตอนจ่ายค่าแรง หักได้แค่เท่าค่าแรงของงวดนั้น** แล้วส่วนที่เหลือ**ค้างไว้หักรอบหน้า**
    (`deducted_amount` + FIFO ตามวันที่เบิก) — ตีตราว่าหักครบทั้งใบเมื่อไหร่ เงินส่วนที่เกิน
    หายไปถาวรโดยไม่มี error ที่ไหนเลย
+1b. 🔴 **ใบเบิกที่ยังไม่ `approved` ไม่ใช่เงิน** (R14 · 21 ก.ย. 2569) — ทุกที่ที่นับ
+   "เบิกไปแล้ว" ต้องมี `and status = 'approved'` เสมอ: `employee_balance` ·
+   `payroll_balances` · `close_payroll_run` (ทั้งยอดที่หักและคิว FIFO) ·
+   `report_summary` · `report_labor` · รายการใบเบิกบน `/payroll`
+   · ลืมที่ใดที่หนึ่ง = คนงานถูกหักเงินที่ยังไม่เคยได้รับ และใบคำขอถูกตีตราว่า
+   "หักแล้ว" โดยไม่มี error ที่ไหนเลย · หัวหน้าโครงการตั้งสถานะเองไม่ได้
+   (`APPROVE_FORBIDDEN`) · ใบที่ถูกหักคืนไปแล้วเปลี่ยนสถานะไม่ได้ (`PAYROLL_CLOSED`)
 2. **`wage_snapshot` ห้ามแก้หลังปิดรอบ** — guard trigger บน `attendance`
 3. **`transactions.status`** — supervisor เปลี่ยนเป็น `approved` ไม่ได้ · supervisor แก้/ลบรายการที่
    `approved` แล้วไม่ได้ · supervisor แก้รายการที่ `rejected` ของตัวเองได้ และ trigger จะดันสถานะ
@@ -164,7 +172,14 @@ create type payroll_status as enum ('open','closed');
 ```sql
 is_owner() -> boolean
 supervises_site(p_site uuid, p_on date default current_date) -> boolean
+employee_balance(p_employee uuid)      -- ประตูของ authenticated · **เจ้าของเท่านั้น**
+employee_balance_raw(p_employee uuid)  -- สูตรเปล่า ไม่มีด่าน · เฉพาะ definer/superuser
 ```
+⚠️ **ยอดค่าแรงเป็นความลับจากหัวหน้าโครงการ (P4.5)** — ตั้งแต่ R14 หัวหน้าโครงการ
+ยุ่งกับใบเบิกได้แล้ว `employee_balance()` จึงต้องมีด่าน `is_owner()` ไม่งั้นเขายิง
+RPC ตรง ๆ อ่านค่าแรงค้างจ่ายของทุกคนได้ · สคริปต์ที่รันเป็น superuser
+(`seed-demo` · `verify-ship` · `verify-payroll`) เรียก `_raw` แทน — **ห้ามแก้ด้วย
+ทางลัด `auth.uid() is null`**
 ⚠️ **ห้ามใส่ทางลัด `auth.uid() is null` เพื่อให้ service-role ผ่าน** ในฟังก์ชันที่ `anon` เรียกได้ —
 นั่นคือช่องที่เปิดข้อมูลทั้งระบบให้คนที่ยังไม่ล็อกอิน
 ⚠️ **ขอบเขตโครงการไม่ใช่การเช็ค role** — `supervises_site()` บอกแค่ว่าอยู่โครงการนั้นไหม ไม่ได้บอกว่าอนุมัติได้
@@ -371,6 +386,7 @@ src/
     (app)/page.tsx            ภาพรวม
     (app)/sites/[id]/page.tsx · (app)/ledger · (app)/entry
     (app)/attendance · (app)/employees · (app)/approvals · (app)/audit · (app)/settings
+    (app)/advances           ตั้งเบิกค่าแรง (หัวหน้าโครงการ) — ยื่นคำขอแทนลูกน้อง · เจ้าของเด้งไป /payroll
     (app)/reports            รายงานสรุป (เจ้าของ) — RPC `report_*` รวมยอดในฐานข้อมูล
     (app)/settings/users     ผู้ใช้ระบบ (มี login) · `?tab=workers` = คนงาน (ไม่มี login)
 #                            เข้าจาก **สองปุ่มแยกกัน** บนหน้าตั้งค่า ไม่มีแถบแท็บแล้ว
@@ -393,6 +409,9 @@ src/
     api/auth/pin/route.ts
     api/branding/route.ts    ← ไม่ต้องล็อกอิน · หน้า login เรียกใช้
     api/transactions/route.ts · api/transactions/[id]/route.ts
+    api/advances/route.ts · api/advances/[id]/route.ts
+#                            POST = เจ้าของบันทึกจ่ายจริง (approved) · หัวหน้าโครงการยื่นคำขอ (pending)
+#                            PATCH = อนุมัติ/ตีกลับ (เจ้าของ) หรือแก้คำขอของตัวเอง (= ส่งใหม่)
     api/transactions/[id]/attachments/route.ts · api/attachments/[id]/route.ts
     api/uploads/sign/route.ts · api/uploads/[id]/route.ts
     api/cron/sweep-orphans/route.ts · api/cron/daily-digest/route.ts
@@ -502,6 +521,18 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       ที่ `/settings/customers` · **ใบแจ้งหนี้เป็นชนิดที่สาม** เดินเลขชุดของตัวเอง
       และแปลงต่อกันได้ตามลำดับงาน (เสนอราคา → แจ้งหนี้ → เก็บเงิน · ข้ามใบแจ้งหนี้ได้)
       · ตารางตรวจรับ `docs/test-plan/R12.md` 148 แถว
+- [ ] **R14 · หัวหน้าโครงการตั้งเบิกค่าแรงให้ลูกน้อง + คิวอนุมัติ** (21 ก.ย. 2569) — `advance_status`
+      + `status`/`rejected_reason`/`approved_by`/`approved_at` บน `advances` · RLS ให้หัวหน้า
+      โครงการ **ยื่นคำขอ** ของโครงการตัวเอง และเห็นเฉพาะใบที่ตัวเองยื่น · `guard_advance`
+      ตั้งสถานะตาม role (เหมือน `guard_transaction`) และแก้ใบที่ถูกตีกลับ = ส่งใหม่ ·
+      `notify_advance` + `notification_kind` อีก 3 ค่า · คิวคำขอบน `/approvals` พร้อม
+      **คำเตือนยอดที่เกินค่าแรงค้างจ่าย (เตือน ไม่ใช่ห้าม)** · หน้า `/advances` ของหัวหน้า
+      โครงการ · ป้ายตัวเลขรวมคำขอเข้าเมนู "รออนุมัติ"
+      · 🔴 **ทุกสูตรที่นับ "เบิกไปแล้ว" ต้องกรอง `status='approved'`** (§5 ข้อ 1b)
+      · ⚠️ **ยังไม่ได้ apply migration** — เซสชันที่เขียนไม่มี `.env.local` และโปรเจ็คที่
+      MCP เห็นเป็นของลูกค้าอีกราย · ต้อง apply + `generate_typescript_types` แล้ว diff
+      กับ `database.types.ts` ที่เขียนมือต้องว่าง (`R14-DB-00`) · ตารางตรวจรับ
+      `docs/test-plan/R14-advance-requests.md`
 - [x] **R9 · รอบคำสั่งเจ้าของ 4 ก.ย. 2569** — เรียกหน่วยงานว่า "โครงการ" ทั้งระบบ · ปิดการ์ด
       "งานวันนี้" · ต้นทุนสะสมแยกสามก้อน (ค่าแรง/ค่าวัสดุ/อื่น ๆ) + ธง `categories.is_material`
       · ยอดรวมแยกหมวดในหน้าโครงการ · **จ่ายค่าแรงรายคนปุ่มเดียว** (เลิกใช้คำว่า "รอบจ่าย"
@@ -788,6 +819,24 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    · **แก้:** `insert … returning id` แล้ว `track()` ทุกครั้ง แม้ในกิ่งที่คาดว่าจะล้ม
    · **บทเรียน:** โค้ดเก็บกวาดต้องเขียนโดยสมมติว่า **ทุก assertion ในไฟล์อาจเป็นเท็จ**
    — มันคือโค้ดชิ้นเดียวที่ต้องทำงานถูกในวันที่ของอื่นพังหมด (ต่อจาก §17 ข้อ 9)
+
+29. **เปิดสิทธิ์ให้ role หนึ่งเขียนตารางเดิม = ทุกสูตรที่เคยอ่านตารางนั้นต้องถูกถามใหม่ว่ายังจริงไหม**
+   ตอนเปิดให้หัวหน้าโครงการยื่นคำขอเบิก (R14) ของใหม่ในตาราง `advances` คือแถวที่
+   **ยังไม่ใช่เงิน** · แต่สูตรทั้งห้าที่เขียนไว้ตั้งแต่สมัยที่ทุกแถวแปลว่า "จ่ายแล้ว"
+   ยังนับมันเป็นเงินหมด — `employee_balance` · `payroll_balances` ·
+   `close_payroll_run` · `report_summary` · `report_labor`
+   · อาการถ้าพลาด: คนงานถูกหักค่าแรงคืนสำหรับเงินที่ยังไม่เคยได้รับ และใบคำขอ
+   ถูกตีตราว่าหักแล้วในทรานแซกชันเดียวกัน **ไม่มี error ที่ไหนเลย ทุกยอดบนจอ
+   ยังดูสมเหตุสมผล** — ตรงกับข้อ 22 เป๊ะ แค่คนละทิศ (ข้อ 22 คือถอดกฎ · ข้อนี้คือ
+   เพิ่มค่าใหม่ให้คอลัมน์ที่โค้ดเก่าอ่านอยู่)
+   · **วิธีหา:** `grep -n "from public.advances"` ทุก migration แล้วไล่ทีละที่ว่า
+   "ถ้าแถวนี้แปลว่าคำขอ ที่นี่ยังถูกอยู่ไหม" ไม่ใช่ grep ชื่อฟังก์ชันที่คิดว่าเกี่ยว
+   · และ **default ของคอลัมน์สถานะต้องเป็นค่าที่ปลอดภัยที่สุด** (`pending`)
+   แล้วให้ทางที่จ่ายเงินจริงระบุ `approved` เอง — ตรงข้ามกันเมื่อไหร่ แถวที่
+   ใครสักคนลืมระบุจะกลายเป็นเงินที่จ่ายออกไปแล้วโดยไม่มีใครกด
+   · ของที่ต้องตามแก้พร้อมกันคือ **คนเขียนที่ไม่ใช่หน้าจอ**: `mcp_create_advance`
+   (AI คีย์แทนเจ้าของ = อนุมัติแล้ว) · `seed-demo.mjs` · `verify-payroll.mjs`
+   ซึ่ง insert ผ่าน PostgREST/SQL ตรงโดยไม่เคยส่งคอลัมน์นี้มาก่อน
 
 ## 18. ตัวแปรสภาพแวดล้อม
 

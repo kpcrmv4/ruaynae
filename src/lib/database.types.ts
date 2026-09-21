@@ -18,6 +18,8 @@ export type Database = {
         Row: {
           advance_date: string
           amount: number
+          approved_at: string | null
+          approved_by: string | null
           created_at: string
           created_by: string | null
           deducted_amount: number
@@ -27,12 +29,16 @@ export type Database = {
           note: string | null
           pay_method: Database["public"]["Enums"]["pay_method"]
           payroll_run_id: string | null
+          rejected_reason: string | null
           site_id: string | null
+          status: Database["public"]["Enums"]["advance_status"]
           updated_at: string
         }
         Insert: {
           advance_date: string
           amount: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           deducted_amount?: number
@@ -42,12 +48,16 @@ export type Database = {
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
           payroll_run_id?: string | null
+          rejected_reason?: string | null
           site_id?: string | null
+          status?: Database["public"]["Enums"]["advance_status"]
           updated_at?: string
         }
         Update: {
           advance_date?: string
           amount?: number
+          approved_at?: string | null
+          approved_by?: string | null
           created_at?: string
           created_by?: string | null
           deducted_amount?: number
@@ -57,10 +67,19 @@ export type Database = {
           note?: string | null
           pay_method?: Database["public"]["Enums"]["pay_method"]
           payroll_run_id?: string | null
+          rejected_reason?: string | null
           site_id?: string | null
+          status?: Database["public"]["Enums"]["advance_status"]
           updated_at?: string
         }
         Relationships: [
+          {
+            foreignKeyName: "advances_approved_by_fkey"
+            columns: ["approved_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "advances_created_by_fkey"
             columns: ["created_by"]
@@ -1668,6 +1687,14 @@ export type Database = {
           balance: number
         }[]
       }
+      employee_balance_raw: {
+        Args: { p_employee: string }
+        Returns: {
+          accrued: number
+          advanced: number
+          balance: number
+        }[]
+      }
       employees_delete_info: {
         Args: never
         Returns: {
@@ -1989,6 +2016,7 @@ export type Database = {
     }
     Enums: {
       adjust_kind: "add" | "deduct"
+      advance_status: "pending" | "approved" | "rejected"
       bond_kind: "cash" | "bank_guarantee"
       doc_kind: "quotation" | "invoice" | "receipt"
       doc_status: "draft" | "issued" | "sent" | "accepted" | "void"
@@ -1998,6 +2026,9 @@ export type Database = {
         | "txn_approved"
         | "txn_rejected"
         | "daily_digest"
+        | "advance_pending"
+        | "advance_approved"
+        | "advance_rejected"
       pay_method: "cash" | "transfer"
       payroll_status: "open" | "closed"
       site_status: "planning" | "active" | "paused" | "done" | "cancelled"
@@ -2134,6 +2165,7 @@ export const Constants = {
   public: {
     Enums: {
       adjust_kind: ["add", "deduct"],
+      advance_status: ["pending", "approved", "rejected"],
       bond_kind: ["cash", "bank_guarantee"],
       doc_kind: ["quotation", "invoice", "receipt"],
       doc_status: ["draft", "issued", "sent", "accepted", "void"],
@@ -2143,6 +2175,9 @@ export const Constants = {
         "txn_approved",
         "txn_rejected",
         "daily_digest",
+        "advance_pending",
+        "advance_approved",
+        "advance_rejected",
       ],
       pay_method: ["cash", "transfer"],
       payroll_status: ["open", "closed"],

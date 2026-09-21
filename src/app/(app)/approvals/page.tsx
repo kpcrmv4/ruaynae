@@ -1,6 +1,6 @@
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
-import { ClipboardCheck, Inbox } from 'lucide-react'
+import { ClipboardCheck, HandCoins, Inbox } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -47,16 +47,37 @@ export default async function ApprovalsPage({
     }
   }
 
-  const [{ data: rows, error }, { count }] = await Promise.all([
+  const [
+    { data: rows, error },
+    { count },
+    { data: advanceRows, error: aErr, count: advanceCount },
+    { data: balances, error: bErr },
+  ] = await Promise.all([
     q
       .order('created_at', { ascending: true })
       .order('id', { ascending: true })
       .range(0, PAGE_SIZE),
     sb.from('transactions').select('id', { count: 'exact', head: true }).eq('status', 'pending'),
+    // 🔴 คำขอเบิกค่าแรงที่หัวหน้าโครงการยื่นเข้ามา (R14) — คนละตารางกับรายจ่าย
+    // แต่เป็นคิวของคนเดียวกัน · เรียงเก่าก่อนด้วยเหตุผลเดียวกัน
+    sb
+      .from('advances')
+      .select(`
+        id, amount, advance_date, note, created_at, employee_id,
+        employees(full_name), sites(name),
+        profiles!advances_created_by_fkey(full_name)
+      `, { count: 'exact' })
+      .eq('status', 'pending')
+      .order('created_at', { ascending: true })
+      .order('id', { ascending: true })
+      .range(0, PAGE_SIZE),
+    // ยอดค้างจ่ายของทุกคนในคำสั่งเดียว — ไม่ใช่ยิง employee_balance ทีละคน (N+1)
+    // · คนที่ไม่มีทั้งค่าแรงค้างและยอดเบิกจะไม่อยู่ในผลลัพธ์ = คงเหลือ ฿0
+    sb.rpc('payroll_balances'),
   ])
 
-  if (error) {
-    console.error('[approvals] อ่านคิวไม่ได้', error.message)
+  if (error || aErr || bErr) {
+    console.error('[approvals] อ่านคิวไม่ได้', error?.message ?? aErr?.message ?? bErr?.message)
     return (
       <DataError message="โหลดคิวอนุมัติไม่สำเร็จ" />
     )
@@ -66,6 +87,17 @@ export default async function ApprovalsPage({
   const hasMore = all.length > PAGE_SIZE
   const page = hasMore ? all.slice(0, PAGE_SIZE) : all
   const last = page[page.length - 1]
+
+  // คำขอเบิกหน้าแรก · ที่เหลือรออยู่จนกดเคลียร์ของหน้านี้ก่อน (คิวสั้นโดยธรรมชาติ)
+  const advAll = advanceRows ?? []
+  const advPage = advAll.slice(0, PAGE_SIZE)
+  // ค่าแรงค้างจ่ายของคนนั้น ณ ตอนนี้ — ใช้เตือนว่ากำลังจะอนุมัติเกินเท่าไหร่
+  // 🔴 **เตือน ไม่ใช่ห้าม** — เบิกเกินได้ (คำสั่งเจ้าของ 20 ก.ย. 2569)
+  // คนที่ไม่อยู่ในผลลัพธ์ของ `payroll_balances()` = ไม่มีทั้งค่าแรงค้างและยอดเบิก
+  const balanceOf = new Map(
+    (balances ?? []).map((b) => [b.employee_id, Number(b.balance)] as const),
+  )
+  const pendingTotal = (count ?? 0) + (advanceCount ?? 0)
 
   // อายุของรายการในคิว — เทียบกับสิ้นวันนี้เวลาไทย ให้ของเมื่อวานนับเป็น 1 วัน
   // ค้างนานคือสัญญาณว่าหัวหน้าโครงการกำลังรอคำตอบ ไม่ใช่แค่ตัวเลขประดับ
@@ -78,26 +110,111 @@ export default async function ApprovalsPage({
       <PageHeader
         title="รออนุมัติ"
         titleExtra={
-          (count ?? 0) > 0 ? (
+          pendingTotal > 0 ? (
             <span className="chip text-status-progress bg-status-progress-bg ring-status-progress-ring">
               <ClipboardCheck className="size-3.5" />
-              <span className="tnum">{count}</span> รายการ
+              <span className="tnum">{pendingTotal}</span> รายการ
             </span>
           ) : null
         }
-        subtitle="รายจ่ายที่หัวหน้าโครงการคีย์เข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด"
+        subtitle="รายจ่ายและคำขอเบิกค่าแรงที่หัวหน้าโครงการส่งเข้ามา · เรียงคนที่รอนานที่สุดไว้บนสุด"
       />
 
+      {/* ── คำขอเบิกค่าแรง (R14) ────────────────────────────────────────
+          อยู่บนคิวรายจ่ายเพราะมันคือ **คนกำลังรอเงินอยู่หน้างาน** ไม่ใช่เอกสาร
+          ที่รอตรวจ · ใบละไม่กี่วินาทีในการตัดสินใจ แต่ค้างหนึ่งวันแปลว่า
+          ลูกน้องของหัวหน้าโครงการยังไม่ได้เงิน */}
+      {advPage.length > 0 && (
+        <section className="panel mb-5">
+          <div className="panel-head">
+            <HandCoins className="size-4 text-brand" />
+            คำขอเบิกค่าแรง
+            <span className="ml-auto text-xs font-normal tnum text-muted-token">
+              {advanceCount ?? advPage.length} รายการ
+            </span>
+          </div>
+          {advPage.map((a) => {
+            const balance = balanceOf.get(a.employee_id) ?? 0
+            // เหลือให้เบิกเท่าไหร่ก่อนจะเกินค่าแรงที่เขาทำมาแล้ว
+            const over = Number(a.amount) - balance
+            return (
+              <div
+                key={a.id}
+                className="flex flex-wrap items-start gap-x-3 gap-y-2.5 border-b border-line-soft px-3.5 py-3.5 last:border-b-0 md:px-4"
+              >
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                    <span className="text-base font-bold tnum text-ink">
+                      {fmtBaht(Number(a.amount))}
+                    </span>
+                    <span className="truncate font-semibold text-ink">
+                      {a.employees?.full_name ?? 'คนงานที่ถูกลบแล้ว'}
+                    </span>
+                    <span className="chip border border-brand-tint-strong bg-brand-tint text-brand-on-tint ring-0">
+                      {a.sites?.name ?? 'ไม่ระบุโครงการ'}
+                    </span>
+                  </div>
+                  <div className="mt-0.5 text-sm text-muted-token">
+                    {fmtDate(a.advance_date)}
+                    {' · ยื่นโดย '}
+                    <span className="font-medium text-ink-2">
+                      {a.profiles?.full_name ?? 'ผู้ใช้ที่ถูกลบแล้ว'}
+                    </span>
+                    {ageDays(a.created_at) >= 1 && (
+                      <>
+                        {' · '}
+                        <span
+                          className={
+                            ageDays(a.created_at) >= 2 ? 'font-semibold text-urgent' : undefined
+                          }
+                        >
+                          ค้าง {ageDays(a.created_at)} วัน
+                        </span>
+                      </>
+                    )}
+                  </div>
+                  {a.note && <div className="mt-0.5 text-sm text-ink-2">{a.note}</div>}
+                  {/* 🔴 ตัวเลขที่เจ้าของต้องเห็นก่อนกด — ไม่ได้ปิดปุ่ม เพราะ
+                      เจ้าของสั่งเองว่า "เบิกเกินได้ เดี๋ยวผมจะอนุมัติอีกที" */}
+                  <div
+                    data-advance-warning={over > 0 ? 'over' : 'ok'}
+                    className={`mt-1 text-sm ${over > 0 ? 'text-urgent' : 'text-muted-token'}`}
+                  >
+                    {over > 0 ? (
+                      <>
+                        เกินค่าแรงค้างจ่าย <span className="font-semibold tnum">{fmtBaht(over)}</span>
+                        {' · ส่วนที่เกินจะถูกหักคืนจากค่าแรงงวดถัดไปจนครบ'}
+                      </>
+                    ) : (
+                      <>
+                        ค่าแรงค้างจ่ายของเขาตอนนี้{' '}
+                        <span className="font-semibold tnum">{fmtBaht(balance)}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex w-full shrink-0 flex-col gap-2 sm:w-auto sm:flex-row sm:items-center">
+                  <ApprovalActions id={a.id} amount={Number(a.amount)} kind="advance" />
+                </div>
+              </div>
+            )
+          })}
+        </section>
+      )}
+
       {page.length === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          message="ไม่มีรายการรออนุมัติ — ทุกอย่างที่หัวหน้าโครงการคีย์เข้ามาถูกตรวจครบแล้ว"
-          action={
-            <Link href="/ledger" className="btn-secondary">
-              ดูรายการทั้งหมด
-            </Link>
-          }
-        />
+        advPage.length === 0 ? (
+          <EmptyState
+            icon={Inbox}
+            message="ไม่มีรายการรออนุมัติ — ทุกอย่างที่หัวหน้าโครงการส่งเข้ามาถูกตรวจครบแล้ว"
+            action={
+              <Link href="/ledger" className="btn-secondary">
+                ดูรายการทั้งหมด
+              </Link>
+            }
+          />
+        ) : null
       ) : (
         <>
           <div className="panel">

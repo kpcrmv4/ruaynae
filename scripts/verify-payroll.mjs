@@ -162,7 +162,7 @@ try {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
-        employee_id: empId, amount: 1000, advance_date: day(0), site_id: siteId }),
+        employee_id: empId, amount: 1000, advance_date: day(0), site_id: siteId, status: 'approved' }),
     })
     const after = await countOf('advances')
     check('P5-DB-01 ค่าแรงค้างจ่าย ฿3,300 · เบิก ฿1,000 → สำเร็จ · advances +1',
@@ -186,7 +186,7 @@ try {
     const bal = await balanceOf()
     const r = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 2500, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 2500, advance_date: day(0), status: 'approved' }),
     })
     const after = await balanceOf()
     check('P5-DB-03 เบิกอีก ฿2,500 บนคงเหลือ ฿2,300 → ผ่าน · คงเหลือกลายเป็น −฿200 พอดี',
@@ -202,7 +202,7 @@ try {
     const before = await countOf('advances')
     const over = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 4000, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 4000, advance_date: day(0), status: 'approved' }),
     })
     const after = await countOf('advances')
     const bal = await balanceOf()
@@ -223,12 +223,12 @@ try {
     const r = await db(ownerTok, '/advances', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ employee_id: empId, amount: 120, advance_date: back }),
+      body: JSON.stringify({ employee_id: empId, amount: 120, advance_date: back, status: 'approved' }),
     })
     const saved = r.body?.[0]?.advance_date ?? null
     const future = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 120, advance_date: day(1) }),
+      body: JSON.stringify({ employee_id: empId, amount: 120, advance_date: day(1), status: 'approved' }),
     })
     check('P5-DB-22 ลงเบิกย้อนหลัง 4 วัน → เก็บวันที่ส่งมา ไม่ใช่วันนี้ · วันในอนาคตยังถูกปฏิเสธ',
       r.status === 201 && saved === back && saved !== day(0) && future.status >= 400,
@@ -242,7 +242,7 @@ try {
     for (const a of [0, -500]) {
       const r = await db(ownerTok, '/advances', {
         method: 'POST',
-        body: JSON.stringify({ employee_id: empId, amount: a, advance_date: day(0) }),
+        body: JSON.stringify({ employee_id: empId, amount: a, advance_date: day(0), status: 'approved' }),
       })
       bad.push(r.status)
     }
@@ -262,7 +262,7 @@ try {
     }
     const write = await db(supTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0), status: 'approved' }),
     })
     const ownerSees = (await db(ownerTok, '/advances?select=id')).body?.length ?? 0
     check('P5-DB-06 หัวหน้าโครงการอ่านทั้งสามตารางได้ 0 แถวและเขียนไม่ได้ · เจ้าของอ่านได้ > 0',
@@ -374,7 +374,7 @@ try {
     const bal = await balanceOf()
     const r = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0), status: 'approved' }),
     })
     const after = await balanceOf()
     check('P5-DB-04 หลังปิดรอบ ค้างจ่าย ฿0 → เบิก ฿100 ยังทำได้ · คงเหลือเป็น −฿100 (ไม่ใช่ถูกปฏิเสธ)',
@@ -400,7 +400,7 @@ try {
     }
     await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: emp2Id, amount: 1800, advance_date: day(-20) }),
+      body: JSON.stringify({ employee_id: emp2Id, amount: 1800, advance_date: day(-20), status: 'approved' }),
     })
     const paid = await rpc(ownerTok, 'pay_employee_wage', { p_employee: emp2Id })
     run2Id = paid.body?.[0]?.run_id ?? null
@@ -412,7 +412,7 @@ try {
       `select amount, deducted_amount, payroll_run_id from public.advances
         where employee_id = '${emp2Id}'`)).rows[0] ?? {}
     const bal = (await sql(
-      `select balance from public.employee_balance('${emp2Id}')`)).rows[0] ?? {}
+      `select balance from public.employee_balance_raw('${emp2Id}')`)).rows[0] ?? {}
 
     check('P5-DB-23 ค่าแรง ฿1,100 · เบิกไว้ ฿1,800 → จ่ายจริง ฿0 · หักได้ ฿1,100 · ค้างต่อ ฿700',
       Number(line.accrued) === 1100 && Number(line.advance_deducted) === 1100
@@ -432,7 +432,7 @@ try {
     const fresh = await db(ownerTok, '/advances', {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
-      body: JSON.stringify({ employee_id: emp2Id, amount: 50, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: emp2Id, amount: 50, advance_date: day(0), status: 'approved' }),
     })
     const freshId = fresh.body?.[0]?.id
     const delFresh = await db(ownerTok, `/advances?id=eq.${freshId}`, { method: 'DELETE' })

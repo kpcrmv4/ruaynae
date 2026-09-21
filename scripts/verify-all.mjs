@@ -29,7 +29,7 @@ const SCRIPTS = [
   // แต่ทุกไฟเขียว" ซึ่งทำให้ผลของสคริปต์ที่เหลือน่าเชื่อถือน้อยลงทั้งชุด
   'verify-client-boundary',
   'verify-p0', 'verify-p0-rest', 'verify-rls', 'verify-auth', 'verify-shell',
-  'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api', 'verify-txn', 'verify-txn-edit', 'verify-slips', 'verify-ledger', 'verify-money', 'verify-notify', 'verify-approvals', 'verify-bell', 'verify-employees', 'verify-workers', 'verify-attendance', 'verify-payroll', 'verify-payroll-ui', 'verify-pay-wage', 'verify-recurring', 'verify-digest', 'verify-audit', 'verify-pwa', 'verify-mcp', 'verify-mcp-write', 'verify-back-button', 'verify-ledger-summary',
+  'verify-r2', 'verify-users', 'verify-sites', 'verify-sites-api', 'verify-txn', 'verify-txn-edit', 'verify-slips', 'verify-ledger', 'verify-money', 'verify-notify', 'verify-approvals', 'verify-bell', 'verify-employees', 'verify-workers', 'verify-attendance', 'verify-payroll', 'verify-payroll-ui', 'verify-pay-wage', 'verify-advance-requests', 'verify-recurring', 'verify-digest', 'verify-audit', 'verify-pwa', 'verify-mcp', 'verify-mcp-write', 'verify-back-button', 'verify-ledger-summary',
   'verify-doc-math', 'verify-documents',
   // ท้ายสุดเสมอ — ตรวจว่า "ติ๊ก" ในตารางตรวจรับมีของจริงรองรับ
   // ตัวนี้ไม่ได้ทดสอบแอป มันทดสอบ**เอกสารที่บอกว่าแอปถูกทดสอบแล้ว**

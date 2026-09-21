@@ -287,8 +287,10 @@ await sql(`
 // ── เบิกล่วงหน้า — วิชัยเบิกเกือบเต็มเพดาน (ค่าแรง ฿2,520 เบิก ฿2,500) ──
 // ให้เห็นบนหน้าจอว่าเหลือเบิกได้อีกแค่ ฿20
 await sql(`
-  insert into public.advances(employee_id, amount, advance_date, pay_method, site_id)
-  select v.emp::uuid, v.amount, v.d::date, 'cash', ${q(siteA)}
+  insert into public.advances(employee_id, amount, advance_date, pay_method, site_id, status)
+  -- 🔴 ต้องระบุสถานะ approved เอง — ตั้งแต่ R14 ค่าตั้งต้นของคอลัมน์คือ pending
+  -- (คำขอที่หัวหน้าโครงการยื่น) · ใบเดโม่พวกนี้คือเงินที่จ่ายไปแล้ว
+  select v.emp::uuid, v.amount, v.d::date, 'cash', ${q(siteA)}, 'approved'
   from (values
     (${q(emp.get('สมพงษ์ ใจดี'))}, 1000, ${q(day(-2))}),
     (${q(emp.get('วิชัย ทองสุข'))}, 2500, ${q(day(-1))})
@@ -353,7 +355,7 @@ if (Number(pending) !== 3) problems.push(`ควรมีรายการร�
 
 const [{ n: overCeiling }] = await sql(`
   select count(*)::int n from public.employees e
-  cross join lateral public.employee_balance(e.id) b
+  cross join lateral public.employee_balance_raw(e.id) b
   where b.balance < 0`)
 if (Number(overCeiling) > 0) problems.push(`มีคนที่ยอดค้างจ่ายติดลบ ${overCeiling} คน`)
 

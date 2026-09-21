@@ -177,11 +177,11 @@ try {
   const { rows } = await sql(`
     select e.full_name, b.balance
     from public.employees e
-    cross join lateral public.employee_balance(e.id) b
+    cross join lateral public.employee_balance_raw(e.id) b
     where b.balance > 0 and b.balance < 100`)
   const { rows: neg } = await sql(`
     select count(*)::int n from public.employees e
-    cross join lateral public.employee_balance(e.id) b where b.balance < 0`)
+    cross join lateral public.employee_balance_raw(e.id) b where b.balance < 0`)
   check('P8-SEED-06 มีคนที่เหลือเบิกได้น้อยมาก (ให้เห็นสถานะใกล้เต็มเพดาน) · ไม่มีใครติดลบ',
     rows.length > 0 && Number(neg[0].n) === 0,
     rows.length ? `${rows[0].full_name} เหลือ ฿${rows[0].balance}` : 'ไม่มีใครใกล้เต็มเพดาน')

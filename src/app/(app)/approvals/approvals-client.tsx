@@ -5,7 +5,7 @@ import { Check, Loader2, Undo2 } from 'lucide-react'
 import { useState } from 'react'
 import { fmtBaht } from '@/lib/format'
 import { MAX_NOTE } from '@/lib/transactions'
-import { useApproval } from './use-approval'
+import { useApproval, type ApprovalKind } from './use-approval'
 
 /**
  * ปุ่มอนุมัติ / ตีกลับ ของหนึ่งรายการ
@@ -16,8 +16,17 @@ import { useApproval } from './use-approval'
  *
  * การยิงจริงอยู่ใน `useApproval` — กล่องรายละเอียดใช้ตัวเดียวกัน
  */
-export function ApprovalActions({ id, amount }: { id: string; amount: number }) {
-  const { busy, send } = useApproval(id)
+export function ApprovalActions({
+  id,
+  amount,
+  kind = 'transaction',
+}: {
+  id: string
+  amount: number
+  /** คิวเดียวกันใช้ปุ่มคู่เดียวกัน — ต่างกันแค่ยิงไปคนละตาราง */
+  kind?: ApprovalKind
+}) {
+  const { busy, send } = useApproval(id, kind)
   const [open, setOpen] = useState(false)
   const [reason, setReason] = useState('')
   const [fieldError, setFieldError] = useState('')
@@ -54,21 +63,23 @@ export function ApprovalActions({ id, amount }: { id: string; amount: number }) 
           className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
         >
           <Undo2 className="size-4" />
-          ตีกลับ
+          {kind === 'advance' ? 'ไม่อนุมัติ' : 'ตีกลับ'}
         </Dialog.Trigger>
         <Dialog.Portal>
           <Dialog.Overlay className="fixed inset-0 z-40 bg-black/40 animate-fade-in" />
           <Dialog.Content className="fixed left-1/2 top-1/2 z-50 max-h-[90svh] w-[min(30rem,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 overflow-y-auto rounded-lg border border-line bg-surface p-5 shadow-e3 animate-pop-in">
             <Dialog.Title className="text-lg font-bold text-ink">
-              ตีกลับรายการ {fmtBaht(amount)}
+              {kind === 'advance' ? 'ไม่อนุมัติคำขอเบิก' : 'ตีกลับรายการ'} {fmtBaht(amount)}
             </Dialog.Title>
             <Dialog.Description className="mt-0.5 text-sm text-muted-token">
-              คนที่คีย์จะได้รับแจ้งเตือนพร้อมเหตุผลนี้ เพื่อให้แก้แล้วส่งใหม่ได้
+              {kind === 'advance'
+                ? 'หัวหน้าโครงการที่ยื่นจะได้รับแจ้งเตือนพร้อมเหตุผลนี้ และแก้แล้วส่งใหม่ได้'
+                : 'คนที่คีย์จะได้รับแจ้งเตือนพร้อมเหตุผลนี้ เพื่อให้แก้แล้วส่งใหม่ได้'}
             </Dialog.Description>
 
             <div className="mt-4">
               <label htmlFor={`reason-${id}`} className="label-base">
-                เหตุผลที่ตีกลับ
+                {kind === 'advance' ? 'เหตุผลที่ไม่อนุมัติ' : 'เหตุผลที่ตีกลับ'}
               </label>
               <textarea
                 id={`reason-${id}`}
@@ -79,7 +90,7 @@ export function ApprovalActions({ id, amount }: { id: string; amount: number }) 
                 }}
                 maxLength={MAX_NOTE}
                 rows={3}
-                placeholder="เช่น สลิปเบลอ อ่านยอดไม่ออก"
+                placeholder={kind === 'advance' ? 'เช่น เพิ่งเบิกไปเมื่อวาน' : 'เช่น สลิปเบลอ อ่านยอดไม่ออก'}
                 aria-invalid={fieldError ? 'true' : undefined}
                 className="input-base"
                 autoFocus
@@ -102,7 +113,7 @@ export function ApprovalActions({ id, amount }: { id: string; amount: number }) 
                 ) : (
                   <Undo2 className="size-4" />
                 )}
-                ยืนยันตีกลับ
+                {kind === 'advance' ? 'ยืนยันไม่อนุมัติ' : 'ยืนยันตีกลับ'}
               </button>
             </div>
           </Dialog.Content>

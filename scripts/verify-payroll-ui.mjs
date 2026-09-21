@@ -137,14 +137,31 @@ try {
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }
 
-  // ── P5-API-01 · หัวหน้าโครงการบันทึกเบิกไม่ได้ ───────────────────────
+  // ── P5-API-01 (แก้ตาม R14) · หัวหน้าโครงการยื่นคำขอได้ แต่ต้องผูกโครงการ ──
+  // 🔴 แถวนี้เคยยืนยันว่า "หัวหน้าโครงการบันทึกเบิกไม่ได้ → 403" · คำสั่งเจ้าของ
+  // 21 ก.ย. 2569 เปิดให้เขา **ยื่นคำขอ** ได้ สิ่งที่ยังต้องยืนยันจึงกลายเป็น
+  // ขอบเขตของเขา: ใบที่ไม่ผูกโครงการเป็นของเจ้าของเท่านั้น (เหมือนรายจ่ายส่วนกลาง)
   {
     const before = await countOf('advances')
     const r = await req('POST', '/api/advances', {
       employeeId: empId, amount: '500', advanceDate: today }, supJar)
     const b = await r.json().catch(() => ({}))
     const after = await countOf('advances')
-    check('P5-API-01 หัวหน้าโครงการยิง POST /api/advances → 403 FORBIDDEN · ไม่มีแถวใหม่',
+    check('P5-API-01 หัวหน้าโครงการยิง POST /api/advances โดยไม่ผูกโครงการ → 400 SITE_REQUIRED · ไม่มีแถวใหม่',
+      r.status === 400 && b.error === 'SITE_REQUIRED' && after === before,
+      `${r.status} ${b.error} · ${before}→${after}`)
+  }
+
+  // ── R14-API-03 · โครงการที่ไม่ได้ดูแล → RLS ปฏิเสธ ───────────────────
+  // fixture ของสคริปต์นี้ไม่ได้ตั้งหัวหน้าโครงการให้ `siteId` เลย มันจึงเป็น
+  // "โครงการของคนอื่น" ในสายตาของ supJar พอดี
+  {
+    const before = await countOf('advances')
+    const r = await req('POST', '/api/advances', {
+      employeeId: empId, amount: '500', advanceDate: today, siteId }, supJar)
+    const b = await r.json().catch(() => ({}))
+    const after = await countOf('advances')
+    check('R14-API-03 หัวหน้าโครงการยื่นคำขอให้โครงการที่ไม่ได้ดูแล → 403 · ไม่มีแถวใหม่',
       r.status === 403 && b.error === 'FORBIDDEN' && after === before,
       `${r.status} ${b.error} · ${before}→${after}`)
   }

@@ -158,6 +158,10 @@ create type advance_status as enum ('pending','approved','rejected');
    · ลืมที่ใดที่หนึ่ง = คนงานถูกหักเงินที่ยังไม่เคยได้รับ และใบคำขอถูกตีตราว่า
    "หักแล้ว" โดยไม่มี error ที่ไหนเลย · หัวหน้าโครงการตั้งสถานะเองไม่ได้
    (`APPROVE_FORBIDDEN`) · ใบที่ถูกหักคืนไปแล้วเปลี่ยนสถานะไม่ได้ (`PAYROLL_CLOSED`)
+   · 🔴 **เจ้าของ insert = `approved` เสมอ** ไม่ว่าจะส่งสถานะมาหรือไม่ (migration
+   `20260922090000`) — เจ้าของคีย์เบิกคือเงินสดออกไปแล้ว ไม่ใช่คำขอ · กฎนี้ทำให้
+   client เวอร์ชันเก่า (ที่ยังไม่รู้จักคอลัมน์ `status`) ปลอดภัยด้วย ซึ่งสำคัญมาก
+   ในช่วงระหว่าง "apply migration" กับ "deploy โค้ด" ที่ทั้งสองอย่างไม่ได้เกิดพร้อมกัน
 2. **`wage_snapshot` ห้ามแก้หลังปิดรอบ** — guard trigger บน `attendance`
 3. **`transactions.status`** — supervisor เปลี่ยนเป็น `approved` ไม่ได้ · supervisor แก้/ลบรายการที่
    `approved` แล้วไม่ได้ · supervisor แก้รายการที่ `rejected` ของตัวเองได้ และ trigger จะดันสถานะ
@@ -531,7 +535,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
       · 🔴 **ทุกสูตรที่นับ "เบิกไปแล้ว" ต้องกรอง `status='approved'`** (§5 ข้อ 1b)
       · ✅ **apply บนฐานจริงแล้ว 22 ก.ย. 2569** · types ที่ generate มา diff กับที่เขียนมือ
       **ว่างเปล่า** · ใบเบิกเดิม 16 ใบเป็น `approved` ครบ ยอดคงเหลือ 12 คนเท่าเดิมทุกบาท
-      · advisors ERROR 0 · **`node scripts/verify-advance-db.mjs` 23/23 ผ่านบนฐานจริง**
+      · advisors ERROR 0 · **`node scripts/verify-advance-db.mjs` 25/25 ผ่านบนฐานจริง**
       (ทุกอย่างอยู่ใน `do` block ที่จบด้วย `raise exception` = rollback ทั้งก้อน จึงรันบน
       ฐานลูกค้าได้โดยไม่ทิ้งของค้าง และสวมสิทธิ์ด้วย `set local role authenticated` จึง
       ทดสอบ RLS จริง) · ยังเหลือ **ฝั่ง API กับหน้าจอ** ที่ต้องรันบนฐานที่มีบัญชี `SEED_*`
@@ -855,7 +859,7 @@ docs/design/{demo.html,DESIGN.md} · docs/test-plan/*.md · docs/LESSONS.md
    — ถ้าไม่สลับ role ทุก policy จะถูกข้ามและสคริปต์จะเขียวโดยไม่ได้ตรวจอะไรเลย
    · 🔴 **ถ้าคำสั่งสำเร็จแทนที่จะโยน exception = แดงทันที** ไม่ใช่เขียว เพราะแปลว่า
    รายงานไม่ถูกส่งกลับ และอาจมีของค้างจริง · ตัวอย่าง: `scripts/verify-advance-db.mjs`
-   (R14 · 23 แถว รันบนฐานลูกค้า 22 ก.ย. 2569 · ตรวจของค้างหลังรัน = 0 ทุกตาราง)
+   (R14 · 25 แถว รันบนฐานลูกค้า 22 ก.ย. 2569 · ตรวจของค้างหลังรัน = 0 ทุกตาราง)
 
 ## 18. ตัวแปรสภาพแวดล้อม
 

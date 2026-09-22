@@ -195,8 +195,17 @@ begin
     v_out := v_out || format(E'❌ R14-NOTIF pending=%s rejected=%s\\n', v_num, v_num2); end if;
 
   -- R14-DB-16/17 · จ่ายค่าแรงตอนมีคำขอค้างอยู่
-  insert into public.advances(employee_id, amount, advance_date, site_id, status)
-    values (v_emp, 900, v_today, v_site, 'pending') returning id into v_adv2;
+  -- 🔴 คำขอต้องถูก **ยื่นโดยหัวหน้าโครงการจริง ๆ** — insert ใต้สิทธิ์เจ้าของเมื่อไหร่
+  -- guard จะดันเป็นสถานะ approved ให้ (กฎ 22 ก.ย. 2569: เจ้าของคีย์เอง = จ่ายเงินแล้ว)
+  -- แล้วแถวตรวจนี้จะวัดคนละเรื่องกับที่ตั้งใจ โดยที่ตัวเลขยังดูสมเหตุสมผล
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_sup::text, 'role', 'authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into public.advances(employee_id, amount, advance_date, site_id)
+    values (v_emp, 900, v_today, v_site) returning id into v_adv2;
+  reset role;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', v_owner::text, 'role', 'authenticated')::text, true);
   select run_id into v_run from public.pay_employee_wage(v_emp);
   select accrued, advance_deducted, net_paid into v_num, v_num2, v_num3
     from public.payroll_lines where run_id = v_run and employee_id = v_emp;
@@ -312,8 +321,14 @@ begin
   else v_fail := v_fail+1; v_out := v_out || format(E'❌ R14-DB-12 แจ้งเตือนเพิ่มจาก %s เป็น %s\\n', v_n, v_num); end if;
 
   -- R14-DB-18 · รายงานนับเฉพาะที่อนุมัติแล้ว
-  insert into public.advances(employee_id,amount,advance_date,site_id,status)
-    values (v_emp,700,v_today,v_site,'pending');
+  perform set_config('request.jwt.claims',
+    json_build_object('sub',v_sup::text,'role','authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into public.advances(employee_id,amount,advance_date,site_id)
+    values (v_emp,700,v_today,v_site);
+  reset role;
+  perform set_config('request.jwt.claims',
+    json_build_object('sub',v_owner::text,'role','authenticated')::text, true);
   select advance_paid into v_num  from public.report_summary(v_today, v_today, v_site);
   select advance_paid into v_num2 from public.report_labor(v_today, v_today, v_site);
   if v_num = 1500 and v_num2 = 1500 then v_pass := v_pass+1;
@@ -353,12 +368,51 @@ begin
   raise exception '%', v_out;
 end $check$;`
 
+const BLOCK3 = `do $c$
+declare
+  v_out text := E'\\n';
+  v_owner uuid; v_sup uuid; v_site uuid; v_emp uuid; v_id uuid; v_st text; v_by uuid;
+  v_today date := (now() at time zone 'Asia/Bangkok')::date;
+  v_pass int := 0; v_fail int := 0;
+begin
+  perform pg_catalog.set_config('search_path','public',true);
+  select id into v_owner from public.profiles where role='owner' and is_active limit 1;
+  select id into v_sup   from public.profiles where role='site_supervisor' and is_active limit 1;
+  insert into public.sites(name,status) values ('R14 ตรวจ owner','active') returning id into v_site;
+  insert into public.site_supervisors(site_id,profile_id,effective_from) values (v_site,v_sup,v_today-30);
+  insert into public.employees(full_name,job_title) values ('R14 ตรวจ owner','กรรมกร') returning id into v_emp;
+
+  -- R14-DB-24 · เจ้าของคีย์เบิกโดย **ไม่ส่งคอลัมน์ status** (โค้ดก่อน R14 ที่ยัง deploy อยู่)
+  perform set_config('request.jwt.claims', json_build_object('sub',v_owner::text,'role','authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into public.advances(employee_id, amount, advance_date, site_id)
+    values (v_emp, 500, v_today, v_site) returning id into v_id;
+  reset role;
+  select status::text, approved_by into v_st, v_by from public.advances where id = v_id;
+  if v_st = 'approved' and v_by = v_owner then v_pass := v_pass+1;
+    v_out := v_out || E'✅ R14-DB-24 เจ้าของ insert ไม่ส่งสถานะ → approved + approved_by (โค้ดเก่าที่ยัง deploy อยู่ปลอดภัย)\\n';
+  else v_fail := v_fail+1; v_out := v_out || format(E'❌ R14-DB-24 ได้ status=%s\\n', v_st); end if;
+
+  -- คู่ตรงข้าม: หัวหน้าโครงการยังถูกบังคับเป็น pending เหมือนเดิม
+  perform set_config('request.jwt.claims', json_build_object('sub',v_sup::text,'role','authenticated')::text, true);
+  execute 'set local role authenticated';
+  insert into public.advances(employee_id, amount, advance_date, site_id)
+    values (v_emp, 300, v_today, v_site) returning id into v_id;
+  reset role;
+  select status::text into v_st from public.advances where id = v_id;
+  if v_st = 'pending' then v_pass := v_pass+1;
+    v_out := v_out || E'✅ R14-DB-24b หัวหน้าโครงการ insert → ยังเป็น pending เหมือนเดิม\\n';
+  else v_fail := v_fail+1; v_out := v_out || format(E'❌ R14-DB-24b หัวหน้าโครงการได้ status=%s\\n', v_st); end if;
+
+  raise exception '%', v_out;
+end $c$;`
+
 console.log('\n── R14 · คำขอเบิกค่าแรง (ฐานข้อมูล) ──────────────────────────')
 
 let pass = 0
 let fail = 0
 
-for (const [i, sql] of [BLOCK1, BLOCK2].entries()) {
+for (const [i, sql] of [BLOCK1, BLOCK2, BLOCK3].entries()) {
   const { rolledBack, message } = await run(sql)
   if (!rolledBack) {
     fail += 1

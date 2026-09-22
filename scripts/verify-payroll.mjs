@@ -13,7 +13,7 @@
  *   รวมต้นทุน ฿3,300 · เงินสดออก ฿3,300 · ค้างจ่าย ฿0
  */
 import { readFileSync } from 'node:fs'
-import { derivePassword, syntheticEmail } from '../src/lib/pin-core.ts'
+import { derivePassword, hashPin } from '../src/lib/pin-core.ts'
 
 const env = Object.fromEntries(
   readFileSync('.env.local', 'utf8').split('\n')
@@ -71,10 +71,33 @@ const sql = async (q) => {
 console.log('\n── P5-DB · เบิกล่วงหน้า + รอบจ่ายค่าแรง ─────────────────────')
 
 const ownerTok = await signIn(env.SEED_OWNER_EMAIL, env.SEED_OWNER_PASSWORD)
-const supTok = await signIn(
-  syntheticEmail('sup1'),
-  derivePassword(env.PIN_PEPPER, env.SEED_SUPERVISOR1_PIN),
-)
+
+/**
+ * บัญชีหัวหน้าโครงการของชุดเดโม่ — **อาจไม่มีในฐานที่ใช้งานจริง**
+ *
+ * 🔴 ล้มแล้วโยนทิ้งทั้งสคริปต์ไม่ได้ เพราะแถวที่เหลืออีกยี่สิบกว่าแถวไม่ได้ใช้บัญชีนี้เลย
+ * · และห้าม seed ผู้ใช้เดโม่ลงฐานที่มีข้อมูลจริงเพื่อให้สคริปต์เขียว — นั่นคือ
+ *   การสร้างบัญชีล็อกอินค้างไว้บนระบบของลูกค้าเพื่อความสะดวกของตัวตรวจ
+ * · แถวที่ต้องใช้บัญชีนี้จึงรายงานว่า **ตัดสินไม่ได้** ไม่ใช่ "ผ่าน" และไม่ใช่ "ตก"
+ */
+const supTok = await (async () => {
+  // หาอีเมลสังเคราะห์ของเจ้าของ PIN ใบนี้จาก `pin_hash` — **ห้ามเดาจากชื่อ
+  // ในไฟล์ seed** เพราะฐานที่ใช้งานจริงตั้งชื่อหัวหน้าโครงการเป็นอย่างอื่น
+  // แล้ว `syntheticEmail('sup1')` จะไม่มีอยู่จริง (วิธีเดียวกับที่ /api/auth/pin ใช้)
+  const hash = hashPin(env.PIN_PEPPER, env.SEED_SUPERVISOR1_PIN ?? '')
+  const { rows } = await sql(
+    `select u.email from auth.users u
+       join public.profiles p on p.id = u.id
+      where p.pin_hash = '${hash}' and p.is_active limit 1`)
+  const email = rows?.[0]?.email
+  if (!email) return null
+  return signIn(email, derivePassword(env.PIN_PEPPER, env.SEED_SUPERVISOR1_PIN)).catch(() => null)
+})()
+const undecided = []
+const skip = (label, why) => {
+  undecided.push(label)
+  console.log(`  ⏭ ${label} — ตัดสินไม่ได้: ${why}`)
+}
 
 const day = (offset) => {
   const d = new Date(
@@ -90,6 +113,11 @@ const MARK = 'ทดสอบรอบจ่าย'
 let siteId = null
 let empId = null
 let runId = null
+/** คนที่สองกับรอบของเขา — ใช้เฉพาะฉากยกยอดเบิกเกิน (P5-DB-23/24) */
+let emp2Id = null
+let run2Id = null
+/** id ของ attendance ที่ fixture สร้างเอง — ใช้ตามลบ audit ของตัวเองแบบตรงตัว */
+const attIds = []
 
 /** ต้นทุนรวมของโครงการตามที่ RPC คำนวณ — ตัวเลขเดียวกับที่หน้าจอวาด */
 const siteCost = async () => {
@@ -119,8 +147,9 @@ try {
 
   // ทำงาน 6 วัน × ฿550 = ฿3,300 (ตัวอย่างจาก DESIGN.md §5.4)
   for (let i = 1; i <= 6; i++) {
-    await sql(`insert into public.attendance(work_date, site_id, employee_id, work_units)
-               values ('${day(-i)}', '${siteId}', '${empId}', 1)`)
+    const r = await sql(`insert into public.attendance(work_date, site_id, employee_id, work_units)
+               values ('${day(-i)}', '${siteId}', '${empId}', 1) returning id`)
+    if (r.rows?.[0]?.id) attIds.push(r.rows[0].id)
   }
 
   const costAfterWork = await siteCost()
@@ -133,7 +162,7 @@ try {
       method: 'POST',
       headers: { Prefer: 'return=representation' },
       body: JSON.stringify({
-        employee_id: empId, amount: 1000, advance_date: day(0), site_id: siteId }),
+        employee_id: empId, amount: 1000, advance_date: day(0), site_id: siteId, status: 'approved' }),
     })
     const after = await countOf('advances')
     check('P5-DB-01 ค่าแรงค้างจ่าย ฿3,300 · เบิก ฿1,000 → สำเร็จ · advances +1',
@@ -149,40 +178,62 @@ try {
       `ก่อนเบิก ฿${costAfterWork} → หลังเบิก ฿${costNow}`)
   }
 
-  // ── P5-DB-03 · เพดานคิดจากยอดที่เบิกไปแล้วด้วย ────────────────────
+  // ── P5-DB-03 · ยอดคงเหลือหักยอดที่เบิกไปแล้วด้วย ──────────────────
+  // (เดิมแถวนี้ยืนยันว่า "เพดานคิดจากยอดที่เบิกไปแล้ว" แล้วปฏิเสธ · เจ้าของสั่ง
+  //  20 ก.ย. 2569 ให้เบิกเกินได้ สิ่งที่ต้องยืนยันจึงเปลี่ยนเป็น **ตัวเลขที่เอาไปเตือน**
+  //  ต้องถูกต้อง ไม่ใช่การปฏิเสธ)
   {
     const bal = await balanceOf()
     const r = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 2500, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 2500, advance_date: day(0), status: 'approved' }),
     })
-    check('P5-DB-03 เบิกอีก ฿2,500 บนคงเหลือ ฿2,300 → ปฏิเสธ · เพดานคิดจากยอดที่เบิกไปแล้วด้วย',
-      bal.balance === 2300 && /ADVANCE_OVER_CEILING/.test(r.raw ?? ''),
-      `คงเหลือ ฿${bal.balance} · ${r.status}`)
+    const after = await balanceOf()
+    check('P5-DB-03 เบิกอีก ฿2,500 บนคงเหลือ ฿2,300 → ผ่าน · คงเหลือกลายเป็น −฿200 พอดี',
+      bal.balance === 2300 && r.status === 201 && after.balance === -200
+      && after.advanced === 3500,
+      `คงเหลือ ฿${bal.balance} → ฿${after.balance} · ${r.status}`)
+    // คืนสภาพ: ลบใบ ฿2,500 ออก เหลือ ฿1,000 ตามตัวอย่างใน DESIGN
+    await sql(`delete from public.advances where employee_id = '${empId}' and amount = 2500`)
   }
 
-  // ── P5-DB-02 · เกินเพดานถูกปฏิเสธ · พอดีเพดานผ่าน ─────────────────
+  // ── P5-DB-02 · เบิกเกินค่าแรงค้างจ่ายได้ · คงเหลือติดลบเท่าที่เกินจริง ──
   {
     const before = await countOf('advances')
     const over = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 4000, advance_date: day(0) }),
-    })
-    const mid = await countOf('advances')
-    // ฝั่งบวก: เบิกพอดีเพดานที่เหลือต้องผ่าน
-    const exact = await db(ownerTok, '/advances', {
-      method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 2300, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 4000, advance_date: day(0), status: 'approved' }),
     })
     const after = await countOf('advances')
-    check('P5-DB-02 เบิกเกินเพดานถูกปฏิเสธและไม่มีแถวใหม่ · เบิกพอดีเพดานผ่าน',
-      /ADVANCE_OVER_CEILING/.test(over.raw ?? '') && mid === before
-      && exact.status === 201 && after === mid + 1,
-      `เกิน ${over.status} · พอดี ${exact.status}`)
-    // คืนสภาพ: ลบใบที่เบิกพอดีเพดานออก เหลือ ฿1,000 ตามตัวอย่างใน DESIGN
-    const [{ id }] = (await sql(
-      `select id from public.advances where employee_id = '${empId}' and amount = 2300`)).rows
-    await sql(`delete from public.advances where id = '${id}'`)
+    const bal = await balanceOf()
+    check('P5-DB-02 เบิก ฿4,000 บนค่าแรงค้างจ่าย ฿3,300 → 201 · advances +1 · คงเหลือ −฿1,700',
+      over.status === 201 && after === before + 1 && bal.balance === -1700,
+      `${over.status} · +${after - before} · คงเหลือ ฿${bal.balance}`)
+    // คืนสภาพ: ลบใบ ฿4,000 ออก เหลือ ฿1,000 ตามตัวอย่างใน DESIGN
+    await sql(`delete from public.advances where employee_id = '${empId}' and amount = 4000`)
+    const back = await balanceOf()
+    check('P5-DB-02b ลบใบที่เบิกเกินออก → คงเหลือกลับเป็น ฿2,300 (ยอดติดลบไม่ค้างในระบบ)',
+      back.balance === 2300, `คงเหลือ ฿${back.balance}`)
+  }
+
+  // ── P5-DB-22 · ลงวันย้อนหลังได้ และเก็บวันที่ส่งมาจริง ────────────
+  // เจ้าของแจ้ง 20 ก.ย. 2569: *"บางทีมาลงย้อนหลัง มันจะบันทึกเป็นปัจจุบัน"*
+  {
+    const back = day(-4)
+    const r = await db(ownerTok, '/advances', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ employee_id: empId, amount: 120, advance_date: back, status: 'approved' }),
+    })
+    const saved = r.body?.[0]?.advance_date ?? null
+    const future = await db(ownerTok, '/advances', {
+      method: 'POST',
+      body: JSON.stringify({ employee_id: empId, amount: 120, advance_date: day(1), status: 'approved' }),
+    })
+    check('P5-DB-22 ลงเบิกย้อนหลัง 4 วัน → เก็บวันที่ส่งมา ไม่ใช่วันนี้ · วันในอนาคตยังถูกปฏิเสธ',
+      r.status === 201 && saved === back && saved !== day(0) && future.status >= 400,
+      `เก็บ ${saved} (ส่ง ${back}) · อนาคต ${future.status}`)
+    await sql(`delete from public.advances where employee_id = '${empId}' and amount = 120`)
   }
 
   // ── P5-DB-05 · ยอดติดลบหรือศูนย์ ──────────────────────────────────
@@ -191,7 +242,7 @@ try {
     for (const a of [0, -500]) {
       const r = await db(ownerTok, '/advances', {
         method: 'POST',
-        body: JSON.stringify({ employee_id: empId, amount: a, advance_date: day(0) }),
+        body: JSON.stringify({ employee_id: empId, amount: a, advance_date: day(0), status: 'approved' }),
       })
       bad.push(r.status)
     }
@@ -200,7 +251,10 @@ try {
   }
 
   // ── P5-DB-06 · หัวหน้าโครงการไม่เห็นและเขียนไม่ได้ ───────────────────
-  {
+  if (!supTok) {
+    skip('P5-DB-06 หัวหน้าโครงการอ่านทั้งสามตารางได้ 0 แถวและเขียนไม่ได้',
+      'ฐานนี้ไม่มีบัญชีหัวหน้าโครงการของชุดเดโม่ (SEED_SUPERVISOR1_PIN) — ต้องตรวจด้วยบัญชีจริงในเบราว์เซอร์')
+  } else {
     const reads = []
     for (const t of ['advances', 'payroll_runs', 'payroll_lines']) {
       const r = await db(supTok, `/${t}?select=id`)
@@ -208,7 +262,7 @@ try {
     }
     const write = await db(supTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0), status: 'approved' }),
     })
     const ownerSees = (await db(ownerTok, '/advances?select=id')).body?.length ?? 0
     check('P5-DB-06 หัวหน้าโครงการอ่านทั้งสามตารางได้ 0 แถวและเขียนไม่ได้ · เจ้าของอ่านได้ > 0',
@@ -315,14 +369,77 @@ try {
       /PAYROLL_CLOSED/.test(del.raw ?? '') && still === 1, `${del.status} · เหลือ ${still} แถว`)
   }
 
-  // ── P5-DB-04 · เบิกหลังปิดรอบต้องเริ่มนับเพดานใหม่จาก 0 ───────────
+  // ── P5-DB-04 · เบิกหลังปิดรอบเริ่มนับใหม่จาก 0 ────────────────────
   {
+    const bal = await balanceOf()
     const r = await db(ownerTok, '/advances', {
       method: 'POST',
-      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0) }),
+      body: JSON.stringify({ employee_id: empId, amount: 100, advance_date: day(0), status: 'approved' }),
     })
-    check('P5-DB-04 หลังปิดรอบ ค้างจ่ายเป็น ฿0 → เบิกเพิ่มไม่ได้จนกว่าจะมีค่าแรงใหม่',
-      /ADVANCE_OVER_CEILING/.test(r.raw ?? ''), `${r.status}`)
+    const after = await balanceOf()
+    check('P5-DB-04 หลังปิดรอบ ค้างจ่าย ฿0 → เบิก ฿100 ยังทำได้ · คงเหลือเป็น −฿100 (ไม่ใช่ถูกปฏิเสธ)',
+      bal.balance === 0 && r.status === 201 && after.balance === -100,
+      `฿${bal.balance} → ฿${after.balance} · ${r.status}`)
+    await sql(`delete from public.advances where employee_id = '${empId}' and amount = 100`)
+  }
+
+  // ── P5-DB-23 · 🔴 เบิกเกินแล้วจ่ายค่าแรง → ส่วนที่หักไม่ครบต้องค้างไว้ ──
+  // นี่คือรูที่เปิดพร้อมกับการอนุญาตให้เบิกเกิน: เดิม `close_payroll_run()`
+  // ตีตราใบเบิก **ทุกใบ** ว่าหักแล้ว ทั้งที่หักได้แค่เท่าค่าแรงของงวดนั้น
+  // → ส่วนที่เกินจะหายไปเฉย ๆ โดยไม่มี error ที่ไหนเลย
+  {
+    ;[{ id: emp2Id }] = (await sql(
+      `insert into public.employees(full_name, job_title) values ('${MARK} ยกยอด', 'กรรมกร') returning id`)).rows
+    await sql(`insert into public.employee_wages(employee_id, wage_type, daily_rate)
+               values ('${emp2Id}', 'daily', 550)`)
+    // ค่าแรง 2 วัน = ฿1,100 · เบิกไป ฿1,800 → เกินอยู่ ฿700
+    for (let i = 1; i <= 2; i++) {
+      const r = await sql(`insert into public.attendance(work_date, site_id, employee_id, work_units)
+                 values ('${day(-20 - i)}', '${siteId}', '${emp2Id}', 1) returning id`)
+      if (r.rows?.[0]?.id) attIds.push(r.rows[0].id)
+    }
+    await db(ownerTok, '/advances', {
+      method: 'POST',
+      body: JSON.stringify({ employee_id: emp2Id, amount: 1800, advance_date: day(-20), status: 'approved' }),
+    })
+    const paid = await rpc(ownerTok, 'pay_employee_wage', { p_employee: emp2Id })
+    run2Id = paid.body?.[0]?.run_id ?? null
+
+    const line = (await sql(
+      `select accrued, advance_deducted, net_paid from public.payroll_lines
+        where employee_id = '${emp2Id}'`)).rows[0] ?? {}
+    const adv = (await sql(
+      `select amount, deducted_amount, payroll_run_id from public.advances
+        where employee_id = '${emp2Id}'`)).rows[0] ?? {}
+    const bal = (await sql(
+      `select balance from public.employee_balance_raw('${emp2Id}')`)).rows[0] ?? {}
+
+    check('P5-DB-23 ค่าแรง ฿1,100 · เบิกไว้ ฿1,800 → จ่ายจริง ฿0 · หักได้ ฿1,100 · ค้างต่อ ฿700',
+      Number(line.accrued) === 1100 && Number(line.advance_deducted) === 1100
+      && Number(line.net_paid) === 0
+      && Number(adv.deducted_amount) === 1100 && adv.payroll_run_id === null
+      && Number(bal.balance) === -700,
+      `line ${line.accrued}/${line.advance_deducted}/${line.net_paid} · ใบเบิกหักแล้ว ${adv.deducted_amount} · คงเหลือ ${bal.balance}`)
+  }
+
+  // ── P5-DB-24 · ใบที่ถูกหักคืนไปแล้วบางส่วน ลบไม่ได้ ───────────────
+  {
+    const [{ id: partId }] = (await sql(
+      `select id from public.advances where employee_id = '${emp2Id}'`)).rows
+    const del = await db(ownerTok, `/advances?id=eq.${partId}`, { method: 'DELETE' })
+    const still = await countOf('advances', `&id=eq.${partId}`)
+    // คู่ตรงข้ามที่ต้องผ่าน: ใบใหม่ที่ยังไม่เคยถูกหักเลย ต้องลบได้ตามปกติ
+    const fresh = await db(ownerTok, '/advances', {
+      method: 'POST',
+      headers: { Prefer: 'return=representation' },
+      body: JSON.stringify({ employee_id: emp2Id, amount: 50, advance_date: day(0), status: 'approved' }),
+    })
+    const freshId = fresh.body?.[0]?.id
+    const delFresh = await db(ownerTok, `/advances?id=eq.${freshId}`, { method: 'DELETE' })
+    check('P5-DB-24 ลบใบที่หักคืนไปแล้วบางส่วน → /PAYROLL_CLOSED/ · แถวยังอยู่ · ใบที่ยังไม่ถูกหักลบได้',
+      /PAYROLL_CLOSED/.test(del.raw ?? '') && still === 1
+      && fresh.status === 201 && delFresh.status === 204,
+      `ลบใบที่หักแล้ว ${del.status} · เหลือ ${still} แถว · ใบใหม่ ${delFresh.status}`)
   }
 
   // ── P5-DB-19 · index ──────────────────────────────────────────────
@@ -366,12 +483,18 @@ try {
       missing.length === 0, missing.length ? `ไม่มีใครเขียน: ${missing.join(', ')}` : `${cols.length}/${cols.length}`)
   }
 } finally {
-  if (empId) {
-    await sql(`delete from public.advances where employee_id = '${empId}'`)
+  const people = [empId, emp2Id].filter(Boolean)
+  for (const id of people) {
+    // 🔴 `advances_guard_delete` กันลบใบที่ถูกหักคืนไปแล้ว (ทั้งใบหรือบางส่วน)
+    // ปลดธงของ **แถวทดสอบเท่านั้น** ก่อนลบ — ไม่ใช่ปิด trigger ทั้งระบบ
+    // ไม่งั้นสคริปต์นี้จะทิ้งข้อมูลค้างไว้แล้วทำให้ตัวตรวจอื่นแดงยกชุด (§17 ข้อ 9)
+    await sql(`update public.advances set deducted_amount = 0, payroll_run_id = null
+               where employee_id = '${id}'`)
+    await sql(`delete from public.advances where employee_id = '${id}'`)
   }
-  if (runId) {
-    await sql(`delete from public.payroll_lines where run_id = '${runId}'`)
-    await sql(`delete from public.payroll_runs where id = '${runId}'`)
+  for (const id of [runId, run2Id].filter(Boolean)) {
+    await sql(`delete from public.payroll_lines where run_id = '${id}'`)
+    await sql(`delete from public.payroll_runs where id = '${id}'`)
   }
   if (siteId) {
     // trigger กันลบของรอบที่ปิดแล้ว — ลบรอบก่อน แล้วค่อยลบ attendance
@@ -380,8 +503,32 @@ try {
     await sql(`delete from public.site_finance where site_id = '${siteId}'`)
     await sql(`delete from public.sites where id = '${siteId}'`)
   }
-  if (empId) await sql(`delete from public.employees where id = '${empId}'`)
-  console.log('  (ลบข้อมูลทดสอบแล้ว)')
+  for (const id of people) await sql(`delete from public.employees where id = '${id}'`)
+
+  // 🔴 ลบร่องรอยใน `audit_log` ของ fixture ชุดนี้ด้วย (คำสั่งเจ้าของ 20 ก.ย. 2569)
+  // · ลบตาม **id ที่สคริปต์สร้างเอง** เท่านั้น
+  // · ห้ามใช้ "แถวที่กลายเป็นกำพร้า" เป็นตัวชี้ว่าเป็นของทดสอบ — ลูกค้าลบข้อมูล
+  //   ของตัวเองเป็นเรื่องปกติ แถวพวกนั้นก็กำพร้าเหมือนกัน (ทำพังมาแล้ว 21 ก.ย. 2569)
+  for (const id of [empId, emp2Id, siteId, runId, run2Id].filter(Boolean)) {
+    await sql(`delete from public.audit_log
+                where row_id::text = '${id}'
+                   or before::text like '%${id}%'
+                   or after::text  like '%${id}%'`)
+  }
+  if (attIds.length) {
+    await sql(`delete from public.audit_log
+                where table_name = 'attendance_wages'
+                  and coalesce(after->>'attendance_id', before->>'attendance_id')
+                      in (${attIds.map((i) => `'${i}'`).join(', ')})`)
+  }
+
+  // ยืนยันว่าคืนจริง — `delete` คือคำขอ ส่วน "เหลือ 0 แถว" คือคำตอบ
+  const left = (await sql(
+    `select count(*)::int n from public.employees where full_name like '${MARK}%'`)).rows[0]
+  console.log(
+    Number(left?.n ?? -1) === 0
+      ? '  (ลบข้อมูลทดสอบแล้ว)'
+      : `  ⚠️ ลบข้อมูลทดสอบไม่ครบ — เหลือคนงาน ${left?.n} แถว ต้องตามลบก่อนรันตัวอื่น`)
 }
 
 // ── P5-DB-17 · RLS เปิดทุกตาราง ─────────────────────────────────────
@@ -412,4 +559,9 @@ try {
 console.log('\n══════════════════════════════════════════════')
 const pass = results.filter((r) => r.ok).length
 console.log(`  ${results.length} แถว: ผ่าน ${pass} · ตก ${results.length - pass}`)
+// 🔴 แถวที่ตัดสินไม่ได้ต้องถูกนับและเอ่ยชื่อ ไม่ใช่หายไปจากรายงานจนดูเหมือนตรวจครบ
+if (undecided.length) {
+  console.log(`  ⏭ ตัดสินไม่ได้ ${undecided.length} แถว (ยังเป็น ☐ ในตารางตรวจรับ):`)
+  for (const u of undecided) console.log(`     · ${u}`)
+}
 process.exit(pass === results.length ? 0 : 1)

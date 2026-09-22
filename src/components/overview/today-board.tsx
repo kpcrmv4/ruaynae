@@ -13,6 +13,7 @@ import {
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { fmtBaht, fmtDate } from '@/lib/format'
+import { DataError } from '@/components/ui/data-error'
 
 /**
  * การ์ด "งานวันนี้" ของหน้าแรก — กระดานงานประจำวันของ role นั้น
@@ -91,11 +92,8 @@ export async function TodayBoard({
   if (loadError) {
     console.error('[overview] โหลดงานวันนี้ไม่ได้', loadError.message)
     return (
-      <section className="panel mb-6">
-        <div className="panel-head">งานวันนี้</div>
-        <p className="px-4 py-5 text-center text-sm text-urgent">
-          โหลดงานวันนี้ไม่สำเร็จ — ลองรีเฟรชหน้านี้อีกครั้ง
-        </p>
+      <section className="mb-6">
+        <DataError message="โหลดงานวันนี้ไม่สำเร็จ" />
       </section>
     )
   }

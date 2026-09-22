@@ -20,7 +20,9 @@ import { EmptyState } from '@/components/ui/states'
 import { MoneyBars, OverrunBadge, ProfitChip, SiteSummary } from '@/components/sites/money-bars'
 import { TodayBoard } from '@/components/overview/today-board'
 import { BondAlert } from '@/components/overview/bond-alert'
+import { PageHeader } from '@/components/ui/page-header'
 import { BOND_SOON_DAYS } from '@/lib/bonds'
+import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'วันนี้' }
 
@@ -81,10 +83,7 @@ export default async function OverviewPage() {
   if (loadError) {
     console.error('[overview] โหลดภาพรวมไม่ได้', loadError.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดภาพรวมไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดภาพรวมไม่สำเร็จ" />
     )
   }
 
@@ -115,21 +114,17 @@ export default async function OverviewPage() {
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold text-ink">
-            สวัสดี {me.fullName.split(' ')[0]}
-          </h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            {fmtDateWithWeekday(today)} · {isOwner ? 'ภาพรวมทั้งบริษัท' : 'เฉพาะโครงการที่คุณดูแล'}
-          </p>
-        </div>
-        {/* บนมือถือปุ่มกลมกลางแถบล่างทำหน้าที่นี้อยู่แล้ว — ไม่วางปุ่มซ้ำสองที่ */}
-        <Link href="/entry" className="btn-primary hidden shrink-0 lg:inline-flex">
-          <Plus className="size-4" />
-          บันทึกรายจ่าย
-        </Link>
-      </div>
+      <PageHeader
+        title={`สวัสดี ${me.fullName.split(' ')[0]}`}
+        subtitle={`${fmtDateWithWeekday(today)} · ${isOwner ? 'ภาพรวมทั้งบริษัท' : 'เฉพาะโครงการที่คุณดูแล'}`}
+        action={
+          /* บนมือถือปุ่มกลมกลางแถบล่างทำหน้าที่นี้อยู่แล้ว — ไม่วางปุ่มซ้ำสองที่ */
+          <Link href="/entry" className="btn-primary hidden shrink-0 lg:inline-flex">
+            <Plus className="size-4" />
+            บันทึกรายจ่าย
+          </Link>
+        }
+      />
 
       {/* ── หลักประกันสัญญาที่ครบ/ใกล้ครบ — เด่นสุดบนหน้าแรก (เจ้าของสั่ง 19 ก.ย. 2569) ──
           วาดเฉพาะตอนมีของจริง · ไม่มี = ไม่มีแถบ */}

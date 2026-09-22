@@ -21,6 +21,7 @@ import { BarList, type BarItem } from '@/components/reports/bar-list'
 import { BondReport, ReportTabs, toBondRow } from '@/components/reports/bond-report'
 import { todayInBangkok } from '@/lib/format'
 import { BOND_SOON_DAYS } from '@/lib/bonds'
+import { PageHeader } from '@/components/ui/page-header'
 
 export const metadata = { title: 'รายงาน' }
 
@@ -48,10 +49,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
     const sum = bondSum?.[0]
     return (
       <>
-        <div className="mb-4">
-          <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
-          <p className="mt-0.5 text-sm text-muted-token">หลักประกันสัญญา · ประกันผลงาน · ณ {today.slice(8, 10)}/{today.slice(5, 7)}/{Number(today.slice(0, 4)) + 543}</p>
-        </div>
+        <PageHeader
+          title="รายงาน"
+          subtitle={`หลักประกันสัญญา · ประกันผลงาน · ณ ${today.slice(8, 10)}/${today.slice(5, 7)}/${Number(today.slice(0, 4)) + 543}`}
+          className="mb-4"
+        />
         <ReportTabs active="bonds" periodKey={period.key} />
         <BondReport
           rows={(bondRows ?? []).map(toBondRow)}
@@ -188,12 +190,11 @@ export default async function ReportsPage({ searchParams }: { searchParams: Prom
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-ink">รายงาน</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          {period.label} · {siteName ?? 'ทั้งบริษัท'} · เทียบกับ {period.prev.label}
-        </p>
-      </div>
+      <PageHeader
+        title="รายงาน"
+        subtitle={`${period.label} · ${siteName ?? 'ทั้งบริษัท'} · เทียบกับ ${period.prev.label}`}
+        className="mb-4"
+      />
 
       <ReportTabs active="money" periodKey={period.key} />
       <PeriodPicker period={period} siteId={siteId} sites={sites ?? []} link={link} />

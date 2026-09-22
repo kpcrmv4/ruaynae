@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { DataError } from '@/components/ui/data-error'
 import { EmptyState } from '@/components/ui/states'
+import { PageHeader } from '@/components/ui/page-header'
 
 export const metadata = { title: 'ประวัติการแก้ไข' }
 
@@ -104,13 +105,15 @@ export default async function AuditPage({
 
   return (
     <>
-      <div className="mb-4">
-        <h1 className="text-2xl font-bold text-ink">ประวัติการแก้ไข</h1>
-        <p className="mt-0.5 text-sm text-muted-token">
-          ใครแก้อะไร เมื่อไหร่ · บันทึกที่ระดับฐานข้อมูล{' '}
-          <span className="font-medium text-ink-2">แก้หรือลบไม่ได้แม้แต่เจ้าของ</span>
-        </p>
-      </div>
+      <PageHeader
+        title="ประวัติการแก้ไข"
+        subtitle={
+          <>
+            ใครแก้อะไร เมื่อไหร่ · บันทึกที่ระดับฐานข้อมูล{' '}
+            <span className="font-medium text-ink-2">แก้หรือลบไม่ได้แม้แต่เจ้าของ</span>
+          </>
+        }
+      />
 
       <div className="mb-3 flex flex-wrap gap-1.5">
         <FilterChip href={keep({ action: 'all' })} active={action === 'all'}>

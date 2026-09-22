@@ -67,7 +67,7 @@ export function BottomNav({
     <>
       <nav
         data-nav="bottom"
-        className="fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
+        className="print-hide fixed inset-x-0 bottom-0 z-40 grid h-16 grid-cols-5 border-t border-line bg-surface pb-[env(safe-area-inset-bottom)] lg:hidden"
       >
         {slots.slice(0, 2).map((i) => (
           <Slot

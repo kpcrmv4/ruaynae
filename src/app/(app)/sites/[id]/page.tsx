@@ -1,10 +1,10 @@
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 import {
-  ArrowLeft,
   Banknote,
   CalendarDays,
   FileCheck,
+  FileText,
   Phone,
   MapPin,
   Receipt,
@@ -26,14 +26,21 @@ import { CategoryTotals } from '@/components/sites/category-totals'
 import { TxnDetailProvider } from '@/components/ledger/txn-detail'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
+import { DOC_KINDS, DOC_KIND_SHORT } from '@/lib/documents'
+import { DocRow } from '@/components/documents/doc-row'
 import {
   BOND_KIND_LABEL, BOND_STATUS_LABEL, BOND_STATUS_TONE, WARRANTY_DEFAULT_MONTHS, bondStatusOf,
 } from '@/lib/bonds'
 import { SiteDetailActions } from './site-detail-client'
 import { BondReturnButton } from './bond-return'
+import { PageHeader } from '@/components/ui/page-header'
+import { DataError } from '@/components/ui/data-error'
 
 /** กี่แถวล่าสุดที่โชว์ในหน้าโครงการ — ที่เหลืออยู่ที่ /ledger ซึ่งมีตัวกรองครบ */
 const RECENT_TXN = 10
+
+/** เอกสารล่าสุดของโครงการ — ที่เหลืออยู่ที่ /documents ซึ่งกรองตามโครงการได้ */
+const RECENT_DOC = 5
 
 export const metadata = { title: 'รายละเอียดโครงการ' }
 
@@ -50,10 +57,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   if (error) {
     console.error('[sites] อ่านโครงการไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดข้อมูลโครงการไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดข้อมูลโครงการไม่สำเร็จ" />
     )
   }
   // 🔴 หัวหน้าโครงการที่ไม่ได้ดูแลโครงการนี้จะได้ 0 แถวจาก RLS → 404 ไม่ใช่หน้าเปล่า
@@ -71,6 +75,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
     pickerSites,
     pickerCategories,
     catTotals,
+    docResult,
     bondRow,
   ] = await Promise.all([
     sb
@@ -166,6 +171,20 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         if (e) console.error('[sites] อ่านยอดรวมแยกหมวดไม่ได้', e.message)
         return data ?? []
       }),
+    // เอกสารของโครงการนี้ (R12) — RLS ของ `documents` เป็น owner-only
+    // หัวหน้าโครงการจึงได้ 0 แถวเอง ไม่ต้องมี if ตรงนี้ · ดึงเกินมา 1 แถว
+    // เพื่อรู้ว่ายังมีต่อโดยไม่ต้องนับทั้งตาราง (§7)
+    sb
+      .from('documents')
+      .select('id, kind, doc_no, status, doc_date, customer_name, total')
+      .eq('site_id', id)
+      .order('doc_date', { ascending: false })
+      .order('id', { ascending: false })
+      .range(0, RECENT_DOC)
+      .then(({ data, error: e }) => {
+        if (e) console.error('[sites] อ่านเอกสารของโครงการไม่ได้', e.message)
+        return { rows: data ?? [], failed: Boolean(e) }
+      }),
     // หลักประกันสัญญา (R11) — `site_finance` owner-only · หัวหน้าโครงการได้ null เอง
     sb
       .from('site_finance')
@@ -205,51 +224,47 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
   const txnRows = txnResult.data ?? []
   const hasMoreTxn = txnRows.length > RECENT_TXN
   const recentTxns = hasMoreTxn ? txnRows.slice(0, RECENT_TXN) : txnRows
+  const hasMoreDoc = docResult.rows.length > RECENT_DOC
+  const recentDocs = hasMoreDoc ? docResult.rows.slice(0, RECENT_DOC) : docResult.rows
 
   return (
     <>
-      <Link
-        href="/sites"
-        className="mb-3 inline-flex items-center gap-1.5 text-sm font-medium text-muted-token transition-colors hover:text-ink"
-      >
-        <ArrowLeft className="size-4" />
-        โครงการทั้งหมด
-      </Link>
-
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <div className="flex flex-wrap items-center gap-2.5">
-            <h1 className="text-2xl font-bold text-ink">{site.name}</h1>
-            <Badge tone={SITE_STATUS_TONE[site.status]} dot>
-              {SITE_STATUS_LABEL[site.status]}
-            </Badge>
-          </div>
-          {/* ไม่มีชื่อลูกค้า = ไม่เขียนอะไรเลย · "ยังไม่ได้ระบุ" กินบรรทัดเท่าข้อมูลจริง
-              แต่ไม่ได้บอกอะไรใหม่ (เจ้าของสั่ง 4 ก.ย. 2569) — ช่องกรอกอยู่ในกล่อง
-              "แก้ไข" ซึ่งเจ้าของเห็นอยู่แล้วทางขวา */}
-          {site.client_name && (
-            <p className="mt-0.5 text-sm text-muted-token">ลูกค้า: {site.client_name}</p>
-          )}
-        </div>
-        {isOwner && (
-          <SiteDetailActions
-            site={site}
-            contractAmount={money.contract ?? 0}
-            bond={{
-              contract_no: bond?.contract_no ?? null,
-              contract_date: bond?.contract_date ?? null,
-              bond_kind: bond?.bond_kind ?? null,
-              bond_amount: bond?.bond_amount ?? 0,
-              bond_ref: bond?.bond_ref ?? null,
-              handover_date: bond?.handover_date ?? null,
-              warranty_months: bond?.warranty_months ?? WARRANTY_DEFAULT_MONTHS,
-            }}
-            crew={crew ?? []}
-            milestones={milestones ?? []}
-            people={people}
-          />
-        )}
-      </div>
+      {/* ลิงก์ "โครงการทั้งหมด" ที่เคยลอยอยู่เหนือหัวข้อถูกยุบมาเป็นปุ่มย้อนกลับ
+          ในแถวหัวข้อแทน (คำสั่งเจ้าของ 20 ก.ย. 2569) — ลูกศรสองอันซ้อนกันคนละที่
+          บนหน้าเดียวคือความสับสน · ปุ่มถอยตามประวัติจริง และถ้าเปิดลิงก์ตรงเข้ามา
+          จะพาไป `/sites` เหมือนลิงก์เดิมทุกประการ */}
+      <PageHeader
+        title={site.name}
+        titleExtra={
+          <Badge tone={SITE_STATUS_TONE[site.status]} dot>
+            {SITE_STATUS_LABEL[site.status]}
+          </Badge>
+        }
+        /* ไม่มีชื่อลูกค้า = ไม่เขียนอะไรเลย · "ยังไม่ได้ระบุ" กินบรรทัดเท่าข้อมูลจริง
+           แต่ไม่ได้บอกอะไรใหม่ (เจ้าของสั่ง 4 ก.ย. 2569) */
+        subtitle={site.client_name ? `ลูกค้า: ${site.client_name}` : undefined}
+        action={
+          isOwner ? (
+            <SiteDetailActions
+              site={site}
+              contractAmount={money.contract ?? 0}
+              bond={{
+                contract_no: bond?.contract_no ?? null,
+                contract_date: bond?.contract_date ?? null,
+                bond_kind: bond?.bond_kind ?? null,
+                bond_amount: bond?.bond_amount ?? 0,
+                bond_ref: bond?.bond_ref ?? null,
+                handover_date: bond?.handover_date ?? null,
+                warranty_months: bond?.warranty_months ?? WARRANTY_DEFAULT_MONTHS,
+              }}
+              crew={crew ?? []}
+              milestones={milestones ?? []}
+              people={people}
+            />
+          ) : undefined
+        }
+        backHref="/sites"
+      />
 
       {/* ── ปุ่มลัดของโครงการนี้ ─────────────────────────────────────────
           เปิดหน้าโครงการแล้วงานถัดไปเกือบทุกครั้งคือ "บันทึกของโครงการนี้" —
@@ -604,6 +619,73 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
         )}
       </section>
 
+      {/* ── เอกสารของโครงการนี้ (R12) — เจ้าของเท่านั้น ────────────────────
+          ใบเสนอราคากับใบเสร็จของงานเดียวกันควรอยู่ตรงที่คนเปิดดูงานนั้น
+          ไม่ใช่ให้เดินออกไปหน้ารวมแล้วกรองกลับมาเอง · ใบที่ไม่ผูกโครงการ
+          (งานนอก ขายของเบ็ดเตล็ด) ไม่โผล่ตรงนี้ตามการออกแบบ */}
+      {isOwner && (
+        <section className="panel mt-4">
+          <div className="panel-head">
+            <FileText className="size-4 shrink-0 text-muted-token" strokeWidth={1.8} />
+            เอกสารของโครงการนี้
+            <Link
+              href={`/documents?site=${site.id}`}
+              className="ml-auto text-xs font-semibold text-brand hover:underline"
+            >
+              ดูทั้งหมด
+            </Link>
+          </div>
+
+          {docResult.failed ? (
+            <DataError message="โหลดเอกสารของโครงการนี้ไม่สำเร็จ" />
+          ) : recentDocs.length === 0 ? (
+            <div className="px-4 py-6 text-center">
+              <p className="text-sm text-muted-token">
+                ยังไม่มีเอกสารที่ผูกกับโครงการนี้
+              </p>
+              <div className="mt-3 flex flex-wrap justify-center gap-2">
+                {DOC_KINDS.map((k) => (
+                  <Link
+                    key={k}
+                    href={`/documents/new?kind=${k}&site=${site.id}`}
+                    className="btn-secondary"
+                  >
+                    สร้าง{DOC_KIND_SHORT[k]}
+                  </Link>
+                ))}
+              </div>
+            </div>
+          ) : (
+            <>
+              <ul>
+                {recentDocs.map((d) => (
+                  <DocRow key={d.id} doc={d} showSite={false} showKind />
+                ))}
+              </ul>
+              <div className="flex flex-wrap items-center gap-2 border-t border-line-soft px-4 py-3">
+                {DOC_KINDS.map((k) => (
+                  <Link
+                    key={k}
+                    href={`/documents/new?kind=${k}&site=${site.id}`}
+                    className="btn-secondary"
+                  >
+                    สร้าง{DOC_KIND_SHORT[k]}
+                  </Link>
+                ))}
+                {hasMoreDoc && (
+                  <Link
+                    href={`/documents?site=${site.id}`}
+                    className="ml-auto text-xs font-semibold text-brand hover:underline"
+                  >
+                    ยังมีอีก — ดูทั้งหมด
+                  </Link>
+                )}
+              </div>
+            </>
+          )}
+        </section>
+      )}
+
       {/* ── รายรับ-รายจ่ายของโครงการนี้ ──────────────────────────────────
           เดิมหน้านี้บอกแค่ "ยอดรวมเท่าไร" แล้วให้เดินออกไปอีกหน้าเพื่อดูว่า
           ยอดนั้นมาจากอะไร · ตัวเลขที่ไล่ที่มาไม่ได้คือตัวเลขที่ไม่มีใครเชื่อ
@@ -631,9 +713,7 @@ export default async function SiteDetailPage({ params }: { params: Promise<{ id:
           <CategoryTotals rows={catTotals} />
 
           {txnResult.error ? (
-            <p className="px-4 py-6 text-center text-sm text-urgent">
-              โหลดรายการของโครงการนี้ไม่สำเร็จ — ลองรีเฟรชหน้านี้อีกครั้ง
-            </p>
+            <DataError message="โหลดรายการของโครงการนี้ไม่สำเร็จ" />
           ) : recentTxns.length === 0 ? (
             <p className="px-4 py-6 text-center text-sm text-muted-token">
               ยังไม่มีรายการของโครงการนี้

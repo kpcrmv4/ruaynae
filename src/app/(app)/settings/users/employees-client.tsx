@@ -12,6 +12,7 @@ import {
 import { Badge } from '@/components/ui/badge'
 import { EmptyState } from '@/components/ui/states'
 import { EmployeeDelete, type DeleteInfo } from './employee-delete'
+import { PageHeader } from '@/components/ui/page-header'
 
 export type EmployeeRow = {
   id: string
@@ -157,11 +158,22 @@ export function EmployeesClient({
           · แยกเป็นสามชั้นแทน: หัวเรื่อง+ปุ่มบรรทัดเดียว · คำอธิบายเต็มความกว้าง
           · ทางลัดไปหน้าผู้ใช้ระบบเป็นลิงก์ของตัวเองที่แตะได้เต็มบรรทัด
           — บนจอกว้างยังเป็นสองคอลัมน์เหมือนเดิม */}
-      <div>
-        <div className="flex items-center gap-3">
-          {/* h1 เพราะตอนนี้เป็นหน้าของตัวเอง ไม่ได้อยู่ใต้แท็บของหน้าผู้ใช้ระบบแล้ว —
-              หน้าที่หัวเรื่องหลักเป็น h2 คือหน้าที่ข้ามลำดับหัวข้อไปหนึ่งขั้น */}
-          <h1 className="min-w-0 flex-1 truncate text-lg font-bold text-ink">คนงาน</h1>
+      <PageHeader
+        title="คนงาน"
+        subtitle={
+          <>
+            ทุกคนที่มีค่าแรงต้องจ่าย ·{' '}
+            <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span> และไม่มี role
+            <Link
+              href="/settings/users"
+              className="mt-1 flex items-center gap-1 font-medium text-brand hover:underline"
+            >
+              คนที่ล็อกอินได้อยู่ที่นี่
+              <ArrowRight className="size-4" />
+            </Link>
+          </>
+        }
+        action={
           <button
             onClick={() => {
               setEditing(null)
@@ -174,19 +186,10 @@ export function EmployeesClient({
             <Plus className="size-4" />
             เพิ่มคนงาน
           </button>
-        </div>
-        <p className="mt-1 text-sm leading-6 text-muted-token">
-          ทุกคนที่มีค่าแรงต้องจ่าย · <span className="font-medium text-ink-2">ไม่ต้องล็อกอิน</span>{' '}
-          และไม่มี role
-        </p>
-        <Link
-          href="/settings/users"
-          className="mt-1 inline-flex items-center gap-1 text-sm font-medium text-brand hover:underline"
-        >
-          คนที่ล็อกอินได้อยู่ที่นี่
-          <ArrowRight className="size-4" />
-        </Link>
-      </div>
+        }
+        backHref="/settings"
+        className="mb-0"
+      />
 
       {formOpen && (
         <section className="rounded-lg border border-line bg-surface p-4">

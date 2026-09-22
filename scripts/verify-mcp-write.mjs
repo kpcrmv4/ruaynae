@@ -215,16 +215,26 @@ try {
       `คนงานสอง → ${two?.attendance_on_date?.site_name ?? 'ว่าง'}`)
   }
 
-  // ══ 4 · เบิกล่วงหน้า — เพดานต้องมีตัวเลขจริงในข้อความ ═════════════
+  // ══ 4 · เบิกล่วงหน้า — เบิกเกินได้ แต่ต้องบอก AI ว่าเกิน ═════════
+  // เจ้าของสั่ง 20 ก.ย. 2569 ให้เบิกเกินได้ · สิ่งที่ต้องยืนยันจึงไม่ใช่
+  // "ถูกปฏิเสธ" อีกต่อไป แต่เป็น **คำตอบต้องพกคำเตือนกลับไปให้แชท**
+  // ไม่งั้น AI จะรายงานว่าสำเร็จเฉย ๆ แล้วเจ้าของไม่มีวันรู้ว่าจ่ายเกินไปเท่าไหร่
   {
-    const over = await tool(k.url, 'record_advance', { employee_id: F.emp, amount: 999999 })
-    const msg = textOf(over)
-    const ok = await tool(k.url, 'record_advance', { employee_id: F.emp, amount: 100 })
-    const j = jsonOf(ok)
-    check('R6-TOOL-09 เบิกเกินเพดาน → isError พร้อมตัวเลขเพดานที่เหลือจริง · เบิกในเพดานผ่าน',
-      over.result?.isError === true && /\d/.test(msg) && msg.includes('เบิกได้ไม่เกิน')
-        && j?.ok === true,
-      `“${msg}” · ในเพดาน ok=${j?.ok}`)
+    const over = jsonOf(await tool(k.url, 'record_advance', { employee_id: F.emp, amount: 999999 }))
+    const small = jsonOf(await tool(k.url, 'record_advance', { employee_id: F.emp, amount: 100 }))
+    check('R6-TOOL-09 เบิกเกินค่าแรงค้างจ่าย → ok:true พร้อม overdrawn:true และ balance ติดลบ',
+      over?.ok === true && over?.overdrawn === true && Number(over?.balance) < 0
+        && small?.ok === true,
+      `เกิน: ok=${over?.ok} overdrawn=${over?.overdrawn} balance=${over?.balance}`)
+
+    // วันในอนาคตยังต้องถูกปฏิเสธ — ห้ามหลวมไปพร้อมกับการปลดเพดาน
+    const future = await tool(k.url, 'record_advance', {
+      employee_id: F.emp, amount: 50,
+      advance_date: new Date(Date.now() + 86400000).toISOString().slice(0, 10),
+    })
+    check('R6-TOOL-09b เบิกลงวันในอนาคต → ยังถูกปฏิเสธ (DATE_FUTURE)',
+      future.result?.isError === true && /อนาคต/.test(textOf(future)),
+      `“${textOf(future)}”`)
   }
 
   // ══ 5 · แก้และลบ ══════════════════════════════════════════════════

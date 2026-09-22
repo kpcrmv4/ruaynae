@@ -1,11 +1,26 @@
 'use client'
 
 import * as Dialog from '@radix-ui/react-dialog'
-import { BadgeCheck, Check, HandCoins, Loader2, Wallet, X } from 'lucide-react'
+import { BadgeCheck, Check, ChevronDown, HandCoins, Loader2, Wallet, X } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { fmtBaht, fmtDate } from '@/lib/format'
+
+/**
+ * เบี้ย/ค่าหักหนึ่งรายการของคนหนึ่งคน — **พร้อมวันที่ที่ได้**
+ *
+ * 🔴 ยอดรวมตอบคำถามของเจ้าของไม่ได้ ("ให้ครบวันที่เขาออกต่างจังหวัดหรือยัง")
+ * ฿3,000 อาจเป็น 15 วัน × ฿200 หรือ 10 วัน × ฿300 ก็ได้ · ต้องกางวันให้ดู
+ */
+type Adjustment = {
+  name: string
+  kind: 'add' | 'deduct'
+  total: number
+  /** ได้กี่ครั้ง — เทียบกับ \`days\` ของคนนั้นแล้วรู้ทันทีว่าตกหล่นไหม */
+  times: number
+  days: string[]
+}
 
 type Row = {
   employee_id: string
@@ -13,9 +28,15 @@ type Row = {
   job_title: string | null
   /** วันแรงที่ยังไม่ได้รับเงิน (เต็มวัน = 1 · ครึ่งวัน = 0.5) */
   days: number
+  /** ค่าจ้างฐาน (วัน × เรต) · ค่าพิเศษ · ค่าหัก — สามก้อนนี้บวกกันได้ \`accrued\` เป๊ะ
+   *  เพราะฐานข้อมูลเป็นคนคำนวณ ไม่ใช่หน้าจอบวกเอง */
+  base: number
+  extra: number
+  deduct: number
   accrued: number
   advanced: number
   balance: number
+  adjustments: Adjustment[]
 }
 /**
  * ประวัติการจ่ายหนึ่งครั้ง
@@ -40,6 +61,8 @@ type Advance = {
   employee_id: string
   amount: number
   advance_date: string
+  /** หักคืนจากค่าแรงไปแล้วเท่าไหร่ · > 0 = ลบใบนี้ไม่ได้แล้ว เงินถูกหักไปบางส่วนแล้ว */
+  deducted_amount: number
   full_name: string
 }
 
@@ -55,10 +78,7 @@ const MESSAGES: Record<string, string> = {
   NOTHING_TO_PAY: 'คนนี้ไม่มีค่าแรงค้างจ่าย',
   NOT_FOUND: 'ไม่พบรายการนี้',
 }
-const fail = (code?: string, detail?: string) =>
-  code === 'ADVANCE_OVER_CEILING'
-    ? (detail ?? 'เบิกเกินเพดานที่เบิกได้')
-    : (MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่')
+const fail = (code?: string) => MESSAGES[code ?? ''] ?? 'ทำรายการไม่สำเร็จ กรุณาลองใหม่'
 
 export function PayrollBoard({
   today,
@@ -76,7 +96,13 @@ export function PayrollBoard({
   const [advanceFor, setAdvanceFor] = useState<Row | null>(null)
   const [payFor, setPayFor] = useState<Row | null>(null)
   const [amount, setAmount] = useState('')
+  /** วันที่เบิก — ลงย้อนหลังได้ (คำสั่งเจ้าของ 20 ก.ย. 2569) เริ่มที่วันนี้เสมอ */
+  const [advDate, setAdvDate] = useState(today)
   const [fieldError, setFieldError] = useState('')
+  /** การ์ดไหนกางใบเบิกอยู่ · คีย์เป็น employee_id */
+  const [openAdv, setOpenAdv] = useState<string | null>(null)
+  /** เบี้ยรายการไหนกางวันที่อยู่ · คีย์เป็น employee_id + ชื่อรายการ */
+  const [openDays, setOpenDays] = useState<string | null>(null)
 
   async function send(key: string, url: string, body: unknown, ok: string, method = 'POST') {
     // กันกดซ้ำสองชั้น: ปุ่ม disabled *และ* ธงตรงนี้
@@ -91,12 +117,18 @@ export function PayrollBoard({
       })
       const b = await r.json().catch(() => ({}))
       if (!r.ok) {
-        const msg = fail(b.error, b.detail)
+        const msg = fail(b.error)
         setFieldError(msg)
         toast.error(msg)
         return false
       }
-      toast.success(ok)
+      // เบิกเกินค่าแรงที่ทำไปแล้ว = บันทึกสำเร็จ แต่ต้องเตือน ไม่ใช่เงียบ
+      // 🔴 ยอดมาจากคำตอบของเซิร์ฟเวอร์ ไม่ใช่ที่หน้าจอคำนวณเอง
+      if (b.overdrawn && typeof b.balance === 'number') {
+        toast.warning(`${ok} · เบิกเกินค่าแรงค้างจ่ายแล้ว ${fmtBaht(Math.abs(b.balance))}`)
+      } else {
+        toast.success(ok)
+      }
       router.refresh()
       return true
     } catch {
@@ -108,6 +140,18 @@ export function PayrollBoard({
   }
 
   const advancesOf = (id: string) => advances.filter((a) => a.employee_id === id)
+
+  /**
+   * ยอดที่กำลังพิมพ์เกินค่าแรงค้างจ่ายอยู่เท่าไหร่ — `0` = ไม่เกิน
+   *
+   * คงเหลือติดลบอยู่แล้ว (เบิกเกินมาก่อน) จะถูกบวกเข้าไปด้วยโดยอัตโนมัติ
+   * เพราะ `typed − balance` ของ balance ติดลบ = typed + ยอดที่เกินอยู่เดิม
+   */
+  const typed = Number(amount.replace(/,/g, '').trim())
+  const overBy =
+    advanceFor && Number.isFinite(typed) && typed > 0
+      ? Math.max(0, Math.round((typed - advanceFor.balance) * 100) / 100)
+      : 0
 
   return (
     <div className="space-y-4">
@@ -126,80 +170,165 @@ export function PayrollBoard({
             {rows.map((r) => (
               <li
                 key={r.employee_id}
-                className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-line-soft px-3.5 py-3 last:border-b-0 md:px-4"
+                className="border-b border-line-soft px-3.5 py-3.5 last:border-b-0 md:px-4"
               >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate font-semibold text-ink">{r.full_name}</div>
-                  <div className="truncate text-xs text-muted-token">
-                    {r.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
+                {/* ── ชื่อ + จำนวนวัน ─────────────────────────────────
+                    🔴 เดิมเอาตัวเลขสี่ช่องไปวางข้างชื่อในแถวเดียวที่ wrap ได้ · พอจอแคบ
+                    มันพับไปทับลิสต์ใบเบิกที่อยู่ใต้ชื่อ อ่านไม่ออกทั้งใบ (เจ้าของแจ้ง
+                    21 ก.ย. 2569 พร้อมภาพหน้าจอ) · ตอนนี้ทุกยอดอยู่บรรทัดของตัวเอง
+                    ชื่อชิดซ้าย ตัวเลขชิดขวา ซึ่งอ่านได้ทุกความกว้างโดยไม่ต้องมีจุดตัด */}
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="truncate text-base font-semibold text-ink">{r.full_name}</div>
+                    <div className="truncate text-xs text-muted-token">
+                      {r.job_title ?? 'ไม่ได้ระบุตำแหน่ง'}
+                    </div>
                   </div>
-                  {advancesOf(r.employee_id).length > 0 && (
-                    <ul className="mt-1 space-y-0.5">
-                      {advancesOf(r.employee_id).map((a) => (
-                        <li key={a.id} className="flex items-center gap-1.5 text-xs text-muted-token">
-                          {/* 🔴 แถวจ่ายเงินเป็นสีเทาพร้อมป้าย ไม่ใช่ตัวเลขแดง
-                              เหมือนรายจ่าย — มันคือการล้างหนี้ ไม่ใช่ต้นทุนใหม่
-                              (DESIGN.md §5.4) */}
-                          <span className="chip bg-surface-2 text-muted-token ring-line">
-                            จ่ายเงิน · ไม่นับซ้ำเป็นต้นทุน
-                          </span>
-                          <span className="tnum">{fmtBaht(a.amount)}</span>
-                          <span>{fmtDate(a.advance_date)}</span>
+                  <span className="chip shrink-0 bg-surface-2 tnum text-ink-2 ring-line">
+                    {r.days} วัน
+                  </span>
+                </div>
+
+                {/* ── ยอดแยกก้อน: ค่าจ้าง → ค่าพิเศษ → ค่าหัก → รวม → เบิก → คงเหลือ
+                    เรียงตามลำดับที่เงินเดินจริง คนอ่านจึงไล่ตามได้โดยไม่ต้องคิดเอง */}
+                <dl className="mt-2.5 space-y-1 text-sm">
+                  <MoneyLine label="ค่าจ้าง" value={fmtBaht(r.base)} />
+
+                  {r.adjustments.filter((a) => a.kind === 'add').map((a) => (
+                    <AdjustLine
+                      key={'add-' + a.name}
+                      adj={a}
+                      open={openDays === r.employee_id + a.name}
+                      onToggle={() =>
+                        setOpenDays(openDays === r.employee_id + a.name ? null : r.employee_id + a.name)
+                      }
+                    />
+                  ))}
+                  {r.extra > 0 && !r.adjustments.some((a) => a.kind === 'add') && (
+                    <MoneyLine label="ค่าพิเศษ" value={'+ ' + fmtBaht(r.extra)} tone="income" />
+                  )}
+
+                  {r.adjustments.filter((a) => a.kind === 'deduct').map((a) => (
+                    <AdjustLine
+                      key={'ded-' + a.name}
+                      adj={a}
+                      open={openDays === r.employee_id + a.name}
+                      onToggle={() =>
+                        setOpenDays(openDays === r.employee_id + a.name ? null : r.employee_id + a.name)
+                      }
+                    />
+                  ))}
+
+                  <div className="flex items-baseline justify-between gap-3 border-t border-line-soft pt-1.5">
+                    <dt className="text-ink-2">ค่าแรงรวม</dt>
+                    <dd className="tnum font-semibold text-ink">{fmtBaht(r.accrued)}</dd>
+                  </div>
+
+                  {r.advanced !== 0 && (
+                    <>
+                      <div className="flex items-baseline justify-between gap-3">
+                        <dt className="min-w-0">
                           <button
                             type="button"
-                            onClick={() => send(a.id, `/api/advances/${a.id}`, undefined, 'ลบใบเบิกแล้ว', 'DELETE')}
-                            disabled={busy !== null}
-                            aria-label={`ลบใบเบิก ${fmtBaht(a.amount)} ของ ${r.full_name}`}
-                            className="text-urgent transition-opacity hover:opacity-70 disabled:opacity-40"
+                            onClick={() => setOpenAdv(openAdv === r.employee_id ? null : r.employee_id)}
+                            aria-expanded={openAdv === r.employee_id}
+                            className="inline-flex items-center gap-1 text-ink-2 underline-offset-2 hover:underline"
                           >
-                            <X className="size-3.5" />
+                            เบิกล่วงหน้า
+                            <ChevronDown
+                              className={'size-3.5 transition-transform ' + (openAdv === r.employee_id ? 'rotate-180' : '')}
+                              aria-hidden="true"
+                            />
                           </button>
+                          {/* 🔴 ป้ายนี้ต้องเห็นโดย**ไม่ต้องกาง** — กับดักข้อ 1 ของโปรเจ็ค:
+                              ถ้าใบเบิกอ่านเหมือนรายจ่าย คนอ่านจะบวกเข้ากับต้นทุนในหัว
+                              แล้วได้สองเท่า · ตอนออกแบบการ์ดใหม่ผมย้ายมันเข้าไปในส่วนที่
+                              ต้องกดกาง แล้ว P5-UI-07 แดงทันที ซึ่งเป็นหน้าที่ของแถวนั้นพอดี */}
+                          <span className="mt-0.5 block text-[11px] text-muted-token">
+                            จ่ายเงิน · ไม่นับซ้ำเป็นต้นทุน
+                          </span>
+                        </dt>
+                        <dd className="shrink-0 tnum text-muted-token">− {fmtBaht(r.advanced)}</dd>
+                      </div>
+
+                      {/* ใบที่ถูกหักคืนไปแล้วบางส่วน — ต้องเห็นโดยไม่ต้องกางเหมือนกัน
+                          เพราะมันคือเงินที่บริษัทได้คืนไปแล้วส่วนหนึ่ง ไม่ใช่รายละเอียดปลีกย่อย */}
+                      {advancesOf(r.employee_id)
+                        .filter((a) => a.deducted_amount > 0)
+                        .map((a) => (
+                          <div key={'part-' + a.id} className="flex items-baseline justify-between gap-3">
+                            <dt className="min-w-0 truncate text-xs text-muted-token">
+                              {fmtDate(a.advance_date)} · หักแล้ว {fmtBaht(a.deducted_amount)} · เหลือ{' '}
+                              {fmtBaht(a.amount - a.deducted_amount)}
+                            </dt>
+                            <dd className="shrink-0 text-[11px] text-muted-token">ค้างหักรอบหน้า</dd>
+                          </div>
+                        ))}
+                    </>
+                  )}
+
+                  {/* ใบเบิกทีละใบ — กางเมื่อกด ไม่ใช่กางค้างไว้ให้ทุกการ์ดยาว */}
+                  {openAdv === r.employee_id && advancesOf(r.employee_id).length > 0 && (
+                    <ul className="space-y-1 rounded-sm bg-surface-2 p-2">
+                      {advancesOf(r.employee_id).map((a) => (
+                        <li key={a.id} className="flex items-center justify-between gap-2 text-xs">
+                          <span className="min-w-0 truncate text-muted-token">
+                            {fmtDate(a.advance_date)}
+                            {a.deducted_amount > 0 && ' · หักแล้ว ' + fmtBaht(a.deducted_amount)}
+                          </span>
+                          <span className="flex shrink-0 items-center gap-1.5">
+                            <span className="tnum text-ink-2">
+                              {fmtBaht(a.amount - a.deducted_amount)}
+                            </span>
+                            {a.deducted_amount > 0 ? (
+                              <span className="text-[11px] text-muted-token">ค้างหัก</span>
+                            ) : (
+                              <button
+                                type="button"
+                                onClick={() => send(a.id, '/api/advances/' + a.id, undefined, 'ลบใบเบิกแล้ว', 'DELETE')}
+                                disabled={busy !== null}
+                                aria-label={'ลบใบเบิก ' + fmtBaht(a.amount) + ' ของ ' + r.full_name}
+                                className="text-urgent transition-opacity hover:opacity-70 disabled:opacity-40"
+                              >
+                                <X className="size-3.5" />
+                              </button>
+                            )}
+                          </span>
                         </li>
                       ))}
                     </ul>
                   )}
-                </div>
 
-                <dl className="flex shrink-0 gap-4 text-right text-sm">
-                  {/* เจ้าของสั่งให้เห็นทั้ง "กี่วัน" และ "กี่บาท" — ยอดเงินอย่างเดียว
-                      ตอบไม่ได้ว่าคนนี้มาทำงานกี่วัน ซึ่งเป็นตัวเลขที่ใช้เถียงกันจริง */}
-                  <div>
-                    <dt className="text-xs text-muted-token">ค้างจ่าย</dt>
-                    <dd className="tnum font-semibold text-ink">{r.days} วัน</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-token">ค่าแรง</dt>
-                    <dd className="tnum font-semibold text-ink">{fmtBaht(r.accrued)}</dd>
-                  </div>
-                  <div>
-                    <dt className="text-xs text-muted-token">เบิกแล้ว</dt>
-                    <dd className="tnum text-muted-token">{fmtBaht(r.advanced)}</dd>
-                  </div>
-                  <div data-balance-for={r.employee_id}>
-                    <dt className="text-xs text-muted-token">คงเหลือ</dt>
-                    <dd className="tnum font-bold text-income">{fmtBaht(r.balance)}</dd>
+                  {/* 🔴 ติดลบ = เบิกเกินค่าแรงที่ทำไปแล้ว · ต้องอ่านออกตั้งแต่ในลิสต์ */}
+                  <div
+                    data-balance-for={r.employee_id}
+                    className="flex items-baseline justify-between gap-3 border-t border-line pt-1.5"
+                  >
+                    <dt className="font-medium text-ink">
+                      {r.balance < 0 ? 'เบิกเกิน' : 'คงเหลือต้องจ่าย'}
+                    </dt>
+                    <dd className={'tnum text-lg font-bold ' + (r.balance < 0 ? 'text-urgent' : 'text-income')}>
+                      {r.balance < 0 ? '− ' + fmtBaht(Math.abs(r.balance)) : fmtBaht(r.balance)}
+                    </dd>
                   </div>
                 </dl>
 
-                <div className="flex shrink-0 gap-2">
+                <div className="mt-3 flex gap-2">
                   <button
                     type="button"
                     onClick={() => {
                       setAdvanceFor(r)
                       setAmount('')
+                      setAdvDate(today)
                       setFieldError('')
                     }}
-                    disabled={busy !== null || r.balance <= 0}
-                    className="btn-secondary disabled:cursor-not-allowed disabled:opacity-60"
+                    // 🔴 ไม่ปิดปุ่มตอนคงเหลือ ฿0 หรือติดลบ — เบิกเกินได้ (20 ก.ย. 2569)
+                    disabled={busy !== null}
+                    className="btn-secondary flex-1 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <HandCoins className="size-4" />
                     เบิก
                   </button>
-                  {/* จ่ายค่าแรง = เคลียร์ยอดค้างของคนนี้ให้หมดในปุ่มเดียว
-                      · ยอดค่าแรงยังไม่ถึงมือแต่เบิกไปแล้วเต็มจำนวน (accrued
-                        เท่ากับ advanced) ยังต้องกดได้ เพราะมันคือการปิดยอดค้าง
-                        ที่เหลือ ฿0 ไม่ใช่ "ไม่มีอะไรให้ทำ" — ปิดเฉพาะตอนไม่มี
-                        ค่าแรงค้างเลยจริง ๆ */}
                   <button
                     type="button"
                     onClick={() => {
@@ -207,7 +336,7 @@ export function PayrollBoard({
                       setFieldError('')
                     }}
                     disabled={busy !== null || r.accrued <= 0}
-                    className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                    className="btn-primary flex-1 disabled:cursor-not-allowed disabled:opacity-60"
                   >
                     <Wallet className="size-4" />
                     จ่ายค่าแรง
@@ -280,12 +409,42 @@ export function PayrollBoard({
               เบิกล่วงหน้า — {advanceFor?.full_name}
             </Dialog.Title>
             <Dialog.Description className="mt-0.5 text-sm text-muted-token">
-              เบิกได้ไม่เกิน{' '}
-              <span className="font-semibold tnum text-ink">{fmtBaht(advanceFor?.balance ?? 0)}</span>{' '}
+              {(advanceFor?.balance ?? 0) < 0 ? (
+                <>
+                  คนนี้<span className="font-semibold text-urgent">เบิกเกินไปแล้ว{' '}
+                    <span className="tnum">{fmtBaht(Math.abs(advanceFor?.balance ?? 0))}</span>
+                  </span>{' '}
+                </>
+              ) : (
+                <>
+                  ค่าแรงค้างจ่ายที่เบิกได้{' '}
+                  <span className="font-semibold tnum text-ink">{fmtBaht(advanceFor?.balance ?? 0)}</span>{' '}
+                </>
+              )}
               · การเบิกคือเงินสดออก ไม่ทำให้ต้นทุนโครงการเพิ่ม
             </Dialog.Description>
 
             <div className="mt-4">
+              <label htmlFor="adv-date" className="label-base">วันที่เบิก</label>
+              {/* 🔴 `<input type="date">` รับและส่งเป็น ค.ศ. เสมอ ห้ามแปลงเป็น พ.ศ. ก่อนส่ง
+                  · `max` กันวันในอนาคตตั้งแต่บนหน้าจอ ส่วน route กันซ้ำอีกชั้น */}
+              <input
+                id="adv-date"
+                type="date"
+                value={advDate}
+                max={today}
+                onChange={(e) => {
+                  setAdvDate(e.target.value)
+                  if (fieldError) setFieldError('')
+                }}
+                className="input-base tnum"
+              />
+              <p className="mt-1 text-xs text-muted-token">
+                ลงย้อนหลังได้ · ไม่ว่าลงวันไหน ใบเบิกจะถูกหักตอนจ่ายค่าแรงครั้งถัดไป
+              </p>
+            </div>
+
+            <div className="mt-3">
               <label htmlFor="adv-amount" className="label-base">จำนวนเงิน (บาท)</label>
               <input
                 id="adv-amount"
@@ -302,6 +461,13 @@ export function PayrollBoard({
                 autoFocus
               />
               {fieldError && <p className="mt-1 text-sm text-urgent">{fieldError}</p>}
+              {/* คำเตือนสด ๆ ก่อนกด — ไม่ห้าม แต่ต้องรู้ตัวว่ากำลังจ่ายเกินค่าแรงที่เขาทำมา */}
+              {overBy > 0 && (
+                <p className="mt-1.5 rounded-xs bg-urgent-bg px-2.5 py-1.5 text-sm text-urgent">
+                  เกินค่าแรงค้างจ่าย <span className="font-semibold tnum">{fmtBaht(overBy)}</span>{' '}
+                  · จะถูกหักคืนจากค่าแรงงวดถัดไปจนครบ
+                </p>
+              )}
             </div>
 
             <div className="mt-4 flex justify-end gap-2">
@@ -312,16 +478,16 @@ export function PayrollBoard({
                   if (!advanceFor) return
                   const done = await send(
                     advanceFor.employee_id, '/api/advances',
-                    { employeeId: advanceFor.employee_id, amount, advanceDate: today },
+                    { employeeId: advanceFor.employee_id, amount, advanceDate: advDate },
                     'บันทึกเบิกแล้ว',
                   )
                   if (done) setAdvanceFor(null)
                 }}
-                disabled={busy !== null || amount.trim() === ''}
-                className="btn-primary disabled:cursor-not-allowed disabled:opacity-60"
+                disabled={busy !== null || amount.trim() === '' || advDate === ''}
+                className={`${overBy > 0 ? 'btn-danger' : 'btn-primary'} disabled:cursor-not-allowed disabled:opacity-60`}
               >
                 {busy !== null ? <Loader2 className="size-4 animate-spin" /> : <Check className="size-4" />}
-                บันทึกเบิก
+                {overBy > 0 ? 'ยืนยันเบิกเกิน' : 'บันทึกเบิก'}
               </button>
             </div>
           </Dialog.Content>
@@ -398,5 +564,88 @@ export function PayrollBoard({
         </Dialog.Portal>
       </Dialog.Root>
     </div>
+  )
+}
+
+/**
+ * หนึ่งบรรทัดของยอด: ชื่อชิดซ้าย ตัวเลขชิดขวา
+ *
+ * 🔴 ตัวเลขเงินต้อง \`tnum\` เสมอ ไม่งั้นหลักไม่ตรงกันระหว่างบรรทัด แล้วสายตา
+ * เทียบยอดไม่ได้ · และห้ามเอาหลายยอดมาเรียงแนวนอนบนจอแคบ (นั่นคือบั๊กที่เพิ่งแก้)
+ */
+function MoneyLine({
+  label,
+  value,
+  tone = 'default',
+}: {
+  label: React.ReactNode
+  value: string
+  tone?: 'default' | 'income' | 'urgent' | 'muted'
+}) {
+  const color =
+    tone === 'income' ? 'text-income'
+      : tone === 'urgent' ? 'text-urgent'
+        : tone === 'muted' ? 'text-muted-token'
+          : 'text-ink'
+  return (
+    <div className="flex items-baseline justify-between gap-3">
+      <dt className="min-w-0 text-ink-2">{label}</dt>
+      <dd className={'shrink-0 tnum ' + color}>{value}</dd>
+    </div>
+  )
+}
+
+/**
+ * บรรทัดเบี้ย/ค่าหัก ที่ **กางดูวันที่ได้**
+ *
+ * บรรทัดปิดอยู่ยังบอก "กี่ครั้ง" เสมอ เพราะตัวเลขนั้นคือสิ่งที่เอาไปเทียบกับ
+ * จำนวนวันที่เขาออกต่างจังหวัดจริง · กางแล้วเห็นวันเป็นชิป ไล่ทีละวันได้
+ */
+function AdjustLine({
+  adj,
+  open,
+  onToggle,
+}: {
+  adj: Adjustment
+  open: boolean
+  onToggle: () => void
+}) {
+  const add = adj.kind === 'add'
+  return (
+    <>
+      <div className="flex items-baseline justify-between gap-3">
+        <dt className="min-w-0">
+          <button
+            type="button"
+            onClick={onToggle}
+            aria-expanded={open}
+            className="inline-flex max-w-full items-center gap-1 text-left text-ink-2 underline-offset-2 hover:underline"
+          >
+            <span className="truncate">{adj.name}</span>
+            <span className="shrink-0 tnum text-muted-token">×{adj.times}</span>
+            <ChevronDown
+              className={'size-3.5 shrink-0 transition-transform ' + (open ? 'rotate-180' : '')}
+              aria-hidden="true"
+            />
+          </button>
+        </dt>
+        <dd className={'shrink-0 tnum ' + (add ? 'text-income' : 'text-urgent')}>
+          {add ? '+ ' : '− '}
+          {fmtBaht(adj.total)}
+        </dd>
+      </div>
+      {open && (
+        <dd className="flex flex-wrap gap-1 rounded-sm bg-surface-2 p-2">
+          {adj.days.map((d, i) => (
+            <span
+              key={d + i}
+              className="chip bg-surface tnum text-ink-2 ring-line"
+            >
+              {fmtDate(d)}
+            </span>
+          ))}
+        </dd>
+      )}
+    </>
   )
 }

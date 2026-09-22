@@ -9,6 +9,8 @@ import { EmptyState } from '@/components/ui/states'
 import { ListRow } from '@/components/ui/list-row'
 import { ListToolbar, type FilterChip } from '@/components/ui/list-toolbar'
 import { NewSiteButton } from '../sites-client'
+import { PageHeader } from '@/components/ui/page-header'
+import { DataError } from '@/components/ui/data-error'
 
 export const metadata = { title: 'โครงการ' }
 
@@ -94,10 +96,7 @@ export default async function SitesPage({
   if (error) {
     console.error('[sites] อ่านรายการโครงการไม่ได้', error.message)
     return (
-      <div className="rounded-lg border border-urgent-ring bg-urgent-bg p-6 text-center">
-        <p className="text-sm text-urgent">โหลดรายการโครงการไม่สำเร็จ</p>
-        <p className="mt-1 text-xs text-urgent">ลองรีเฟรชหน้านี้อีกครั้ง</p>
-      </div>
+      <DataError message="โหลดรายการโครงการไม่สำเร็จ" />
     )
   }
 
@@ -122,15 +121,11 @@ export default async function SitesPage({
 
   return (
     <>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="truncate text-2xl font-bold text-ink">โครงการ</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            {isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะโครงการที่คุณดูแลอยู่ตอนนี้'}
-          </p>
-        </div>
-        {isOwner && <NewSiteButton />}
-      </div>
+      <PageHeader
+        title="โครงการ"
+        subtitle={isOwner ? 'โปรเจ็คทั้งหมดในระบบ' : 'เฉพาะโครงการที่คุณดูแลอยู่ตอนนี้'}
+        action={isOwner ? <NewSiteButton /> : undefined}
+      />
 
       <ListToolbar
         basePath="/sites"

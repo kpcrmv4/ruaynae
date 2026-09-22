@@ -75,7 +75,7 @@
 | R6-SEC-03 | `mcp_create_transaction(p_actor = หัวหน้าโครงการ)` | site_supervisor เป็น actor | `MCP_ACTOR_NOT_OWNER` — คีย์ของคนที่ถูกลดสิทธิ์ใช้ไม่ได้ทันที | `C=MCP_ACTOR_NOT_OWNER` | ✅ |
 | R6-SEC-04 | บันทึกรายการวันพรุ่งนี้ | owner | `DATE_FUTURE` | `D=DATE_FUTURE` | ✅ |
 | R6-SEC-05 | บันทึกรายจ่ายด้วย **หมวดรายรับ** | owner | `CATEGORY_KIND_MISMATCH` — `guard_transaction` เดิมยังทำงานผ่านทางนี้ | `E=CATEGORY_KIND_MISMATCH` | ✅ |
-| R6-SEC-06 | เบิกล่วงหน้า ฿9,999,999 | owner | `ADVANCE_OVER_CEILING` พร้อมตัวเลขเพดานที่เหลือจริง — `guard_advance` เดิมยังทำงาน | `F=ADVANCE_OVER_CEILING` | ✅ |
+| R6-SEC-06 | เบิกล่วงหน้า ฿9,999,999 (**เขียนใหม่ 20 ก.ย. 2569** — เดิมคาดว่าถูกปฏิเสธ) | owner | `ok: true` + `overdrawn: true` + `balance` ติดลบ — ฐานข้อมูลไม่ห้ามแล้ว แต่คำตอบต้องพกคำเตือนกลับไป | `F=overdrawn` | ✅ |
 | R6-SEC-07 | แก้รายการด้วย id ที่ไม่มีในตาราง | owner | `TXN_NOT_FOUND` ไม่ใช่ "สำเร็จ 0 แถว" | `G=TXN_NOT_FOUND` | ✅ |
 | R6-SEC-08 | ลงชื่อคนเข้าโครงการของวันพรุ่งนี้ | owner | `DATE_FUTURE` | `H=DATE_FUTURE` | ✅ |
 | R6-SEC-09 | ยิง `record_transaction` ด้วย **คีย์ที่ถูกเพิกถอน** | — | 401 ก่อนถึงฐานข้อมูล (ทางเดียวกับฝั่งอ่าน P9-SEC-01) | ต้องรันผ่าน HTTP | 👤 `verify-mcp-write` |
@@ -93,7 +93,8 @@
 | R6-TOOL-06 | `record_transaction` สองครั้งด้วย `client_ref` เดิม | ครั้งที่สองได้ `duplicate: true` · จำนวนแถวในตารางเพิ่มขึ้น **1 แถว** ไม่ใช่ 2 | 👤 `verify-mcp-write` |
 | R6-TOOL-07 | `record_attendance` ที่มีคนลงชื่อโครงการอื่นไปแล้วปนอยู่ | คนที่เหลือลงสำเร็จ · คนนั้นอยู่ใน `skipped` พร้อม `reason` | 👤 `verify-mcp-write` |
 | R6-TOOL-08 | `list_employees` | มี `attendance_on_date` บอกว่าคนไหนอยู่โครงการไหนแล้ววันนั้น | 👤 `verify-mcp-write` |
-| R6-TOOL-09 | `record_advance` เกินเพดาน | `isError: true` พร้อม**ตัวเลขเพดานที่เหลือจริง** ในข้อความ (ไม่ใช่ "ทำรายการไม่สำเร็จ") | 👤 `verify-mcp-write` |
+| R6-TOOL-09 | `record_advance` เกินค่าแรงค้างจ่าย | `ok: true` · `overdrawn: true` · `balance` **ติดลบ** — AI ต้องเอาตัวเลขนี้ไปบอกเจ้าของ ห้ามรายงานว่าสำเร็จเฉย ๆ | ✅ `verify-mcp-write` |
+| R6-TOOL-09b | `record_advance` ลงวันในอนาคต | `isError: true` ข้อความมีคำว่า "อนาคต" — ปลดเพดานแล้วแต่กฎวันที่ยังอยู่ (และย้ายมาบังคับที่ trigger) | ✅ `verify-mcp-write` |
 | R6-TOOL-10 | `update_transaction` แล้ว `delete_transaction` | คืน `before`/`after` · แถวหายจริง · `mcp_call_log` มีร่องรอยครบทุกครั้ง | 👤 `verify-mcp-write` |
 | R6-TOOL-11 | ยิง tool ฝั่งเขียนจนเกิน 60 ครั้ง/นาที | โดนเพดานเดียวกับฝั่งอ่าน (P9-SEC-02) | 👤 `verify-mcp-write` |
 

@@ -1,5 +1,5 @@
 import Link from 'next/link'
-import { Receipt, Undo2 } from 'lucide-react'
+import { Receipt, TrendingDown, TrendingUp, Undo2, Users } from 'lucide-react'
 import { getCurrentUser } from '@/lib/auth/current-user'
 import { getSupabaseServer } from '@/lib/supabase/server'
 import { PAGE_SIZE } from '@/lib/constants'
@@ -14,8 +14,13 @@ import { LedgerFilters, type StatusChip } from '@/components/ledger/ledger-filte
 import { TxnCreateButton } from '@/components/ledger/txn-create'
 import { TxnEditProvider } from '@/components/ledger/txn-edit'
 import { TxnRow } from '@/components/ledger/txn-row'
+import { PageHeader } from '@/components/ui/page-header'
+import { Metric, MetricBar } from '@/components/ui/metric'
 
 export const metadata = { title: 'รายรับ-รายจ่าย' }
+
+/** เก่ากว่ารายการแรกที่เป็นไปได้ — ใช้เปิดปลายช่วงที่ผู้ใช้ไม่ได้กรอง */
+const EPOCH_START = '1970-01-01'
 
 
 type Search = {
@@ -44,6 +49,29 @@ export default async function LedgerPage({
   // id ที่ไม่ใช่ uuid = ไม่ไฮไลท์อะไรเลย ไม่ใช่เอาไปเทียบกับทุกแถวทิ้ง ๆ ขว้าง ๆ
   const focus = isUuid(sp.focus) ? sp.focus : undefined
   const isOwner = me.role === 'owner'
+
+  /**
+   * ช่วงเวลาของแถบสรุปหัวหน้า — **ต้องเป็นช่วงเดียวกับลิสต์ข้างล่างเสมอ**
+   *
+   * 🔴 สรุปที่นับคนละช่วงกับรายการที่วาดอยู่ใต้มัน คือสองตัวเลขที่ขัดกันบนจอเดียว
+   * แล้วคนจะเลิกเชื่อทั้งคู่ (§17 ข้อ 2) · ไม่ได้กรองช่วง = เอา **ทั้งเดือนนี้**
+   * ตามที่เจ้าของสั่ง (21 ก.ย. 2569) และเขียนกำกับไว้ว่าเป็นเดือนนี้
+   */
+  const today = todayInBangkok()
+  const monthStart = `${today.slice(0, 7)}-01`
+  const monthEnd = new Date(Date.UTC(Number(today.slice(0, 4)), Number(today.slice(5, 7)), 0))
+    .toISOString().slice(0, 10)
+  // โครงการที่กรองอยู่ — `'central'` (ส่วนกลาง) ไม่ใช่ uuid จึงส่งเป็น null
+  // แล้วให้ RPC สรุปทั้งบริษัทแทน ดีกว่าส่งค่าที่ฐานข้อมูลแปลไม่ออก
+  const siteParam = sp.site && sp.site !== 'central' && isUuid(sp.site) ? sp.site : null
+  const ranged = Boolean(sp.from || sp.to)
+  // RPC รับ `date` ที่ไม่ใช่ null — กรองแค่ปลายเดียวจึงเปิดอีกปลายให้กว้างสุด
+  // (`EPOCH_START` เก่ากว่าทุกรายการที่เป็นไปได้ ไม่ใช่ค่าที่ต้องตรงกับอะไร)
+  const sumFrom = ranged ? (sp.from || EPOCH_START) : monthStart
+  const sumTo = ranged ? (sp.to || today) : monthEnd
+  const sumLabel = ranged
+    ? `ช่วงที่เลือก ${sp.from ? fmtDate(sp.from) : 'ตั้งแต่แรก'} – ${sp.to ? fmtDate(sp.to) : fmtDate(today)}`
+    : `เดือนนี้ · ${fmtDate(monthStart)} – ${fmtDate(monthEnd)}`
 
   const sb = await getSupabaseServer()
 
@@ -89,7 +117,10 @@ export default async function LedgerPage({
     return count ?? 0
   }
 
-  const [listResult, siteFilterName, sitesResult, categoriesResult, rejectedTotal, ...counts] = await Promise.all([
+  const [
+    listResult, siteFilterName, sitesResult, categoriesResult, rejectedTotal,
+    summary, wageDue, ...counts
+  ] = await Promise.all([
     listQuery
       .order('txn_date', { ascending: false })
       .order('id', { ascending: false })
@@ -133,6 +164,29 @@ export default async function LedgerPage({
         }
         return count ?? 0
       }),
+    // ── สรุปหัวหน้า — รวมยอดในฐานข้อมูล ไม่ใช่บวกแถวที่ดึงมา (§7) ─────
+    // RPC เป็น security invoker · RLS จึงกรองให้เอง หัวหน้าโครงการได้เฉพาะ
+    // รายจ่ายของโครงการที่ตัวเองดูแล โดยที่หน้านี้ไม่ต้องรู้กฎนั้นเลย
+    sb
+      .rpc('report_summary', { p_from: sumFrom, p_to: sumTo, p_site: siteParam ?? undefined })
+      .then(({ data, error }) => {
+        if (error) {
+          console.error('[ledger] อ่านสรุปช่วงเวลาไม่ได้', error.message)
+          return null
+        }
+        return data?.[0] ?? null
+      }),
+    // ค่าแรงค้างจ่ายรวม — เจ้าของเท่านั้น (RPC กรองเองด้วย is_owner ข้างใน)
+    // ⚠️ หัวหน้าโครงการได้ศูนย์ ไม่ใช่ null จึงต้องไม่วาดการ์ดนี้ให้เขา
+    isOwner
+      ? sb.rpc('payroll_outstanding').then(({ data, error }) => {
+          if (error) {
+            console.error('[ledger] อ่านค่าแรงค้างจ่ายไม่ได้', error.message)
+            return null
+          }
+          return data?.[0] ?? null
+        })
+      : Promise.resolve(null),
     countFor('all'),
     ...TXN_STATUSES.map((s) => countFor(s)),
   ])
@@ -169,7 +223,6 @@ export default async function LedgerPage({
     else groups.push({ date: t.txn_date, rows: [t] })
   }
 
-  const today = todayInBangkok()
   const y = new Date(`${today}T00:00:00Z`)
   y.setUTCDate(y.getUTCDate() - 1)
   const yesterday = y.toISOString().slice(0, 10)
@@ -228,23 +281,82 @@ export default async function LedgerPage({
       categories={categoriesResult.data ?? []}
     >
      <TxnDetailProvider>
-      <div className="mb-5 flex flex-wrap items-start justify-between gap-x-4 gap-y-3">
-        <div className="min-w-0">
-          <h1 className="text-2xl font-bold text-ink">รายรับ-รายจ่าย</h1>
-          <p className="mt-0.5 text-sm text-muted-token">
-            {isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของโครงการที่คุณดูแล'}
-          </p>
-        </div>
-        {/* บันทึกได้จากหน้านี้เลย ไม่ต้องเด้งไป /entry แล้วเดินกลับมาดูว่าลงไหม
-            · กล่องใช้ฟอร์มชุดเดียวกับหน้า /entry ทุกช่อง */}
-        <TxnCreateButton
-          role={me.role}
-          today={today}
-          sites={sitesResult.data ?? []}
-          categories={categoriesResult.data ?? []}
-          initialSiteId={sp.site && sp.site !== 'central' ? sp.site : undefined}
-        />
-      </div>
+      <PageHeader
+        title="รายรับ-รายจ่าย"
+        subtitle={isOwner ? 'ทุกรายการทั้งบริษัท รวมรายจ่ายส่วนกลาง' : 'รายจ่ายของโครงการที่คุณดูแล'}
+        action={
+          /* บันทึกได้จากหน้านี้เลย ไม่ต้องเด้งไป /entry แล้วเดินกลับมาดูว่าลงไหม
+             · กล่องใช้ฟอร์มชุดเดียวกับหน้า /entry ทุกช่อง */
+          <TxnCreateButton
+            role={me.role}
+            today={today}
+            sites={sitesResult.data ?? []}
+            categories={categoriesResult.data ?? []}
+            initialSiteId={sp.site && sp.site !== 'central' ? sp.site : undefined}
+          />
+        }
+      />
+
+      {/* ── ภาพรวมของช่วงที่กำลังดู (คำสั่งเจ้าของ 21 ก.ย. 2569) ──────────
+          🔴 ทุกตัวเลขรวมมาจากฐานข้อมูล (`report_summary` · `payroll_outstanding`)
+          ไม่ใช่บวกแถวที่โหลดมาแสดง — ลิสต์ข้างล่างโหลดแค่หน้าแรก การบวกจากมัน
+          จะได้ยอด "ของหน้าที่หนึ่ง" ที่ดูน่าเชื่อถือแต่ผิดเสมอ (§7)
+          · ช่วงเวลาเป็นช่วงเดียวกับลิสต์ข้างล่างเสมอ และเขียนกำกับไว้ว่าช่วงไหน */}
+      {summary && (
+        <>
+          <p className="mb-1.5 text-xs text-muted-token">ภาพรวม {sumLabel}</p>
+          <MetricBar>
+            {isOwner && (
+              <Metric
+                label="รายรับ"
+                value={fmtBaht(Number(summary.income_approved))}
+                icon={TrendingUp}
+                tone="done"
+                hint={
+                  Number(summary.income_pending) > 0
+                    ? `รออนุมัติอีก ${fmtBaht(Number(summary.income_pending))}`
+                    : 'ที่อนุมัติแล้ว'
+                }
+              />
+            )}
+            <Metric
+              label="รายจ่าย"
+              value={fmtBaht(Number(summary.expense_approved))}
+              icon={TrendingDown}
+              hint={
+                Number(summary.expense_pending) > 0
+                  ? `รออนุมัติอีก ${fmtBaht(Number(summary.expense_pending))}`
+                  : 'ที่อนุมัติแล้ว'
+              }
+            />
+            {isOwner && (
+              <Metric
+                label="คงเหลือ"
+                value={fmtBaht(Number(summary.income_approved) - Number(summary.expense_approved))}
+                tone={
+                  Number(summary.income_approved) - Number(summary.expense_approved) < 0
+                    ? 'urgent'
+                    : 'default'
+                }
+                hint="รายรับ − รายจ่าย (ยังไม่รวมค่าแรง)"
+              />
+            )}
+            {/* ⚠️ ค่าแรงค้างจ่ายเป็นยอด **ทั้งบริษัท ณ ตอนนี้** ไม่ใช่ของช่วงที่กรอง
+                — มันคือหนี้ที่ค้างอยู่ ไม่ใช่รายการที่เกิดในช่วงนั้น · เขียนบอกไว้
+                ในคำอธิบายใต้ตัวเลข ไม่ให้ใครอ่านรวมกับสามช่องซ้ายมือโดยเข้าใจผิด */}
+            {isOwner && wageDue && (
+              <Metric
+                label="ค่าแรงค้างจ่าย"
+                value={fmtBaht(Number(wageDue.accrued))}
+                icon={Users}
+                tone={Number(wageDue.balance) > 0 ? 'progress' : 'default'}
+                href="/payroll"
+                hint={`ทั้งบริษัทตอนนี้ · หักเบิกแล้วเหลือ ${fmtBaht(Number(wageDue.balance))}`}
+              />
+            )}
+          </MetricBar>
+        </>
+      )}
 
       {/* ── ตัวเลขบนเมนูมาจากไหน ────────────────────────────────────
           ป้ายแดงบนเมนู "รายการ" นับใบที่ถูกตีกลับ · เข้ามาแล้วไม่มีอะไรบอกว่า

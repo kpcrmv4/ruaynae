@@ -28,7 +28,13 @@ const req = (method, path, body, cookie) =>
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   })
 const jarOf = (r) => (r.headers.getSetCookie?.() ?? []).map((c) => c.split(';')[0]).join('; ')
-const visible = (html) => html.replace(/<script[\s\S]*?<\/script>/g, '')
+const visible = (html) =>
+  html
+    .replace(/<script[\s\S]*?<\/script>/g, '')
+    // 🔴 React คั่น text node ที่อยู่ติดกันด้วย `<!-- -->` — ข้อความอย่าง
+    // "หักแล้ว ฿550 · เหลือ ฿350" ออกมาเป็น "หักแล้ว ฿550<!-- --> · เหลือ <!-- -->฿350"
+    // ตัวตรวจที่เทียบข้อความต่อเนื่องจะแดงทั้งที่หน้าจอถูกต้องทุกตัวอักษร
+    .replace(/<!--[\s\S]*?-->/g, '')
 const page = async (path, cookie) =>
   visible(await (await fetch(`${BASE}${path}`, { headers: { cookie } })).text())
 
@@ -87,6 +93,16 @@ const MARK = 'ทดสอบหน้าค่าแรง'
 let siteId = null
 let empId = null
 let runId = null
+/** ฉาก "เบิกเกินแล้วหักบางส่วน" (P5-UI-09 / P5-UI-11) — คนละคนกับฉากหลัก
+ *  เพราะกฎคนละข้อต้องใช้คนละตัวตั้ง ไม่งั้นสถานะของฉากหนึ่งไปทำอีกฉากล้ม */
+let overEmpId = null
+let overRunId = null
+/** id ของ attendance ที่ fixture ชุดนี้สร้างเอง — เก็บไว้เพื่อตามลบ audit_log
+ *  ของตัวเองได้ตรงตัว โดยไม่ต้องเดาจาก "แถวที่กลายเป็นกำพร้า" ซึ่งเป็นของลูกค้าด้วย */
+const fixtureAttendanceIds = []
+/** ทุก id ที่สคริปต์นี้สร้างขึ้นเอง — รวมของที่สร้าง-ลบภายในบล็อกเดียว
+ *  (เช่นคนงาน "ไม่มีค่าแรง" ของ P5-API-07) ซึ่งลบแถวข้อมูลไปแล้วแต่ audit ยังอยู่ */
+const fixtureIds = []
 
 try {
   ;[{ id: siteId }] = (await sql(
@@ -96,8 +112,9 @@ try {
   await sql(`insert into public.employee_wages(employee_id, wage_type, daily_rate)
              values ('${empId}', 'daily', 550)`)
   for (let i = 1; i <= 6; i++) {
-    await sql(`insert into public.attendance(work_date, site_id, employee_id, work_units)
-               values ('${day(-i)}', '${siteId}', '${empId}', 1)`)
+    const { rows } = await sql(`insert into public.attendance(work_date, site_id, employee_id, work_units)
+               values ('${day(-i)}', '${siteId}', '${empId}', 1) returning id`)
+    if (rows?.[0]?.id) fixtureAttendanceIds.push(rows[0].id)
   }
 
   // ── P5-UI-01 · หน้าแสดงค้างจ่ายรายคน ──────────────────────────────
@@ -120,14 +137,31 @@ try {
       `${r.status} → ${loc || '(ไม่มี location)'}`)
   }
 
-  // ── P5-API-01 · หัวหน้าโครงการบันทึกเบิกไม่ได้ ───────────────────────
+  // ── P5-API-01 (แก้ตาม R14) · หัวหน้าโครงการยื่นคำขอได้ แต่ต้องผูกโครงการ ──
+  // 🔴 แถวนี้เคยยืนยันว่า "หัวหน้าโครงการบันทึกเบิกไม่ได้ → 403" · คำสั่งเจ้าของ
+  // 21 ก.ย. 2569 เปิดให้เขา **ยื่นคำขอ** ได้ สิ่งที่ยังต้องยืนยันจึงกลายเป็น
+  // ขอบเขตของเขา: ใบที่ไม่ผูกโครงการเป็นของเจ้าของเท่านั้น (เหมือนรายจ่ายส่วนกลาง)
   {
     const before = await countOf('advances')
     const r = await req('POST', '/api/advances', {
       employeeId: empId, amount: '500', advanceDate: today }, supJar)
     const b = await r.json().catch(() => ({}))
     const after = await countOf('advances')
-    check('P5-API-01 หัวหน้าโครงการยิง POST /api/advances → 403 FORBIDDEN · ไม่มีแถวใหม่',
+    check('P5-API-01 หัวหน้าโครงการยิง POST /api/advances โดยไม่ผูกโครงการ → 400 SITE_REQUIRED · ไม่มีแถวใหม่',
+      r.status === 400 && b.error === 'SITE_REQUIRED' && after === before,
+      `${r.status} ${b.error} · ${before}→${after}`)
+  }
+
+  // ── R14-API-03 · โครงการที่ไม่ได้ดูแล → RLS ปฏิเสธ ───────────────────
+  // fixture ของสคริปต์นี้ไม่ได้ตั้งหัวหน้าโครงการให้ `siteId` เลย มันจึงเป็น
+  // "โครงการของคนอื่น" ในสายตาของ supJar พอดี
+  {
+    const before = await countOf('advances')
+    const r = await req('POST', '/api/advances', {
+      employeeId: empId, amount: '500', advanceDate: today, siteId }, supJar)
+    const b = await r.json().catch(() => ({}))
+    const after = await countOf('advances')
+    check('R14-API-03 หัวหน้าโครงการยื่นคำขอให้โครงการที่ไม่ได้ดูแล → 403 · ไม่มีแถวใหม่',
       r.status === 403 && b.error === 'FORBIDDEN' && after === before,
       `${r.status} ${b.error} · ${before}→${after}`)
   }
@@ -157,25 +191,54 @@ try {
       hasBadge ? 'มีป้ายและไม่ใช้โทนรายจ่าย' : 'ไม่พบป้าย')
   }
 
-  // ── P5-API-02 + P5-UI-04 · เกินเพดาน → บอกเพดานที่เหลือเป็นตัวเลข ──
+  // ── P5-API-02 · เบิกเกินได้ แต่คำตอบต้องพกคำเตือนกลับไป ───────────
+  // (เขียนใหม่ 20 ก.ย. 2569 — เดิมยืนยันว่า 409 ADVANCE_OVER_CEILING
+  //  เจ้าของสั่งให้เบิกเกินได้ ข้อกำหนดจึงเปลี่ยน ไม่ใช่ตัวตรวจเสีย)
   {
     const before = await countOf('advances')
     const r = await req('POST', '/api/advances', {
       employeeId: empId, amount: '5000', advanceDate: today }, ownerJar)
     const b = await r.json().catch(() => ({}))
     const after = await countOf('advances')
-    check('P5-API-02 เบิกเกินเพดาน → 409 ADVANCE_OVER_CEILING · ไม่มีแถวใหม่',
-      r.status === 409 && b.error === 'ADVANCE_OVER_CEILING' && after === before,
-      `${r.status} ${b.error} · ${before}→${after}`)
-    check('P5-UI-04 ข้อความบอก**เพดานที่เหลือจริงเป็นตัวเลข** ไม่ใช่ "ทำรายการไม่สำเร็จ" ลอย ๆ',
-      typeof b.detail === 'string' && /2300/.test(b.detail.replace(/,/g, '')),
-      b.detail ?? '(ไม่มีรายละเอียด)')
+    check('P5-API-02 เบิกเกินค่าแรงค้างจ่าย → 201 · overdrawn:true · balance ติดลบ · advances +1',
+      r.status === 201 && b.overdrawn === true && Number(b.balance) < 0 && after === before + 1,
+      `${r.status} · overdrawn=${b.overdrawn} balance=${b.balance} · ${before}→${after}`)
+    // ยอดที่เตือนต้องเป็นตัวเลขจริง: ค้างจ่าย ฿2,300 − เบิก ฿5,000 = −฿2,700
+    check('P5-API-02b ยอดคงเหลือที่คืนมาเป็นตัวเลขจริง ไม่ใช่ธงเปล่า ๆ',
+      Number(b.balance) === -2700, `balance=${b.balance}`)
+    await sql(`delete from public.advances where employee_id = '${empId}' and amount = 5000`)
+  }
+
+  // ── P5-API-09 + P5-API-10 · วันที่เลือกเองได้ แต่อนาคตไม่ได้ ──────
+  {
+    const back = new Date(`${today}T00:00:00Z`)
+    back.setUTCDate(back.getUTCDate() - 3)
+    const backDate = back.toISOString().slice(0, 10)
+    const fwd = new Date(`${today}T00:00:00Z`)
+    fwd.setUTCDate(fwd.getUTCDate() + 1)
+
+    const ok = await req('POST', '/api/advances', {
+      employeeId: empId, amount: '70', advanceDate: backDate }, ownerJar)
+    const saved = (await sql(
+      `select advance_date::text from public.advances
+        where employee_id = '${empId}' and amount = 70`)).rows[0]?.advance_date ?? null
+    const future = await req('POST', '/api/advances', {
+      employeeId: empId, amount: '70', advanceDate: fwd.toISOString().slice(0, 10) }, ownerJar)
+    const fb = await future.json().catch(() => ({}))
+
+    check('P5-API-09 ลงเบิกย้อนหลัง → 201 และเก็บวันที่ส่งมา ไม่ใช่วันนี้',
+      ok.status === 201 && saved === backDate && saved !== today,
+      `เก็บ ${saved} (ส่ง ${backDate} · วันนี้ ${today})`)
+    check('P5-API-10 ลงเบิกวันในอนาคต → 400 DATE_FUTURE',
+      future.status === 400 && fb.error === 'DATE_FUTURE', `${future.status} ${fb.error}`)
+    await sql(`delete from public.advances where employee_id = '${empId}' and amount = 70`)
   }
 
   // ── P5-API-07 · จ่ายให้คนที่ไม่มีค่าแรงค้าง ───────────────────────
   {
     const [other] = (await sql(
       `insert into public.employees(full_name, is_active) values ('${MARK} ไม่มีค่าแรง', true) returning id`)).rows
+    fixtureIds.push(other.id)
     const runsBefore = await countOf('payroll_runs')
     const r = await req('POST', '/api/payroll/pay', { employeeId: other.id }, ownerJar)
     const b = await r.json().catch(() => ({}))
@@ -207,6 +270,53 @@ try {
       && html.includes('฿3,300') && !html.includes('เปิดรอบ') && !html.includes('ปิดรอบ'),
       `ประวัติ=${html.includes('ประวัติการจ่ายค่าแรง')} · เหลือคำว่ารอบ=${/เปิดรอบ|ปิดรอบ/.test(html)}`)
   }
+  // ── P5-UI-09 · คนที่คงเหลือติดลบต้องอ่านออกตั้งแต่ในลิสต์ ─────────
+  // 🔴 อ่านจาก **บล็อกที่เป็นเจ้าของค่า** (`data-balance-for`) ไม่ใช่ regex
+  // กวาดทั้งหน้า — หน้านี้มีคำว่า "เบิก" อยู่หลายที่ ถ้ากวาดทั้งหน้าจะเขียว
+  // ได้แม้ป้ายของคนคนนี้ไม่เคยเปลี่ยนเลย
+  {
+    const [over] = (await sql(
+      `insert into public.employees(full_name, is_active)
+       values ('${MARK} เบิกเกิน', true) returning id`)).rows
+    overEmpId = over.id
+    await req('POST', '/api/advances', {
+      employeeId: overEmpId, amount: '900', advanceDate: today }, ownerJar)
+    const html = await page('/payroll', ownerJar)
+    const i = html.indexOf(`data-balance-for="${overEmpId}"`)
+    const block = i < 0 ? '' : html.slice(i, i + 400)
+    check('P5-UI-09 คนที่คงเหลือติดลบ → ป้ายเป็น "เบิกเกิน" สี urgent พร้อมเครื่องหมายลบ',
+      /เบิกเกิน/.test(block) && /text-urgent/.test(block) && /−\s*฿900/.test(block)
+      && !/คงเหลือ/.test(block),
+      block ? block.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 80) : 'ไม่พบบล็อกของคนนี้')
+  }
+
+  // ── P5-UI-11 · ใบเบิกที่ถูกหักบางส่วนโชว์ยอดที่เหลือแทนปุ่มลบ ──────
+  // 🔴 ต้อง **สร้างอินพุตขึ้นมาก่อน** — สถานะ "หักบางส่วน" เกิดได้ทางเดียวคือ
+  // เบิกเกินแล้วจ่ายค่าแรง · ถ้าไม่สร้าง แถวนี้จะผ่านด้วยหน้าว่าง ๆ ซึ่งไม่ได้พิสูจน์อะไร
+  {
+    await sql(`insert into public.employee_wages(employee_id, wage_type, daily_rate)
+               values ('${overEmpId}', 'daily', 550)`)
+    const att = await sql(`insert into public.attendance(work_date, site_id, employee_id, work_units)
+               values ('${today}', '${siteId}', '${overEmpId}', 1) returning id`)
+    if (att.rows?.[0]?.id) fixtureAttendanceIds.push(att.rows[0].id)
+    const paid = await req('POST', '/api/payroll/pay', { employeeId: overEmpId }, ownerJar)
+    const [run] = (await sql(
+      `select id from public.payroll_runs where employee_id = '${overEmpId}' limit 1`)).rows
+    overRunId = run?.id ?? null
+
+    const [adv] = (await sql(
+      `select amount::text, deducted_amount::text, payroll_run_id
+         from public.advances where employee_id = '${overEmpId}'`)).rows
+    const html = await page('/payroll', ownerJar)
+
+    check('P5-UI-11 เบิก ฿900 บนค่าแรง ฿550 → หน้าจอโชว์ "หักแล้ว ฿550 · เหลือ ฿350" แทนปุ่มลบ',
+      paid.status === 200
+      && Number(adv?.deducted_amount) === 550 && adv?.payroll_run_id === null
+      && /หักแล้ว ฿550 · เหลือ ฿350/.test(html)
+      && !/aria-label="ลบใบเบิก ฿900/.test(html),
+      `จ่าย ${paid.status} · หักแล้ว ${adv?.deducted_amount}/${adv?.amount} · พบชิป=${/หักแล้ว ฿550 · เหลือ ฿350/.test(html)}`)
+  }
+
   // ── P5-API-04 · ลบใบเบิกที่ถูกหักไปแล้วไม่ได้ ─────────────────────
   {
     const [adv] = (await sql(
@@ -264,10 +374,28 @@ try {
       missing.length ? `ไม่มีใครเขียน: ${missing.join(', ')}` : `${cols.length}/${cols.length}`)
   }
 } finally {
-  if (empId) await sql(`delete from public.advances where employee_id = '${empId}'`)
-  if (runId) {
-    await sql(`delete from public.payroll_lines where run_id = '${runId}'`)
-    await sql(`delete from public.payroll_runs where id = '${runId}'`)
+  if (empId) {
+    // 🔴 `advances_guard_delete` (20 ก.ย. 2569) กันลบใบเบิกที่ถูกหักคืนไปแล้ว
+    // ซึ่งรวมถึงใบที่สคริปต์นี้จ่ายไปเองระหว่างตรวจ · ไม่ปลดธงก่อน = ลบใบเบิกไม่ได้
+    // → ลบคนงานไม่ได้ (FK restrict) → **ทิ้งคนงานทดสอบไว้ในฐานของลูกค้า**
+    // โดยที่สคริปต์ยังพิมพ์ว่า "ลบข้อมูลทดสอบแล้ว" (เจอของจริงค้าง 20 ก.ย. 2569)
+    await sql(`update public.advances set deducted_amount = 0, payroll_run_id = null
+               where employee_id = '${empId}'`)
+    await sql(`delete from public.advances where employee_id = '${empId}'`)
+  }
+  if (overEmpId) {
+    await sql(`update public.advances set deducted_amount = 0, payroll_run_id = null
+               where employee_id = '${overEmpId}'`)
+    await sql(`delete from public.advances where employee_id = '${overEmpId}'`)
+  }
+  // 🔴 ต้องลบ **ทุกรอบที่ปิดแล้ว** ก่อนแตะ `attendance` — `guard_attendance_closed`
+  // ปฏิเสธการลบวันที่อยู่ในรอบที่ปิดแล้ว และ `delete ... where site_id = …`
+  // เป็นคำสั่งเดียวที่คลุมทุกคน · มีวันของใครสักคนที่จ่ายเงินไปแล้วปนอยู่แถวเดียว
+  // ทั้งคำสั่งก็ล้ม แล้ว **ไม่มีอะไรถูกลบเลย** รวมถึงของคนอื่นที่ลบได้อยู่แล้ว
+  // (เจอจริง 21 ก.ย. 2569 — คนงานทดสอบค้างอยู่ในฐานลูกค้าพร้อม attendance 6 แถว)
+  for (const id of [runId, overRunId].filter(Boolean)) {
+    await sql(`delete from public.payroll_lines where run_id = '${id}'`)
+    await sql(`delete from public.payroll_runs where id = '${id}'`)
   }
   if (siteId) {
     await sql(`delete from public.attendance where site_id = '${siteId}'`)
@@ -275,9 +403,44 @@ try {
     await sql(`delete from public.site_finance where site_id = '${siteId}'`)
     await sql(`delete from public.sites where id = '${siteId}'`)
   }
-  if (empId) await sql(`delete from public.employees where id = '${empId}'`)
+  for (const id of [empId, overEmpId].filter(Boolean)) {
+    await sql(`delete from public.attendance where employee_id = '${id}'`)
+    await sql(`delete from public.employee_wages where employee_id = '${id}'`)
+    await sql(`delete from public.employees where id = '${id}'`)
+  }
   await sql(`delete from public.payroll_runs where period_start = '2001-01-01'`)
-  console.log('  (ลบข้อมูลทดสอบแล้ว)')
+
+  // 🔴 ลบ **ร่องรอยใน audit_log ของ fixture ตัวเองด้วย** (คำสั่งเจ้าของ 20 ก.ย. 2569)
+  // แถวข้อมูลถูกลบคืนแล้ว แต่ audit_log เก็บ before/after ไว้ทุกครั้ง — ไม่ตามลบ
+  // ประวัติของลูกค้าจะมีชื่อ "ทดสอบหน้าค่าแรง สมพงษ์" ปนอยู่ตลอดไป
+  // · ลบเฉพาะแถวที่อ้าง id ของ fixture ชุดนี้เท่านั้น ไม่แตะช่วงเวลา ไม่แตะของจริง
+  for (const id of [...fixtureIds, empId, overEmpId, siteId, runId, overRunId].filter(Boolean)) {
+    await sql(`delete from public.audit_log
+                where row_id::text = '${id}'
+                   or before::text like '%${id}%'
+                   or after::text  like '%${id}%'`)
+  }
+  // attendance_wages ไม่มีคอลัมน์ id · audit เก็บ `row_id` เป็น null — ต้องตามเก็บ
+  // จาก `attendance_id` ในเพย์โหลด
+  //
+  // 🔴 ห้ามใช้เงื่อนไข "attendance_id ไม่มีอยู่แล้ว" (orphan) เป็นตัวชี้ว่าเป็นของทดสอบ
+  // เด็ดขาด — ลูกค้าลบวันทำงานเองเป็นเรื่องปกติ แถวพวกนั้นก็กลายเป็น orphan เหมือนกัน
+  // ครั้งแรกที่เขียนแบบนั้น **ลบประวัติจริงของลูกค้าไป 66 แถว** (21 ก.ย. 2569)
+  // · ต้องลบตาม id ที่สคริปต์นี้สร้างเองเท่านั้น ซึ่งเก็บไว้ตั้งแต่ก่อนลบข้อมูล
+  if (fixtureAttendanceIds.length) {
+    const list = fixtureAttendanceIds.map((id) => `'${id}'`).join(', ')
+    await sql(`delete from public.audit_log
+                where table_name = 'attendance_wages'
+                  and coalesce(after->>'attendance_id', before->>'attendance_id') in (${list})`)
+  }
+
+  // ยืนยันว่าคืนจริง — `delete` คือคำขอ ส่วน "เหลือ 0 แถว" คือคำตอบ
+  const left = (await sql(
+    `select count(*)::int n from public.employees where full_name like '${MARK}%'`)).rows[0]
+  console.log(
+    Number(left?.n ?? -1) === 0
+      ? '  (ลบข้อมูลทดสอบแล้ว)'
+      : `  ⚠️ ลบข้อมูลทดสอบไม่ครบ — เหลือคนงาน ${left?.n} แถว ต้องตามลบก่อนรันตัวอื่น`)
 }
 
 // ── P5-UI-03 · สถานะว่าง ────────────────────────────────────────────

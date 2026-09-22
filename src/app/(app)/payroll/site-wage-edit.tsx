@@ -10,6 +10,7 @@ import {
   ADJUST_ERRORS, adjustNet, type AdjustLine, type AdjustPreset,
 } from '@/lib/wage-adjustments'
 import { AdjustDialog } from '@/app/(app)/attendance/adjust-dialog'
+import { wageRowKey, type WageRowKey } from '@/lib/wage-row-key'
 
 /** หนึ่งวันทำงานของคน×โครงการ — จาก `attendance_grid` + บรรทัดปรับของวันนั้น */
 export type WageDay = {
@@ -24,8 +25,7 @@ export type WageDay = {
   lines: AdjustLine[]
 }
 
-export type WageRowKey = string
-export const wageRowKey = (employeeId: string, siteId: string): WageRowKey => `${employeeId}|${siteId}`
+export type { WageRowKey }
 
 type Target = {
   key: WageRowKey

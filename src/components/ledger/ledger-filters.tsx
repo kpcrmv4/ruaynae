@@ -4,50 +4,7 @@ import { CalendarDays, Search, Warehouse } from 'lucide-react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
-
-export type RangeKey = 'all' | 'today' | 'month' | 'last' | 'year' | 'custom'
-
-export const RANGE_LABEL: Record<RangeKey, string> = {
-  all: 'ทุกช่วงเวลา',
-  today: 'วันนี้',
-  month: 'เดือนนี้',
-  last: 'เดือนที่แล้ว',
-  year: 'ปีนี้',
-  custom: 'กำหนดช่วงเอง…',
-}
-
-/** ช่วงวันของแต่ละตัวเลือก — `''` ทั้งคู่ = ไม่จำกัด (ไม่ส่ง from/to เลย) */
-export function rangeDates(key: RangeKey, today: string): { from: string; to: string } {
-  const y = Number(today.slice(0, 4))
-  const m = Number(today.slice(5, 7))
-  const pad = (n: number) => String(n).padStart(2, '0')
-  const lastMonth = m === 1 ? { y: y - 1, m: 12 } : { y, m: m - 1 }
-  // วันสุดท้ายของเดือนก่อน = วันที่ 0 ของเดือนนี้
-  const lastEnd = new Date(Date.UTC(y, m - 1, 0)).toISOString().slice(0, 10)
-
-  switch (key) {
-    case 'today':
-      return { from: today, to: today }
-    case 'month':
-      return { from: `${today.slice(0, 7)}-01`, to: today }
-    case 'last':
-      return { from: `${lastMonth.y}-${pad(lastMonth.m)}-01`, to: lastEnd }
-    case 'year':
-      return { from: `${y}-01-01`, to: today }
-    default:
-      return { from: '', to: '' }
-  }
-}
-
-/** ค่าบน URL ตรงกับตัวเลือกสำเร็จรูปตัวไหน — ไม่ตรงเลยคือ "กำหนดเอง" */
-export function detectRange(from: string, to: string, today: string): RangeKey {
-  if (!from && !to) return 'all'
-  for (const k of ['today', 'month', 'last', 'year'] as const) {
-    const d = rangeDates(k, today)
-    if (d.from === from && d.to === to) return k
-  }
-  return 'custom'
-}
+import { RANGE_LABEL, detectRange, rangeDates, type RangeKey } from '@/lib/date-range'
 
 export type StatusChip = { key: string; label: string; count?: number }
 

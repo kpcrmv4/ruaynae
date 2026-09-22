@@ -34,25 +34,20 @@ const EXTRA_MESSAGES: Record<string, string> = {
   PAYROLL_CLOSED: 'วันนั้นอยู่ในรอบจ่ายค่าแรงที่ปิดแล้ว แก้ไม่ได้',
 }
 
-/** รหัสที่ trigger แนบตัวเลขจริงมาด้วย — ส่งข้อความของมันต่อทั้งประโยค */
-const PASS_THROUGH = ['ADVANCE_OVER_CEILING']
-
 const codeOf = (msg: string): string | null => {
   const m = /\b([A-Z][A-Z0-9_]{4,})\b/.exec(msg)
   return m ? m[1] : null
 }
 
-/** `CODE: ข้อความไทย` → เอาเฉพาะข้อความไทย (ตัดรหัสกับ context ของ Postgres ทิ้ง) */
-const detailOf = (msg: string, code: string): string =>
-  msg.slice(msg.indexOf(code) + code.length).replace(/^[:\s]+/, '').split('\n')[0].trim()
-
+/**
+ * 🔴 เคยมีทางลัด "ส่งข้อความของ trigger ต่อทั้งประโยค" สำหรับ `ADVANCE_OVER_CEILING`
+ * ซึ่งเป็นรหัสเดียวที่แนบตัวเลขมาด้วย · ตั้งแต่ 20 ก.ย. 2569 เบิกเกินได้แล้ว
+ * รหัสนั้นจึงไม่มีทางเกิดอีก และทางลัดถูกถอดออกไปพร้อมกัน — กลไกที่ไม่มีใคร
+ * เดินผ่านคือกลไกที่ไม่มีใครรู้ว่าพังเมื่อไหร่
+ */
 export function messageForDbError(raw: string, fallback: string): string {
   const code = codeOf(raw)
   if (code) {
-    if (PASS_THROUGH.includes(code)) {
-      const detail = detailOf(raw, code)
-      if (detail) return detail
-    }
     const known = EXTRA_MESSAGES[code] ?? TXN_MESSAGES[code]
     if (known) return known
   }

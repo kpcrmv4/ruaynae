@@ -10,6 +10,7 @@ import {
   type DraftCategory, type DraftSite,
 } from '@/components/ledger/txn-draft'
 import type { TxnKind } from '@/lib/transactions'
+import { PageHeader } from '@/components/ui/page-header'
 
 /**
  * หน้าบันทึกเต็มจอ — **เปลือก**ของฟอร์มที่อยู่ใน `components/ledger/txn-draft.tsx`
@@ -48,10 +49,15 @@ export function EntryForm({
   const blocked = draft.busy || draft.uploading
 
   return (
+    <>
+      {/* 🔴 หัวข้ออยู่ **นอก** กล่อง `max-w-xl` ของฟอร์ม — ถ้าอยู่ข้างใน
+          ปุ่มย้อนกลับจะชิดขวาของกล่อง ไม่ใช่ชิดขวาของจอ แล้วมันจะไม่ตรงกับ
+          ทุกหน้าอื่นบนเดสก์ท็อป (คำสั่งเจ้าของ 21 ก.ย. 2569) */}
+      <PageHeader
+        title={draft.isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
+        className="mb-2"
+      />
     <div className="mx-auto w-full max-w-xl">
-      <h1 className="mb-1 text-2xl font-bold text-ink">
-        {draft.isOwner ? 'บันทึกรายรับ-รายจ่าย' : 'บันทึกรายจ่าย'}
-      </h1>
       {/* 🔴 ตอบ "คีย์ให้โครงการไหน" ตั้งแต่บรรทัดบน ไม่ใช่ให้ตาเลื่อนลงไปหา
           กล่องเลือกกลางฟอร์ม · คนคีย์บิลเป็นตั้งจะสลับโครงการแล้วลืม แล้วยอด
           ไปเข้าโครงการผิดโดยไม่มีอะไรทัก */}
@@ -109,5 +115,6 @@ export function EntryForm({
         </Link>
       </div>
     </div>
+    </>
   )
 }
